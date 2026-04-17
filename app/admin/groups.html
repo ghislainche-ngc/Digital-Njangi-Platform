@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Groups — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'admin', title: 'Njangi groups' });
+      const rows = [
+        { name: 'Les Amis de Yaoundé', plan: 'Growth', members: 14, mrr: '12 000', status: 'paid', statusLabel: 'Active' },
+        { name: 'Groupe Familial Mbarga', plan: 'Pro',    members: 25, mrr: '25 000', status: 'paid', statusLabel: 'Active' },
+        { name: 'Youth Savers Douala',   plan: 'Starter', members: 12, mrr: '5 000',  status: 'due',  statusLabel: 'Trial' },
+        { name: 'Bamenda Teachers',      plan: 'Growth',  members: 18, mrr: '12 000', status: 'paid', statusLabel: 'Active' },
+        { name: 'Buea Market Women',     plan: 'Starter', members: 9,  mrr: '0',      status: 'failed', statusLabel: 'Suspended' },
+      ].map(g => `
+        <tr>
+          <td class="px-5 py-3 font-medium">${g.name}</td>
+          <td>${g.plan}</td>
+          <td>${g.members}</td>
+          <td>${g.mrr}</td>
+          <td><span class="chip chip-${g.status}">${g.statusLabel}</span></td>
+          <td class="text-right pr-5">
+            <button class="nav-link text-xs">View</button>
+            <button class="nav-link text-xs text-red-500">Suspend</button>
+          </td>
+        </tr>
+      `).join('');
+      mountContent(`
+        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+          <input type="search" placeholder="Search groups…" class="glass-input flex-1 min-w-[220px]" />
+          <select class="glass-input w-auto">
+            <option>All statuses</option>
+            <option>Active</option>
+            <option>Trial</option>
+            <option>Suspended</option>
+          </select>
+          <button class="btn-primary">+ New group</button>
+        </div>
+
+        <div class="glass-card p-0 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+              <tr>
+                <th class="px-5 py-3">Group</th>
+                <th>Plan</th>
+                <th>Members</th>
+                <th>MRR (FCFA)</th>
+                <th>Status</th>
+                <th class="text-right pr-5">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+          </table>
+        </div>
+
+        <p class="mt-4 text-xs muted">Showing 5 of 47 groups · Per PR-40 & PR-41: Platform Admin can view and suspend any group.</p>
+      `);
+    </script>
+  </body>
+</html>

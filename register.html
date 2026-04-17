@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <title>Register a Njangi — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <!-- Define registerPage BEFORE boot.js calls Alpine.start() -->
+    <script type="module">
+      import { api } from '/src/js/api/client.js';
+      import { session } from '/src/js/auth/session.js';
+      import { redirectByRole } from '/src/js/auth/role-redirect.js';
+      window.registerPage = () => ({
+        step: 0,
+        steps: ['Group', 'Rotation', 'President'],
+        form: {
+          groupName: '',
+          amount: 10000,
+          frequency: 'monthly',
+          rotation: 'fixed',
+          leader: { name: '', email: '', phone: '' },
+        },
+        loading: false,
+        error: '',
+        back() { if (this.step > 0) this.step--; },
+        async submit() {
+          this.error = '';
+          if (this.step < this.steps.length - 1) { this.step++; return; }
+          this.loading = true;
+          try {
+            const { token, user } = await api.post('/api/groups/register', this.form);
+            session.set(token, user);
+            redirectByRole(user.role);
+          } catch (err) {
+            this.error = err.message || 'Registration failed';
+          } finally {
+            this.loading = false;
+          }
+        },
+      });
+    </script>
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body
+    x-data="registerPage()" x-init="$store.theme.init()" x-cloak
+    class="min-h-screen relative"
+  >
+    <header class="mx-auto max-w-7xl px-6 py-5 flex items-center">
+      <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg">
+        <img src="/logo.png" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1" />
+        <span x-text="$t('brand.name')"></span>
+      </a>
+      <div class="ml-auto flex items-center gap-2">
+        <div x-data="{ open: false }" class="relative">
+          <button @click="open = !open" @click.outside="open = false" class="nav-link">
+            <span class="uppercase text-xs font-semibold" x-text="$store.i18n.locale"></span>
+          </button>
+          <div x-show="open" x-transition class="glass-card absolute right-0 mt-2 w-28 p-1">
+            <template x-for="l in $store.i18n.locales()" :key="l">
+              <button
+                @click="$store.i18n.setLocale(l); open = false"
+                class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-muted)]"
+                :class="$store.i18n.locale === l ? 'accent-text font-semibold' : ''"
+                x-text="l.toUpperCase()"
+              ></button>
+            </template>
+          </div>
+        </div>
+        <button @click="$store.theme.toggle()" class="nav-link">
+          <svg x-show="$store.theme.effective === 'light'" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <svg x-show="$store.theme.effective === 'dark'"  class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="relative z-10 mx-auto max-w-2xl px-6 py-10">
+      <!-- stepper -->
+      <ol class="flex items-center gap-2 mb-6 text-xs font-medium">
+        <template x-for="(label, i) in steps" :key="i">
+          <li class="flex items-center gap-2">
+            <span
+              class="h-7 w-7 rounded-full grid place-items-center"
+              :class="i <= step ? 'accent-bg text-white' : 'bg-[var(--bg-muted)] muted'"
+              x-text="i + 1"
+            ></span>
+            <span
+              :class="i === step ? 'text-primary-app' : 'muted'"
+              x-text="label"
+            ></span>
+            <span x-show="i < steps.length - 1" class="mx-2 h-px w-6 bg-[var(--border-subtle)]"></span>
+          </li>
+        </template>
+      </ol>
+
+      <div class="glass-card-heavy p-8 animate-fade-up">
+        <h1 class="font-display text-3xl font-bold" x-text="$t('register.title')"></h1>
+        <p class="mt-2 text-sm text-secondary-app" x-text="$t('register.subtitle')"></p>
+
+        <form @submit.prevent="submit" class="mt-6 space-y-5">
+          <!-- Step 1: Group -->
+          <div x-show="step === 0" class="space-y-4">
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.group_name')"></label>
+              <input x-model="form.groupName" required type="text" class="glass-input mt-1" placeholder="Les Amis de Yaoundé" />
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.contribution_amount')"></label>
+                <input x-model.number="form.amount" required type="number" min="500" class="glass-input mt-1" placeholder="10 000" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.frequency')"></label>
+                <select x-model="form.frequency" class="glass-input mt-1">
+                  <option value="monthly"  x-text="$t('register.frequency_monthly')"></option>
+                  <option value="weekly"   x-text="$t('register.frequency_weekly')"></option>
+                  <option value="biweekly" x-text="$t('register.frequency_biweekly')"></option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Rotation -->
+          <div x-show="step === 1" class="space-y-3">
+            <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.rotation_type')"></label>
+            <template x-for="opt in [
+              { key: 'fixed',     label: $t('register.rotation_fixed'),     hint: 'Order set at start. Everyone knows their payout date.' },
+              { key: 'random',    label: $t('register.rotation_random'),    hint: 'System randomly picks next recipient each cycle.' },
+              { key: 'president', label: $t('register.rotation_president'), hint: 'President nominates; group is notified.' },
+            ]" :key="opt.key">
+              <label
+                class="glass-card p-4 flex gap-3 cursor-pointer transition"
+                :class="form.rotation === opt.key ? 'ring-2 ring-[var(--accent)]' : ''"
+              >
+                <input type="radio" x-model="form.rotation" :value="opt.key" class="mt-1 accent-[var(--accent)]" />
+                <span>
+                  <span class="block font-semibold" x-text="opt.label"></span>
+                  <span class="block text-xs muted mt-0.5" x-text="opt.hint"></span>
+                </span>
+              </label>
+            </template>
+          </div>
+
+          <!-- Step 3: President details -->
+          <div x-show="step === 2" class="space-y-4">
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.leader_name')"></label>
+              <input x-model="form.leader.name" required type="text" class="glass-input mt-1" />
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.leader_email')"></label>
+                <input x-model="form.leader.email" required type="email" class="glass-input mt-1" placeholder="you@example.com" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.leader_phone')"></label>
+                <input x-model="form.leader.phone" required type="tel" class="glass-input mt-1" placeholder="+237 6XX XXX XXX" />
+              </div>
+            </div>
+          </div>
+
+          <template x-if="error">
+            <p class="text-sm text-red-500" x-text="error"></p>
+          </template>
+
+          <div class="flex items-center justify-between pt-2">
+            <button type="button" @click="back" class="btn-ghost" :class="step === 0 ? 'invisible' : ''">
+              ← Back
+            </button>
+            <button
+              type="submit" class="btn-primary"
+              :disabled="loading"
+              :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
+            >
+              <span x-show="step < steps.length - 1">Continue →</span>
+              <span x-show="step === steps.length - 1 && !loading" x-text="$t('register.submit')"></span>
+              <span x-show="loading" x-text="$t('common.loading')"></span>
+            </button>
+          </div>
+        </form>
+
+        <p class="mt-6 text-sm text-center muted">
+          <span x-text="$t('register.have_account')"></span>
+          <a href="/login.html" class="accent-text font-semibold ml-1" x-text="$t('register.sign_in')"></a>
+        </p>
+      </div>
+    </main>
+
+  </body>
+</html>

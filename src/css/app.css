@@ -1,0 +1,179 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -------------------------------------------------------------------------
+   Base
+------------------------------------------------------------------------- */
+@layer base {
+  html, body {
+    @apply font-sans antialiased;
+    background: var(--bg-app);
+    color: var(--text-primary);
+  }
+
+  body {
+    background-image: var(--grad-hero);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* subtle star/dot pattern on dark mode, matches LandingPage.png */
+  .dark body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Glass morphism components
+------------------------------------------------------------------------- */
+@layer components {
+
+  .glass-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 12px 40px -8px rgba(16, 19, 31, 0.18),
+                inset 0 1px 0 var(--glass-stroke);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    @apply rounded-2xl;
+  }
+
+  .glass-card-heavy {
+    background: var(--glass-bg-heavy);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 24px 64px -12px rgba(16, 19, 31, 0.30);
+    backdrop-filter: blur(28px) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(28px) saturate(var(--glass-saturate));
+    @apply rounded-3xl;
+  }
+
+  .glass-nav {
+    background: var(--glass-bg);
+    border-bottom: 1px solid var(--glass-border);
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+  }
+
+  .glass-input {
+    background: var(--glass-bg);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    @apply rounded-xl px-4 py-3 w-full transition;
+  }
+  .glass-input::placeholder { color: var(--text-muted); }
+  .glass-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--text-on-brand);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.35);
+    @apply inline-flex items-center justify-center gap-2
+           rounded-full px-6 py-3 text-sm font-semibold
+           transition hover:-translate-y-0.5 active:translate-y-0;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  /* Inverse button — dark fill on light surfaces, light fill on dark */
+  .btn-inverse {
+    background: var(--text-primary);
+    color: var(--bg-surface);
+    @apply inline-flex items-center justify-center gap-2
+           rounded-full px-6 py-3 text-sm font-semibold
+           transition hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-ghost {
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    @apply inline-flex items-center justify-center gap-2
+           rounded-full px-6 py-3 text-sm font-semibold
+           transition hover:bg-[var(--bg-muted)];
+  }
+
+  .btn-dark-pill {
+    background: #10131f;
+    color: #ffffff;
+    @apply inline-flex items-center justify-center gap-2
+           rounded-full px-6 py-3 text-sm font-semibold
+           transition hover:bg-black;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5
+           rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  .chip-paid   { background: var(--status-paid-bg);   color: var(--status-paid-fg); }
+  .chip-due    { background: var(--status-due-bg);    color: var(--status-due-fg); }
+  .chip-failed { background: var(--status-failed-bg); color: var(--status-failed-fg); }
+  .chip-info   { background: var(--status-info-bg);   color: var(--status-info-fg); }
+
+  .nav-link {
+    color: var(--text-secondary);
+    @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm
+           font-medium transition hover:text-[var(--text-primary)]
+           hover:bg-[var(--bg-muted)];
+  }
+  .nav-link.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .section-heading {
+    @apply font-display text-3xl md:text-4xl font-bold tracking-tight;
+    color: var(--text-primary);
+  }
+
+  .muted { color: var(--text-muted); }
+
+  /* Invisible until Alpine mounts — prevents un-styled flash */
+  [x-cloak] { display: none !important; }
+}
+
+/* -------------------------------------------------------------------------
+   Utilities
+------------------------------------------------------------------------- */
+@layer utilities {
+  .bg-app        { background-color: var(--bg-app); }
+  .bg-surface    { background-color: var(--bg-surface); }
+  .bg-muted-app  { background-color: var(--bg-muted); }
+  .text-primary-app   { color: var(--text-primary); }
+  .text-secondary-app { color: var(--text-secondary); }
+  .text-muted-app     { color: var(--text-muted); }
+  .border-subtle      { border-color: var(--border-subtle); }
+  .accent-text        { color: var(--accent); }
+  .accent-bg          { background-color: var(--accent); }
+
+  .hero-gradient-text {
+    background: linear-gradient(180deg, var(--text-primary) 0%, color-mix(in srgb, var(--text-primary) 65%, transparent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}

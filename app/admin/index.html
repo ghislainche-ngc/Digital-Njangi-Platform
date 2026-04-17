@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <title>Platform Admin — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'admin', title: 'Platform overview' });
+      mountContent(`
+        <div class="grid gap-6 md:grid-cols-4">
+          <div class="glass-card p-5">
+            <p class="text-xs muted uppercase tracking-wider">Active groups</p>
+            <p class="mt-2 font-display text-3xl font-bold">47</p>
+            <p class="mt-1 text-xs text-emerald-500">+5 this month</p>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-xs muted uppercase tracking-wider">Total members</p>
+            <p class="mt-2 font-display text-3xl font-bold">612</p>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-xs muted uppercase tracking-wider">MoMo volume (FCFA)</p>
+            <p class="mt-2 font-display text-3xl font-bold">24.8M</p>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-xs muted uppercase tracking-wider">MRR (FCFA)</p>
+            <p class="mt-2 font-display text-3xl font-bold">612 000</p>
+          </div>
+        </div>
+
+        <div class="glass-card mt-6 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-display text-xl font-bold">Subscribed Njangi groups</h2>
+            <button class="btn-primary">Add group</button>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="text-left muted uppercase text-xs">
+              <tr>
+                <th class="py-2">Group</th><th>Members</th><th>Status</th><th>MRR</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-subtle)]">
+              <tr class="py-2">
+                <td class="py-3 font-medium">Les Amis de Yaoundé</td>
+                <td>14</td>
+                <td><span class="chip chip-paid">Active</span></td>
+                <td>12 000</td>
+              </tr>
+              <tr>
+                <td class="py-3 font-medium">Groupe Familial Mbarga</td>
+                <td>25</td>
+                <td><span class="chip chip-paid">Active</span></td>
+                <td>18 000</td>
+              </tr>
+              <tr>
+                <td class="py-3 font-medium">Youth Savers Douala</td>
+                <td>12</td>
+                <td><span class="chip chip-due">Trial</span></td>
+                <td>0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `);
+    </script>
+  </body>
+</html>

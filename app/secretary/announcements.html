@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Announcements — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'secretary', title: 'Announcements' });
+      const feed = [
+        { title: 'April contribution reminder',   body: 'Friendly reminder: contributions are due Apr 26 by 18:00 before the late fee kicks in.', when: '2h ago', channel: 'Telegram · 14 recipients' },
+        { title: 'March meeting minutes posted',  body: 'Minutes from the March 28 meeting are now available in the Minutes tab.',               when: '5 days ago', channel: 'Telegram' },
+        { title: 'New member welcome — Alice',    body: 'Please welcome Alice Fotso, joining our Njangi this cycle.',                              when: '2 weeks ago', channel: 'Telegram + SMS' },
+        { title: 'Meeting venue change',          body: 'April meeting moves to Salle des Fêtes Ndjouke, 18:00 sharp.',                             when: '3 weeks ago', channel: 'Telegram + SMS' },
+      ].map(a => `
+        <div class="glass-card p-5">
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <p class="font-semibold">${a.title}</p>
+            <span class="chip chip-info text-xs shrink-0">${a.when}</span>
+          </div>
+          <p class="text-sm muted">${a.body}</p>
+          <p class="text-xs muted mt-3">via ${a.channel}</p>
+        </div>
+      `).join('');
+      mountContent(`
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="lg:col-span-2 space-y-4">${feed}</div>
+
+          <div class="glass-card p-6 h-fit sticky top-24">
+            <h2 class="font-display text-xl font-bold mb-4">New announcement</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted">Title</label>
+                <input class="glass-input mt-1" placeholder="e.g. Venue change" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted">Message</label>
+                <textarea class="glass-input mt-1 min-h-[120px]" placeholder="Keep it short — Telegram/SMS friendly."></textarea>
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted">Channels</label>
+                <div class="mt-2 space-y-2">
+                  <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked class="accent-[var(--accent)]"/> Telegram</label>
+                  <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="accent-[var(--accent)]"/> SMS fallback</label>
+                  <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="accent-[var(--accent)]"/> In-app only</label>
+                </div>
+              </div>
+              <button class="btn-primary w-full">Publish</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="mt-4 text-xs muted">PR-10: Secretary posts announcements.</p>
+      `);
+    </script>
+  </body>
+</html>

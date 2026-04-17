@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Secretary — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'secretary', title: 'Secretariat' });
+      mountContent(`
+        <div class="glass-card p-4 mb-4 flex flex-wrap items-center gap-3 animate-fade-up">
+          <span class="chip chip-info">You</span>
+          <p class="text-sm"><span class="muted">Your cycle 4 contribution:</span> <span class="font-semibold">Paid · Orange Money · Apr 14</span></p>
+          <span class="text-sm muted hidden sm:inline">·</span>
+          <p class="text-sm"><span class="muted">Your rotation position:</span> <span class="font-semibold">1 · Done (Jan 28)</span></p>
+          <a href="/app/member/history.html" class="ml-auto nav-link text-xs">My Njangi →</a>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-3 animate-fade-up">
+          <div class="glass-card p-5">
+            <p class="text-xs uppercase tracking-widest muted">Members</p>
+            <p class="mt-2 font-display text-3xl font-bold">14</p>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-xs uppercase tracking-widest muted">Announcements</p>
+            <p class="mt-2 font-display text-3xl font-bold">3</p>
+            <p class="mt-1 text-xs muted">This month</p>
+          </div>
+          <div class="glass-card p-5">
+            <p class="text-xs uppercase tracking-widest muted">Next meeting</p>
+            <p class="mt-2 font-display text-2xl font-bold">April 28</p>
+            <p class="mt-1 text-xs muted">18:00 · Yaoundé</p>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-4 lg:grid-cols-2">
+          <div class="glass-card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="font-display text-xl font-bold">Directory</h2>
+              <button class="btn-primary text-xs">+ Add member</button>
+            </div>
+            <ul class="divide-y divide-[var(--border-subtle)]">
+              <li class="flex items-center gap-3 py-3">
+                <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">MT</div>
+                <div class="flex-1"><p class="text-sm font-medium">Marie Tchinda</p><p class="text-xs muted">President · +237 6XX XXX XX1</p></div>
+              </li>
+              <li class="flex items-center gap-3 py-3">
+                <div class="h-9 w-9 rounded-full bg-emerald-500 text-white grid place-items-center font-semibold text-sm">JP</div>
+                <div class="flex-1"><p class="text-sm font-medium">Jean-Pierre Mbarga</p><p class="text-xs muted">Treasurer · +237 6XX XXX XX2</p></div>
+              </li>
+              <li class="flex items-center gap-3 py-3">
+                <div class="h-9 w-9 rounded-full bg-pink-500 text-white grid place-items-center font-semibold text-sm">FN</div>
+                <div class="flex-1"><p class="text-sm font-medium">Fatou Ngo</p><p class="text-xs muted">Member · +237 6XX XXX XX3</p></div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="glass-card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="font-display text-xl font-bold">Announcements</h2>
+              <button class="btn-primary text-xs">New</button>
+            </div>
+            <div class="space-y-3">
+              <div class="p-3 rounded-xl bg-[var(--bg-muted)]">
+                <p class="text-sm font-medium">April contribution reminder</p>
+                <p class="text-xs muted mt-1">Sent via Telegram · 14 recipients · 2h ago</p>
+              </div>
+              <div class="p-3 rounded-xl bg-[var(--bg-muted)]">
+                <p class="text-sm font-medium">March meeting minutes</p>
+                <p class="text-xs muted mt-1">Posted · 5 days ago</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `);
+    </script>
+  </body>
+</html>

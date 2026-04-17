@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>My history — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'member', title: 'My payment history' });
+      const rows = [
+        ['Cycle 4', 'Apr 14, 2026', 'MTN MoMo',     '10 000', 'paid', 'Paid'],
+        ['Cycle 3', 'Mar 14, 2026', 'MTN MoMo',     '10 000', 'paid', 'Paid'],
+        ['Cycle 2', 'Feb 14, 2026', 'Cash',         '10 000', 'paid', 'Paid'],
+        ['Cycle 1', 'Jan 14, 2026', 'Orange Money', '10 000', 'paid', 'Paid'],
+      ].map(r => `
+        <tr>
+          <td class="px-5 py-3 font-medium">${r[0]}</td>
+          <td>${r[1]}</td>
+          <td>${r[2]}</td>
+          <td class="font-mono">${r[3]}</td>
+          <td><span class="chip chip-${r[4]}">${r[5]}</span></td>
+          <td class="text-right pr-5"><a href="#" class="nav-link text-xs inline-flex">↓ PDF</a></td>
+        </tr>
+      `).join('');
+      mountContent(`
+        <div class="grid gap-4 md:grid-cols-3 mb-6">
+          <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Paid this year</p><p class="mt-2 font-display text-3xl font-bold">40 000</p><p class="mt-1 text-xs muted">4 of 4 cycles</p></div>
+          <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">On-time rate</p><p class="mt-2 font-display text-3xl font-bold">100%</p><p class="mt-1 text-xs text-emerald-500">perfect</p></div>
+          <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Next due</p><p class="mt-2 font-display text-2xl font-bold">Apr 26</p><p class="mt-1 text-xs muted">10 000 FCFA</p></div>
+        </div>
+
+        <div class="glass-card p-0 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+              <tr>
+                <th class="px-5 py-3">Cycle</th>
+                <th>Date</th>
+                <th>Method</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th class="text-right pr-5">Receipt</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+          </table>
+        </div>
+
+        <p class="mt-4 text-xs muted">PR-33: members view own payment history · PR-19 digital receipts.</p>
+      `);
+    </script>
+  </body>
+</html>

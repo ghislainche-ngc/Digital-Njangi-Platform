@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Members — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'president', title: 'Member management' });
+      const rows = [
+        { name: 'Marie Tchinda',      role: 'President',  phone: '+237 6XX XXX 001', status: 'paid', initials: 'MT' },
+        { name: 'Jean-Pierre Mbarga', role: 'Treasurer',  phone: '+237 6XX XXX 002', status: 'paid', initials: 'JP' },
+        { name: 'Claire Biya',        role: 'Secretary',  phone: '+237 6XX XXX 003', status: 'paid', initials: 'CB' },
+        { name: 'Fatou Ngo',          role: 'Member',     phone: '+237 6XX XXX 004', status: 'paid', initials: 'FN' },
+        { name: 'Pa Ngwa',            role: 'Member',     phone: '+237 6XX XXX 005', status: 'due',  initials: 'PN' },
+        { name: 'Alice Fotso',        role: 'Member',     phone: '+237 6XX XXX 006', status: 'failed', initials: 'AF' },
+      ].map(m => {
+        const label = m.status === 'paid' ? 'Current' : m.status === 'due' ? 'Due' : 'Failed';
+        return `
+          <tr>
+            <td class="px-5 py-3">
+              <div class="flex items-center gap-3">
+                <div class="h-8 w-8 rounded-full accent-bg text-[var(--text-on-brand)] grid place-items-center text-xs font-semibold">${m.initials}</div>
+                <span class="font-medium">${m.name}</span>
+              </div>
+            </td>
+            <td>
+              <select class="glass-input w-auto py-1 text-xs">
+                <option ${m.role === 'President' ? 'selected' : ''}>President</option>
+                <option ${m.role === 'Treasurer' ? 'selected' : ''}>Treasurer</option>
+                <option ${m.role === 'Secretary' ? 'selected' : ''}>Secretary</option>
+                <option ${m.role === 'Member' ? 'selected' : ''}>Member</option>
+              </select>
+            </td>
+            <td class="font-mono text-xs">${m.phone}</td>
+            <td><span class="chip chip-${m.status}">${label}</span></td>
+            <td class="text-right pr-5">
+              <button class="nav-link text-xs">Message</button>
+              <button class="nav-link text-xs text-red-500">Remove</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+      mountContent(`
+        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+          <input type="search" placeholder="Search members…" class="glass-input flex-1 min-w-[220px]" />
+          <button class="btn-primary">+ Invite member</button>
+        </div>
+
+        <div class="glass-card p-0 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+              <tr>
+                <th class="px-5 py-3">Name</th>
+                <th>Role</th>
+                <th>Phone (MoMo)</th>
+                <th>Payment</th>
+                <th class="text-right pr-5">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+          </table>
+        </div>
+
+        <p class="mt-4 text-xs muted">PR-06: assign Treasurer/Secretary · PR-07: remove member (audit-logged).</p>
+      `);
+    </script>
+  </body>
+</html>

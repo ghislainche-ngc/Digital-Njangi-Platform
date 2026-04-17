@@ -1,0 +1,762 @@
+
+THE ICT UNIVERSITY
+Faculty of Information and Communication Technologies
+
+
+NAAS
+Njangi as a Service
+
+PRODUCT REQUIREMENTS SPECIFICATION
+
+
+Document Title
+Product Requirements Specification (PRS)
+Project
+Njangi As A Service (NAAS)
+Course Code
+SEN3244
+Course Title
+Software Architecture
+Instructor
+Engr. TEKOH PALMA
+Version
+1.0 — Initial
+Date
+April 2026
+Status
+Draft
+Prepared by
+NAAS Development Team
+
+Table of Contents
+TOC \h \o "1-3"
+
+
+1. Introduction
+1.1 Purpose
+This Product Requirements Specification (PRS) defines the complete functional and non-functional requirements for NAAS (Njangi as a Service), a multi-tenant web platform designed to digitise the operation of Njangi rotating-savings groups in Cameroon. The document draws from the User Requirements Specification (URS) and the Project Brief, translating validated user needs into precise, implementable product requirements. It also articulates how Object-Oriented Programming (OOP) principles are applied throughout the system design.
+
+1.2 Scope
+NAAS is a Progressive Web Application (PWA) that allows any Njangi group in Cameroon to subscribe and manage contributions, payouts, fines, members, and communication from a single digital platform. The MVP scope includes group onboarding, role-based dashboards, MoMo payment collection and disbursement, automated scheduling, WhatsApp/SMS notifications, an immutable group ledger, and offline support. Features such as credit scoring, micro-loans, and bank integrations are explicitly out of scope for version 1.0.
+
+1.3 Intended Audience
+This document is intended for the NAAS development team (CTO, Dev A, Dev B), the Product Owner, the academic supervisor (Engr. TEKOH PALMA), and the defence panel. It serves as the engineering contract for what must be built.
+
+1.4 Definitions and Abbreviations
+Term
+Definition
+Njangi
+A traditional rotating savings and credit association in Cameroon. Members contribute a fixed amount at regular intervals; the pooled sum is paid to one member per cycle.
+NAAS
+Njangi As A Service — the SaaS platform being specified.
+PRS
+Product Requirements Specification — this document.
+URS
+User Requirements Specification — the companion user-needs document.
+MoMo
+MTN Mobile Money, the dominant mobile payment service in Cameroon.
+PWA
+Progressive Web Application — a web app installable on mobile that works offline.
+RLS
+Row-Level Security — Supabase/PostgreSQL feature that enforces tenant data isolation.
+OOP
+Object-Oriented Programming — the design paradigm used throughout the NAAS codebase.
+FCFA
+Franc CFA — the currency of Cameroon.
+PR-XX
+Unique identifier for a product requirement in this document.
+
+2. System Overview
+2.1 What We Are Building
+NAAS is a multi-tenant SaaS platform. One codebase serves many independent Njangi groups, each fully isolated from one another at the data layer. When a Njangi subscribes, they receive a private workspace with member accounts, role-based dashboards, automated payment collection via MTN MoMo and Orange Money, a transparent immutable ledger, an automated payout engine, and WhatsApp notifications.
+
+2.2 Architecture Summary
+The system follows a multi-tenant monolith pattern: a single Node.js/Express backend, a PostgreSQL database managed by Supabase with Row-Level Security (RLS) enforcing tenant isolation, static HTML/Tailwind CSS frontend deployed as a PWA, and third-party integrations for payments and messaging. The monolith was deliberately chosen over microservices to match the team size and delivery timeline.
+
+2.3 User Roles
+Role
+Scope
+Summary of Capabilities
+Platform Admin
+Platform-wide
+Manages all subscribed Njangi groups, billing, analytics, and can suspend any group.
+President
+Group-wide
+Full control — member management, group settings, payout approval, all reports.
+Treasurer
+Financial
+Record payments, trigger MoMo payouts, manage fines and social fund. Cannot manage members.
+Secretary
+Administrative
+Member directory, meeting minutes, group announcements. Cannot touch financials.
+Member
+Personal
+Read-mostly — own payment history, rotation calendar, group ledger, MoMo setup.
+
+3. Object-Oriented Design — Rationale and Application
+NAAS is built using Object-Oriented Programming (OOP) throughout its backend architecture. This section explains why OOP was chosen for this project, how the four pillars of OOP are applied, and what benefit each pillar delivers to the system.
+
+3.1 Why OOP Was Chosen for NAAS
+NAAS is not a simple CRUD application. It models a rich real-world domain — Njangi groups — that has natural entities (Group, Member, Contribution, Payout, Fine, Rotation), complex rules (eligibility checks, anti-fraud controls, rotation scheduling), and multiple actors with different permissions. OOP is the most natural fit because:
+The domain contains distinct, well-bounded real-world entities that map cleanly to classes.
+Business rules are tightly coupled to specific entities (e.g., a Payout knows its own eligibility rules).
+Multiple payment providers (MTN MoMo, Orange Money) share an interface but differ in implementation — a textbook case for polymorphism.
+The platform must support three rotation strategies that are interchangeable at runtime — ideal for the Strategy pattern via polymorphism.
+Role-based access means every user shares common properties but has specialised behaviour — a direct use case for inheritance.
+The payout engine, scheduler, and ledger are complex subsystems that must hide internal implementation from the rest of the code — encapsulation keeps the codebase maintainable for a four-person team.
+
+3.2 The Four Pillars of OOP in NAAS
+
+3.2.1 Encapsulation — Protecting Data and Hiding Complexity
+Encapsulation means bundling data and the methods that operate on it inside a class, and exposing only what other parts of the system need to know. In NAAS, encapsulation is applied in two ways.
+First, domain objects protect their own data integrity. The Contribution class, for example, holds its amount, status, timestamp, and member reference as private fields. External code cannot directly mutate these fields; it must call methods like markAsPaid() or markAsFailed(), which enforce business rules before making any change. This prevents a bug in the Treasurer dashboard from accidentally corrupting a Contribution record by bypassing validation.
+Second, complex subsystems expose clean interfaces. The PayoutEngine class encapsulates the entire five-step payout flow — eligibility check, pot calculation, MoMo disbursement, ledger update, and WhatsApp notification — behind a single public method: execute(groupId, recipientId). The Treasurer dashboard calls this one method without needing to know anything about the internal steps. If the eligibility logic changes, only PayoutEngine needs to change, not the dashboard code.
+Similarly, the MoMoPaymentService encapsulates all HTTP communication with the MTN API, token management, and retry logic. The rest of the codebase only calls charge(phoneNumber, amount) and receives a result.
+
+3.2.2 Inheritance — Shared Structure, Specialised Behaviour
+Inheritance allows a child class to inherit the properties and methods of a parent class while adding or overriding behaviour specific to its role. In NAAS, the user hierarchy is the primary application of inheritance.
+All five user types — PlatformAdmin, President, Treasurer, Secretary, and Member — share a common User base class that holds: userId, email, phoneNumber, hashedPassword, role, createdAt, and methods like authenticate(), updateProfile(), and receiveNotification(). This shared implementation is written once in User and inherited by every subclass.
+Each subclass then adds only the methods relevant to its role. President adds approvePayout(), inviteMember(), and configureRotation(). Treasurer adds recordCashPayment(), triggerMoMoPayout(), and applyFine(). Secretary adds postAnnouncement() and createMeetingMinutes(). Member adds viewLedger() and linkMoMoWallet(). PlatformAdmin adds suspendGroup() and viewPlatformAnalytics().
+This design eliminates duplication. Authentication and notification logic are never repeated across five user types. When a bug is fixed in User.receiveNotification(), all five user types benefit automatically.
+Importantly, President, Treasurer, and Secretary also inherit the Member subclass — because in a real Njangi, leaders are always members of their own group. The President class extends Member, which extends User. This reflects the actual domain accurately.
+
+3.2.3 Polymorphism — One Interface, Many Implementations
+Polymorphism allows different classes to be used interchangeably when they implement the same interface, and for the correct implementation to be selected at runtime without the caller needing to know which one is active.
+NAAS applies polymorphism in two major areas.
+The first is payment processing. Both MTNMoMoService and OrangeMoneyService implement a common PaymentProvider interface that defines: charge(phoneNumber, amount), disburse(phoneNumber, amount), getTransactionStatus(transactionId), and refund(transactionId). The PayoutEngine only ever calls methods on a PaymentProvider reference. At runtime, Supabase injects the correct implementation based on the member's registered wallet type. This means adding a third payment provider in the future requires only creating a new class that implements PaymentProvider — zero changes to PayoutEngine.
+The second is rotation strategy. The project brief requires three rotation types: fixed schedule, random draw, and president decides. Each is implemented as a class (FixedRotationStrategy, RandomDrawStrategy, PresidentDecisionStrategy) that implements a common RotationStrategy interface with a single method: selectNextRecipient(memberList, history). The RotationEngine holds a reference to a RotationStrategy and calls selectNextRecipient() without knowing which strategy is active. The strategy is set once at group creation and injected at runtime. Switching rotation type between cycles requires only swapping the strategy object, not rewriting the rotation engine.
+
+3.2.4 Abstraction — Modelling the Domain at the Right Level
+Abstraction means representing real-world entities in the system at the level of detail needed to solve the problem — hiding irrelevant complexity and surfacing only the essential behaviour.
+In NAAS, abstraction is applied through abstract base classes and interfaces that define contracts without committing to implementation.
+The abstract PaymentProvider class defines what a payment service must be able to do — charge, disburse, check status, refund — without specifying how. This contract is the only thing the rest of the system depends on. The MTN MoMo and Orange Money implementations are free to differ in their HTTP calls, authentication schemes, and retry logic without any impact on the code that uses them.
+The abstract NotificationService class defines the contract send(userId, message, channel) that all notification implementations must satisfy. WhatsAppNotificationService and SMSNotificationService implement this differently — one calls the Twilio WhatsApp Business API, the other calls an SMS gateway — but the PayoutEngine only depends on NotificationService. Adding an email channel means adding one new class with no changes to any caller.
+Abstraction also applies to the RotationStrategy interface described in the polymorphism section. The interface abstracts the concept of 'choosing the next recipient' without encoding any particular algorithm.
+This approach directly supports the team's ability to work in parallel: Dev A and Dev B can build different features that depend on the same abstract PaymentProvider or NotificationService interface, even before the concrete implementations are finished — because they only depend on the contract, not the implementation.
+
+3.3 Core Domain Classes
+The table below lists the primary domain classes in the NAAS system, their responsibility, and the OOP principles each demonstrates.
+Class
+Responsibility
+OOP Pillars Applied
+User
+Base class for all user types — holds shared identity, auth, and notification behaviour.
+Encapsulation, Abstraction
+Member extends User
+Regular group member — links MoMo wallet, views ledger, views rotation.
+Inheritance, Encapsulation
+President extends Member
+Group leader — approves payouts, manages members, configures group.
+Inheritance, Polymorphism
+Treasurer extends Member
+Financial officer — records payments, triggers payouts, manages fines.
+Inheritance, Encapsulation
+Secretary extends Member
+Administrative officer — minutes, announcements, directory.
+Inheritance
+PlatformAdmin extends User
+Platform operator — manages all groups, billing, analytics.
+Inheritance
+NjangiGroup
+Tenant entity — holds group settings, rotation type, member list, ledger reference.
+Encapsulation, Abstraction
+Contribution
+A single payment event — amount, member, status, timestamp, receipt.
+Encapsulation
+Payout
+A disbursement event — recipient, amount, delivery method, approval status.
+Encapsulation
+Fine
+A penalty record — member, reason, amount, paid status.
+Encapsulation
+Ledger
+Immutable ordered log of all financial events for a group.
+Encapsulation, Abstraction
+PayoutEngine
+Orchestrates the five-step payout flow with eligibility checks and anti-fraud rules.
+Encapsulation, Abstraction
+RotationEngine
+Determines the next payout recipient using an injected RotationStrategy.
+Polymorphism, Abstraction
+FixedRotationStrategy
+Implements RotationStrategy — fixed pre-set order.
+Polymorphism, Inheritance
+RandomDrawStrategy
+Implements RotationStrategy — random selection from unpaid members.
+Polymorphism, Inheritance
+PresidentDecisionStrategy
+Implements RotationStrategy — awaits president nomination.
+Polymorphism, Inheritance
+PaymentProvider (abstract)
+Abstract contract for payment services.
+Abstraction, Polymorphism
+MTNMoMoService
+Implements PaymentProvider using MTN MoMo Collection API.
+Polymorphism, Encapsulation
+OrangeMoneyService
+Implements PaymentProvider using Orange Money API.
+Polymorphism, Encapsulation
+NotificationService (abstract)
+Abstract contract for sending user notifications.
+Abstraction, Polymorphism
+WhatsAppNotificationService
+Implements NotificationService via Twilio WhatsApp Business API.
+Polymorphism, Encapsulation
+SMSNotificationService
+Implements NotificationService via SMS gateway.
+Polymorphism, Encapsulation
+SchedulerService
+Cron-driven service that triggers monthly contribution collection.
+Encapsulation
+ReceiptService
+Generates PDF receipts and stores them in Supabase Storage.
+Encapsulation
+TenantMiddleware
+Express middleware that resolves and injects the active NjangiGroup into every request.
+Encapsulation, Abstraction
+
+4. Functional Requirements
+All functional requirements are labelled with a priority: Must Have (MVP blocker), Should Have (important but not blocking), or Could Have (post-MVP). Each requirement traces to one or more User Requirements (UR) and User Needs (UN) from the URS.
+
+4.1 Authentication and Onboarding
+Req. ID
+Priority
+Requirement
+Traces To (UR / UN)
+PR-01
+Must Have
+A group president shall be able to register a new Njangi on the platform by providing the group name, contribution amount, payment frequency, and rotation type.
+UR-01, UN-08
+PR-02
+Must Have
+The system shall send an invitation link via WhatsApp or SMS to each member added by a President or Secretary.
+UR-02, UN-09
+PR-03
+Must Have
+All users shall authenticate using email and password. SMS OTP shall be available as a second factor.
+UR-24, UN-01
+PR-04
+Must Have
+After login the system shall route each user to their role-specific dashboard without any manual selection.
+UR-01, UN-08
+PR-05
+Must Have
+The system shall support both English and French across all user-facing screens.
+UN-12
+
+4.2 Group and Member Management
+Req. ID
+Priority
+Requirement
+Traces To (UR / UN)
+PR-06
+Must Have
+A President shall be able to assign the Treasurer and Secretary roles to any existing member.
+UR-03, UN-02
+PR-07
+Must Have
+A President shall be able to remove a member from the group. Removal shall be permanently logged in the audit trail.
+UR-05, UN-02
+PR-08
+Must Have
+A President shall be able to configure the group's contribution amount, payment schedule, rotation type, and penalty rules.
+UR-04, UN-06
+PR-09
+Must Have
+Rotation type shall be locked after the first cycle begins. Changes shall only be permitted between full cycles.
+UR-04, UN-06
+PR-10
+Should Have
+A Secretary shall be able to maintain the member directory, update contact details, and post announcements.
+UR-23, UN-02
+PR-11
+Should Have
+A Secretary shall be able to create, store, and share meeting minutes within the platform.
+UN-02
+
+4.3 Contribution Collection
+Req. ID
+Priority
+Requirement
+Traces To (UR / UN)
+PR-12
+Must Have
+The system shall send a payment reminder to every member via WhatsApp and SMS at least 24 hours before each contribution due date.
+UR-07, UN-14
+PR-13
+Must Have
+On the scheduled date, the SchedulerService shall initiate a MoMo debit request for every member with a linked wallet.
+UR-12, UN-10
+PR-14
+Must Have
+Each MoMo debit attempt — success, failure, and reason — shall be logged permanently in the Ledger.
+UR-25, UN-01
+PR-15
+Must Have
+Members shall receive a WhatsApp confirmation immediately after each successful deduction.
+UR-22, UN-09
+PR-16
+Must Have
+Failed deductions shall be retried automatically at least once before being flagged as failed.
+UR-16, UN-07
+PR-17
+Must Have
+The President and Treasurer shall receive an alert for every failed deduction.
+UR-16, UN-02
+PR-18
+Must Have
+A Treasurer shall be able to manually record a cash payment for any member.
+UR-10, UN-15
+PR-19
+Must Have
+The system shall generate and store a digital receipt in Supabase Storage for every successful contribution.
+UR-15, UN-01
+PR-20
+Should Have
+Members shall be able to pay via Orange Money as an alternative to MTN MoMo.
+UR-13, UN-10
+
+4.4 Payout Engine
+Req. ID
+Priority
+Requirement
+Traces To (UR / UN)
+PR-21
+Must Have
+Before any payout fires, the system shall check: pot collection threshold met; recipient has no unpaid fines; recipient has a linked MoMo wallet or confirmed alternative; President approval obtained for amounts above the configured threshold.
+UR-14, UN-01
+PR-22
+Must Have
+If any eligibility check fails, the payout shall be blocked and the President shall receive an alert.
+UR-14, UN-01
+PR-23
+Must Have
+For Fixed Schedule rotation, the payout order shall be set at group creation and visible to all members.
+UR-11, UN-04
+PR-24
+Must Have
+For Random Draw rotation, the system shall randomly select the next recipient from members who have not yet received in the current cycle.
+UR-11, UN-06
+PR-25
+Must Have
+For President Decides rotation, the President shall nominate the next recipient from the dashboard; all members shall be notified of the nomination.
+UR-11, UN-06
+PR-26
+Must Have
+Payout shall be delivered via MTN MoMo or Orange Money auto-transfer, cash at meeting (Treasurer flagged), or bank transfer (Treasurer initiates).
+UR-14, UN-10
+PR-27
+Must Have
+After payout, all members shall be notified via WhatsApp: who received, how much, and who is next.
+UR-22, UN-09
+PR-28
+Must Have
+The Ledger shall be updated automatically to mark the recipient as received for the current cycle.
+UR-18, UN-04
+PR-29
+Must Have
+A PDF receipt shall be generated and stored in Supabase Storage for every payout.
+UR-20, UN-03
+PR-30
+Must Have
+If a Treasurer records a cash payout for themselves, the President shall receive an automatic fraud alert.
+UN-01
+
+4.5 Ledger and Reporting
+Req. ID
+Priority
+Requirement
+Traces To (UR / UN)
+PR-31
+Must Have
+Every member shall be able to view the full group contribution ledger showing each member's payment status at all times.
+UR-17, UN-04
+PR-32
+Must Have
+Every member shall be able to view the full payout history: who received what and when.
+UR-18, UN-04
+PR-33
+Must Have
+Every member shall be able to view their own payment history with timestamps and receipts.
+UR-19, UN-04
+PR-34
+Must Have
+The Ledger shall be immutable — no entry can be edited or deleted after creation. Manual overrides shall be recorded as new correction entries, not replacements.
+UR-25, UN-01
+PR-35
+Should Have
+A President or Treasurer shall be able to export the full financial report to PDF.
+UR-20, UN-03
+
+4.6 Fines and Social Fund
+Req. ID
+Priority
+Requirement
+Traces To (UR / UN)
+PR-36
+Should Have
+A Treasurer shall be able to record a fine against a member with a reason and amount.
+UR-09, UN-06
+PR-37
+Should Have
+A Treasurer shall be able to mark a fine as paid and log the payment method.
+UR-09, UN-06
+PR-38
+Should Have
+Any waiver of a fine by the President shall be permanently logged with the reason.
+UR-25, UN-01
+PR-39
+Should Have
+A Treasurer shall be able to manage a separate Social Fund: record deposits, withdrawals, and current balance.
+UN-06
+
+4.7 Platform Administration
+Req. ID
+Priority
+Requirement
+Traces To (UR / UN)
+PR-40
+Must Have
+The Platform Admin shall be able to view all subscribed Njangi groups, their status, and key metrics.
+UN-02
+PR-41
+Must Have
+The Platform Admin shall be able to suspend any group in the event of a policy violation.
+UN-02
+PR-42
+Should Have
+The Platform Admin shall have access to platform analytics including active groups, MoMo transaction volume, and churn.
+UN-02
+
+5. Non-Functional Requirements
+Req. ID
+Category
+Requirement
+NFR-01
+Performance
+Key screens (ledger, payment history, rotation calendar) shall load in under 3 seconds on a 3G mobile connection.
+NFR-02
+Performance
+The contribution scheduler shall complete all debit attempts for a group of 50 members within 5 minutes of the scheduled time.
+NFR-03
+Availability
+The platform shall target 99.5% uptime. Scheduled maintenance windows shall not occur during contribution collection periods.
+NFR-04
+Offline
+Key screens — ledger, rotation calendar, payment history — shall load from PWA cache when the device is offline. New data shall sync automatically when connectivity is restored.
+NFR-05
+Security
+Supabase Row-Level Security (RLS) policies shall ensure that a user from Group A can never read or modify data from Group B. This must be covered by integration tests.
+NFR-06
+Security
+No API keys, passwords, or secrets shall ever be committed to the Git repository. All secrets shall be held in environment variables.
+NFR-07
+Security
+Payouts above a configurable threshold shall require explicit President approval before any MoMo transfer is initiated.
+NFR-08
+Security
+All manual overrides (cash payment recording, fine waivers) shall be permanently logged with the actor's user ID, timestamp, and reason.
+NFR-09
+Usability
+The platform shall be a Progressive Web App — installable from the browser on Android devices without an app store download.
+NFR-10
+Usability
+All user-facing screens shall be functional on low-end Android devices (1GB RAM, Android 8+) with no horizontal scrolling required.
+NFR-11
+Usability
+The interface shall support English and French. The language shall default to the device locale with a manual override option.
+NFR-12
+Accessibility
+Text contrast ratios shall meet WCAG 2.1 AA standards across all screens.
+NFR-13
+Cost
+Infrastructure cost shall remain under 5,000 FCFA per month at launch scale to stay within the 500–2,000 FCFA/member pricing band.
+NFR-14
+Maintainability
+All backend modules shall follow the OOP class structure defined in Section 3. No business logic shall be placed in Express route handlers — handlers shall only call service methods.
+NFR-15
+Maintainability
+Every feature merged into main shall pass the Definition of Done checklist: working on Chrome for Android, no console errors, no hardcoded secrets, PR reviewed by at least one developer, CTO approval.
+
+6. Technical Constraints and Stack
+Layer
+Technology
+Rationale
+Frontend
+HTML + Tailwind CSS + Vanilla JS / HTMX + PWA
+Low complexity for the team; no framework overhead; offline via service worker.
+Backend
+Node.js + Express.js
+Widely understood; matches team skills; lightweight.
+Scheduler
+BullMQ or node-cron
+Reliable job queue for monthly deduction automation.
+Database
+Supabase (PostgreSQL + RLS)
+Managed service; built-in auth; RLS enforces multi-tenant isolation.
+Auth
+Supabase Auth (email/password + SMS OTP)
+Pre-built; secure; integrates with the database.
+File Storage
+Supabase Storage
+Stores PDF receipts and meeting minutes.
+Primary Payment
+MTN MoMo Collection API
+Used by 100% of surveyed groups.
+Alt. Payment
+Orange Money API
+Secondary option for members not on MTN.
+Notifications
+Twilio or Vonage WhatsApp Business API + SMS
+100% of groups use WhatsApp; SMS reaches basic phones offline.
+Backend Hosting
+Railway
+Simple Node.js deployment; free tier sufficient at MVP scale.
+Frontend Hosting
+Vercel or Netlify
+Zero-config static hosting with global CDN.
+CI/CD
+GitHub Actions
+Auto-deploy on merge to main; enforces code quality gates.
+
+7. Requirements Traceability Matrix
+The table below maps each Product Requirement to the User Requirement(s) from the URS it fulfils, confirming full coverage of the user-validated needs.
+
+PR ID
+URS UR ID(s)
+Description
+User Need(s)
+PR-01
+UR-01
+Register Njangi on platform
+UN-08
+PR-02
+UR-02
+WhatsApp/SMS member invitation
+UN-08, UN-09
+PR-03
+UR-24
+Email + OTP authentication
+UN-01
+PR-04
+UR-01
+Role-based dashboard routing
+UN-08
+PR-05
+—
+English/French language support
+UN-12
+PR-06
+UR-03
+Assign Treasurer and Secretary roles
+UN-02
+PR-07
+UR-05
+Remove member with audit log
+UN-02
+PR-08
+UR-04
+Configure group rules
+UN-06
+PR-09
+UR-04
+Lock rotation type during cycle
+UN-06
+PR-10
+UR-23
+Secretary manages directory and announcements
+UN-02
+PR-11
+—
+Secretary meeting minutes
+UN-02
+PR-12
+UR-07
+Payment reminder 24 hours before due date
+UN-14
+PR-13
+UR-12
+Automated MoMo debit on scheduled date
+UN-10
+PR-14
+UR-25
+Log every deduction attempt in Ledger
+UN-01
+PR-15
+UR-22
+WhatsApp confirmation after deduction
+UN-09
+PR-16
+UR-16
+Automatic retry for failed deductions
+UN-07
+PR-17
+UR-16
+Alert President/Treasurer on deduction failure
+UN-02
+PR-18
+UR-10
+Manual cash payment recording by Treasurer
+UN-15
+PR-19
+UR-15
+Digital receipt stored per contribution
+UN-01
+PR-20
+UR-13
+Orange Money as alternative payment channel
+UN-10
+PR-21
+UR-14
+Four-check eligibility gate before payout
+UN-01
+PR-22
+UR-14
+Block payout and alert on eligibility failure
+UN-01
+PR-23
+UR-11
+Fixed Schedule rotation order visible to all
+UN-04
+PR-24
+UR-11
+Random Draw rotation from unpaid members
+UN-06
+PR-25
+UR-11
+President Decides rotation with notification
+UN-06
+PR-26
+UR-14
+Three payout delivery methods supported
+UN-10
+PR-27
+UR-22
+WhatsApp payout notification to all members
+UN-09
+PR-28
+UR-18
+Ledger updated after payout
+UN-04
+PR-29
+UR-20
+PDF receipt generated per payout
+UN-03
+PR-30
+UR-25
+Fraud alert when Treasurer self-records cash payout
+UN-01
+PR-31
+UR-17
+Members view full group contribution ledger
+UN-04
+PR-32
+UR-18
+Members view full payout history
+UN-04
+PR-33
+UR-19
+Members view own payment history
+UN-04
+PR-34
+UR-25
+Immutable Ledger — no edits or deletions
+UN-01
+PR-35
+UR-20
+Export financial reports to PDF
+UN-03
+PR-36
+UR-09
+Record fine against member
+UN-06
+PR-37
+UR-09
+Mark fine as paid
+UN-06
+PR-38
+UR-25
+Log fine waivers with reason
+UN-01
+PR-39
+—
+Social Fund management
+UN-06
+PR-40
+—
+Platform Admin views all groups
+UN-02
+PR-41
+—
+Platform Admin suspends groups
+UN-02
+PR-42
+—
+Platform analytics dashboard
+UN-02
+
+8. Delivery Plan — Four-Week Sprint
+Week
+Focus
+Key Deliverables and PR Coverage
+1
+Setup + Auth
+GitHub repo, Supabase project, CI/CD pipeline, login and register pages, Njangi group creation, role-based routing. PR-01 through PR-05. MoMo sandbox credentials obtained.
+2
+Core Features
+Member management, contribution setup, rotation schedule configuration, fines tracking, shared group ledger read-only view. PR-06 through PR-11, PR-31 through PR-34, PR-36 through PR-38.
+3
+Money Flows
+MoMo API sandbox integration, automated contribution scheduler, payout engine with eligibility checks, WhatsApp notifications, cash payment recording. PR-12 through PR-30.
+4
+Polish and Docs
+PWA offline support, PDF receipt generation, bug fixes, social fund, platform admin dashboard, export to PDF, project documentation, demo preparation. PR-35, PR-39 through PR-42, NFR-04.
+
+9. Definition of Done and Acceptance Criteria
+9.1 Feature-Level Definition of Done
+A feature is only considered complete when ALL of the following are true:
+The feature works as described in the Trello card and maps to a labelled Product Requirement in this document.
+It has been tested on a real browser — Chrome on Android — if it is a UI feature.
+There are no console errors or broken API calls.
+No hardcoded secrets appear anywhere in the code.
+A Pull Request has been opened with title, description, test instructions, and screenshots for UI changes.
+At least one other developer has reviewed and approved the PR.
+The CTO has given final approval and merged the PR into main.
+The corresponding Trello card has been moved to the Done column.
+
+9.2 System-Level Acceptance Criteria
+The following scenarios must pass end-to-end before the system is considered production-ready:
+A new Njangi group can be created, configured, and populated with members entirely through the platform without any manual database intervention.
+A contribution round fires automatically on the scheduled date. Every member with a linked MoMo wallet receives a debit. Each event is logged in the Ledger. Each member receives a WhatsApp confirmation.
+All three rotation types — Fixed Schedule, Random Draw, and President Decides — produce a correct payout to the right member, trigger the eligibility checks, and update the Ledger and calendar.
+A failed deduction is retried automatically, logged as failed if the retry also fails, and triggers an alert to the President and Treasurer.
+Data from Group A is completely invisible to a logged-in user from Group B. An automated RLS test must confirm this.
+The platform's key screens load correctly without internet access, serving data from the PWA cache.
+A Treasurer attempting to record a cash payout to themselves triggers a fraud alert to the President.
+
+10. Document Approval
+This Product Requirements Specification must be reviewed and approved by the following stakeholders before development begins.
+
+Name
+Role
+Date
+Signature
+
+Scrum Master
+
+
+
+Product Owner
+
+
+
+CTO
+
+
+
+Academic Supervisor — Engr. TEKOH PALMA
+
+
+
+This is a living document. Any change to scope, requirements, or design decisions must be reflected here by the Scrum Master with a version increment and team notification via the NAAS Dev Team WhatsApp group.
+

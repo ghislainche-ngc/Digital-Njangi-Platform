@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Payouts — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'treasurer', title: 'Payouts' });
+      const history = [
+        ['Cycle 3', 'Jean-Pierre M.', '140 000', 'Mar 28', 'paid'],
+        ['Cycle 2', 'Claire Biya',    '140 000', 'Feb 28', 'paid'],
+        ['Cycle 1', 'Fatou Ngo',      '140 000', 'Jan 28', 'paid'],
+      ].map(p => `
+        <li class="flex items-center justify-between py-2 border-b border-subtle last:border-0">
+          <div>
+            <p class="font-medium">${p[1]}</p>
+            <p class="text-xs muted">${p[0]} · ${p[3]}</p>
+          </div>
+          <span class="font-mono">${p[2]}</span>
+        </li>
+      `).join('');
+      mountContent(`
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="lg:col-span-2 glass-card p-6">
+            <div class="flex items-center justify-between mb-5">
+              <h2 class="font-display text-xl font-bold">Next payout</h2>
+              <span class="chip chip-info">Cycle 4 · Random draw</span>
+            </div>
+            <div class="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-muted)]">
+              <div class="h-14 w-14 rounded-full accent-bg text-[var(--text-on-brand)] grid place-items-center font-bold">MT</div>
+              <div class="flex-1">
+                <p class="font-display text-2xl font-bold">Marie Tchinda</p>
+                <p class="text-sm muted">MTN MoMo · +237 6XX XXX 001</p>
+              </div>
+              <div class="text-right">
+                <p class="font-display text-2xl font-bold">140 000</p>
+                <p class="text-xs muted">FCFA · Apr 28</p>
+              </div>
+            </div>
+
+            <h3 class="font-semibold mt-6 mb-3 text-sm">Eligibility (PR-21)</h3>
+            <ul class="space-y-2 text-sm">
+              <li class="flex items-center gap-2"><span class="chip chip-paid">✓</span> Pot threshold reached (140 000 / 140 000)</li>
+              <li class="flex items-center gap-2"><span class="chip chip-paid">✓</span> No unpaid fines</li>
+              <li class="flex items-center gap-2"><span class="chip chip-paid">✓</span> MTN MoMo wallet verified</li>
+              <li class="flex items-center gap-2"><span class="chip chip-due">⧗</span> Awaiting President approval</li>
+            </ul>
+
+            <h3 class="font-semibold mt-6 mb-3 text-sm">Delivery method</h3>
+            <div class="grid grid-cols-3 gap-3">
+              <button class="glass-card p-3 text-center ring-2 ring-[var(--accent)]">
+                <p class="font-semibold text-sm">MTN MoMo</p>
+                <p class="text-xs muted mt-1">Instant</p>
+              </button>
+              <button class="glass-card p-3 text-center">
+                <p class="font-semibold text-sm">Cash</p>
+                <p class="text-xs muted mt-1">At meeting</p>
+              </button>
+              <button class="glass-card p-3 text-center">
+                <p class="font-semibold text-sm">Bank transfer</p>
+                <p class="text-xs muted mt-1">Treasurer</p>
+              </button>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+              <button class="btn-ghost flex-1">Decline</button>
+              <button class="btn-primary flex-1">Trigger payout</button>
+            </div>
+          </div>
+
+          <div class="glass-card p-6">
+            <h2 class="font-display text-xl font-bold mb-4">History</h2>
+            <ol class="space-y-3 text-sm">${history}</ol>
+          </div>
+        </div>
+
+        <p class="mt-6 text-xs muted">PR-26 three delivery methods · PR-27 notify all members · PR-29 PDF receipt · PR-30 fraud alert on self-payout.</p>
+      `);
+    </script>
+  </body>
+</html>

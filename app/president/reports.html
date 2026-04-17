@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Reports — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'president', title: 'Financial reports' });
+      const rows = [
+        ['Apr 14', 'Marie T.',      'Contribution', 'MTN MoMo',     '10 000', 'paid', 'Paid'],
+        ['Apr 14', 'Fatou Ngo',     'Contribution', 'Orange Money', '10 000', 'paid', 'Paid'],
+        ['Apr 14', 'Pa Ngwa',       'Contribution', 'Cash',         '10 000', 'due',  'Pending'],
+        ['Apr 12', 'Claire Biya',   'Payout',       'MTN MoMo',     '140 000','paid', 'Sent'],
+        ['Apr 10', 'Alice Fotso',   'Fine',         'MTN MoMo',     '2 000',  'paid', 'Paid'],
+      ].map(r => `
+        <tr>
+          <td class="px-5 py-3">${r[0]}</td>
+          <td class="font-medium">${r[1]}</td>
+          <td>${r[2]}</td>
+          <td>${r[3]}</td>
+          <td class="font-mono">${r[4]}</td>
+          <td class="text-right pr-5"><span class="chip chip-${r[5]}">${r[6]}</span></td>
+        </tr>
+      `).join('');
+      mountContent(`
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div class="flex flex-wrap gap-2">
+            <select class="glass-input w-auto">
+              <option>Cycle 4 · April 2026</option>
+              <option>Cycle 3 · March 2026</option>
+              <option>Cycle 2 · February 2026</option>
+              <option>All cycles</option>
+            </select>
+            <select class="glass-input w-auto">
+              <option>All categories</option>
+              <option>Contributions</option>
+              <option>Payouts</option>
+              <option>Fines</option>
+              <option>Social fund</option>
+            </select>
+          </div>
+          <button class="btn-primary">↓ Export PDF</button>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-4 mb-6">
+          <div class="glass-card p-5"><p class="text-xs muted uppercase">Collected</p><p class="mt-1 font-display text-2xl font-bold">110 000</p></div>
+          <div class="glass-card p-5"><p class="text-xs muted uppercase">Paid out</p><p class="mt-1 font-display text-2xl font-bold">140 000</p></div>
+          <div class="glass-card p-5"><p class="text-xs muted uppercase">Fines</p><p class="mt-1 font-display text-2xl font-bold">8 000</p></div>
+          <div class="glass-card p-5"><p class="text-xs muted uppercase">Social fund</p><p class="mt-1 font-display text-2xl font-bold">85 000</p></div>
+        </div>
+
+        <div class="glass-card p-0 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+              <tr>
+                <th class="px-5 py-3">Date</th>
+                <th>Member</th>
+                <th>Type</th>
+                <th>Method</th>
+                <th>Amount</th>
+                <th class="text-right pr-5">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+          </table>
+        </div>
+
+        <p class="mt-4 text-xs muted">PR-35: PDF export. PR-34: ledger is immutable (corrections added as new entries).</p>
+      `);
+    </script>
+  </body>
+</html>

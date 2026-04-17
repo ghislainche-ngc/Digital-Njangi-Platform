@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Group settings — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'president', title: 'Group settings' });
+      const rotationOptions = [
+        { key: 'fixed', title: 'Fixed schedule', hint: 'Order locked at cycle start.' },
+        { key: 'random', title: 'Random draw', hint: 'System picks next each cycle.' },
+        { key: 'president', title: 'President decides', hint: 'You nominate manually.' },
+      ].map((o, i) => `
+        <label class="glass-card p-4 flex gap-3 cursor-pointer ${i === 1 ? 'ring-2 ring-[var(--accent)]' : ''}">
+          <input type="radio" name="rotation" ${i === 1 ? 'checked' : ''} class="mt-1" />
+          <span>
+            <span class="block font-semibold">${o.title}</span>
+            <span class="block text-xs muted mt-0.5">${o.hint}</span>
+          </span>
+        </label>
+      `).join('');
+      mountContent(`
+        <div class="grid gap-6 lg:grid-cols-2">
+          <section class="glass-card p-6">
+            <h2 class="font-display text-xl font-bold mb-4">Contribution</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted">Group name</label>
+                <input class="glass-input mt-1" value="Les Amis de Yaoundé" />
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Amount (FCFA)</label>
+                  <input class="glass-input mt-1" type="number" value="10000" />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Frequency</label>
+                  <select class="glass-input mt-1">
+                    <option selected>Monthly</option>
+                    <option>Bi-weekly</option>
+                    <option>Weekly</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted">Payout threshold</label>
+                <input class="glass-input mt-1" type="number" value="140000" />
+                <p class="mt-1 text-xs muted">Amounts above this require President approval (PR-21, NFR-07).</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="glass-card p-6">
+            <h2 class="font-display text-xl font-bold mb-4">Rotation strategy</h2>
+            <div class="space-y-3">${rotationOptions}</div>
+            <div class="mt-4 p-3 rounded-xl bg-[var(--bg-muted)] text-xs muted">
+              ⚠ PR-09: rotation type is locked once a cycle starts. Changes only between full cycles.
+            </div>
+          </section>
+
+          <section class="glass-card p-6">
+            <h2 class="font-display text-xl font-bold mb-4">Penalty rules</h2>
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Late fee (FCFA)</label>
+                  <input class="glass-input mt-1" type="number" value="2000" />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Grace period (days)</label>
+                  <input class="glass-input mt-1" type="number" value="3" />
+                </div>
+              </div>
+              <label class="flex items-center gap-3">
+                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+                <span class="text-sm">Auto-deduct fine from next contribution</span>
+              </label>
+              <label class="flex items-center gap-3">
+                <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
+                <span class="text-sm">Notify President of every missed payment</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="glass-card p-6">
+            <h2 class="font-display text-xl font-bold mb-4">Notifications</h2>
+            <div class="space-y-4">
+              <label class="flex items-center justify-between">
+                <span class="text-sm">Telegram alerts</span>
+                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+              </label>
+              <label class="flex items-center justify-between">
+                <span class="text-sm">SMS fallback</span>
+                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+              </label>
+              <label class="flex items-center justify-between">
+                <span class="text-sm">Email receipts</span>
+                <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+          <button class="btn-ghost">Cancel</button>
+          <button class="btn-primary">Save changes</button>
+        </div>
+      `);
+    </script>
+  </body>
+</html>

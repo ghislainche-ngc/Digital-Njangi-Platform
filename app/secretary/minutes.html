@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Meeting minutes — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'secretary', title: 'Meeting minutes' });
+      const cards = [
+        { title: 'April 2026 monthly meeting', date: 'Apr 28, 2026', attendees: 13, pages: 2, status: 'draft' },
+        { title: 'March 2026 monthly meeting', date: 'Mar 28, 2026', attendees: 14, pages: 3, status: 'published' },
+        { title: 'February 2026 monthly meeting', date: 'Feb 28, 2026', attendees: 12, pages: 2, status: 'published' },
+        { title: 'January 2026 kickoff meeting', date: 'Jan 15, 2026', attendees: 14, pages: 4, status: 'published' },
+      ].map(m => `
+        <div class="glass-card p-5">
+          <div class="flex items-start justify-between mb-3">
+            <div class="h-10 w-10 rounded-xl bg-[var(--bg-muted)] grid place-items-center">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+            </div>
+            <span class="chip chip-${m.status === 'draft' ? 'due' : 'paid'}">${m.status}</span>
+          </div>
+          <p class="font-semibold">${m.title}</p>
+          <p class="text-xs muted mt-1">${m.date} · ${m.attendees} attendees · ${m.pages} pages</p>
+          <div class="mt-4 flex gap-2">
+            <button class="btn-ghost flex-1 text-xs">Open</button>
+            <button class="btn-ghost text-xs">↓ PDF</button>
+          </div>
+        </div>
+      `).join('');
+      mountContent(`
+        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+          <input type="search" placeholder="Search minutes…" class="glass-input flex-1 min-w-[220px]" />
+          <button class="btn-primary">+ New minutes</button>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">${cards}</div>
+
+        <p class="mt-4 text-xs muted">PR-11: Secretary creates, stores, and shares meeting minutes.</p>
+      `);
+    </script>
+  </body>
+</html>

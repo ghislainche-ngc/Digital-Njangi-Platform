@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <title>Log in — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <!-- Define loginPage BEFORE boot.js calls Alpine.start() -->
+    <script type="module">
+      import { api } from '/src/js/api/client.js';
+      import { session } from '/src/js/auth/session.js';
+      import { redirectByRole, destinationFor } from '/src/js/auth/role-redirect.js';
+      window.loginPage = () => ({
+        method: 'password',
+        form: { email: '', password: '', otp: '' },
+        loading: false,
+        error: '',
+        preview(role) { return destinationFor(role); },
+        async submit() {
+          this.error = '';
+          this.loading = true;
+          try {
+            const endpoint = this.method === 'otp' ? '/api/auth/otp-verify' : '/api/auth/login';
+            const { token, user } = await api.post(endpoint, this.form);
+            session.set(token, user);
+            redirectByRole(user.role);
+          } catch (err) {
+            this.error = err.message || 'Login failed';
+          } finally {
+            this.loading = false;
+          }
+        },
+      });
+    </script>
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body
+    x-data="loginPage()" x-init="$store.theme.init()" x-cloak
+    class="min-h-screen relative"
+  >
+    <!-- minimal top bar -->
+    <header class="mx-auto max-w-7xl px-6 py-5 flex items-center">
+      <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg">
+        <img src="/logo.png" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1" />
+        <span x-text="$t('brand.name')"></span>
+      </a>
+      <div class="ml-auto flex items-center gap-2">
+        <!-- language -->
+        <div x-data="{ open: false }" class="relative">
+          <button @click="open = !open" @click.outside="open = false" class="nav-link">
+            <span class="uppercase text-xs font-semibold" x-text="$store.i18n.locale"></span>
+          </button>
+          <div x-show="open" x-transition class="glass-card absolute right-0 mt-2 w-28 p-1">
+            <template x-for="l in $store.i18n.locales()" :key="l">
+              <button
+                @click="$store.i18n.setLocale(l); open = false"
+                class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-muted)]"
+                :class="$store.i18n.locale === l ? 'accent-text font-semibold' : ''"
+                x-text="l.toUpperCase()"
+              ></button>
+            </template>
+          </div>
+        </div>
+        <!-- theme -->
+        <button @click="$store.theme.toggle()" class="nav-link">
+          <svg x-show="$store.theme.effective === 'light'" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <svg x-show="$store.theme.effective === 'dark'"  class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="relative z-10 mx-auto max-w-md px-6 py-12">
+      <div class="glass-card-heavy p-8 animate-fade-up">
+        <h1 class="font-display text-3xl font-bold" x-text="$t('login.title')"></h1>
+        <p class="mt-2 text-sm text-secondary-app" x-text="$t('login.subtitle')"></p>
+
+        <!-- Method toggle (password / OTP) -->
+        <div class="mt-6 inline-flex p-1 rounded-xl bg-[var(--bg-muted)] text-sm">
+          <button
+            @click="method = 'password'"
+            :class="method === 'password' ? 'bg-[var(--bg-surface)] shadow-sm' : 'muted'"
+            class="px-4 py-2 rounded-lg font-medium"
+          >Email</button>
+          <button
+            @click="method = 'otp'"
+            :class="method === 'otp' ? 'bg-[var(--bg-surface)] shadow-sm' : 'muted'"
+            class="px-4 py-2 rounded-lg font-medium"
+            x-text="$t('login.otp_use')"
+          ></button>
+        </div>
+
+        <form @submit.prevent="submit" class="mt-6 space-y-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('login.email')"></label>
+            <input
+              x-model="form.email" type="email" required autocomplete="email"
+              class="glass-input mt-1" placeholder="you@example.com"
+            />
+          </div>
+
+          <div x-show="method === 'password'">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('login.password')"></label>
+              <a href="#" class="text-xs accent-text" x-text="$t('login.forgot')"></a>
+            </div>
+            <input
+              x-model="form.password" type="password" autocomplete="current-password"
+              class="glass-input mt-1" placeholder="••••••••"
+            />
+          </div>
+
+          <div x-show="method === 'otp'">
+            <label class="text-xs font-semibold uppercase tracking-wider muted">OTP</label>
+            <input
+              x-model="form.otp" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+              class="glass-input mt-1 tracking-[0.5em] text-center font-mono" placeholder="••••••"
+            />
+          </div>
+
+          <template x-if="error">
+            <p class="text-sm text-red-500" x-text="error"></p>
+          </template>
+
+          <button
+            type="submit" class="btn-primary w-full" :disabled="loading"
+            :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
+          >
+            <span x-show="!loading" x-text="$t('login.submit')"></span>
+            <span x-show="loading" x-text="$t('common.loading')"></span>
+          </button>
+        </form>
+
+        <!-- Role quick-preview (mock mode) -->
+        <div class="mt-6 pt-6 border-t border-subtle">
+          <p class="text-xs uppercase tracking-widest muted">Preview a dashboard</p>
+          <div class="mt-3 grid grid-cols-5 gap-2">
+            <template x-for="role in ['admin','president','treasurer','secretary','member']" :key="role">
+              <a :href="preview(role)" class="nav-link justify-center text-xs capitalize" x-text="role"></a>
+            </template>
+          </div>
+        </div>
+
+        <p class="mt-6 text-sm text-center muted">
+          <span x-text="$t('login.new_user')"></span>
+          <a href="/register.html" class="accent-text font-semibold ml-1" x-text="$t('login.create_account')"></a>
+        </p>
+      </div>
+    </main>
+
+  </body>
+</html>

@@ -1,0 +1,101 @@
+/* NAAS Design Tokens — monochrome black/white scheme
+   Inspired by Monday.com-style hero: pure black canvas, white CTAs,
+   subtle dot grid, functional status colors only. No chromatic accent.
+   Light mode mirrors the same discipline: clean white, sharp black. */
+
+:root {
+  color-scheme: light;
+
+  /* Canvas — near white, clean surfaces */
+  --bg-app:       #ffffff;
+  --bg-surface:   #ffffff;
+  --bg-muted:     #f5f5f5;
+  --bg-elevated:  #ffffff;
+
+  /* Text — true black, muted grays */
+  --text-primary:   #0a0a0a;
+  --text-secondary: #3f3f46;
+  --text-muted:     #71717a;
+  --text-on-brand:  #ffffff;
+
+  /* Borders */
+  --border-subtle:  rgba(10, 10, 10, 0.08);
+  --border-strong:  rgba(10, 10, 10, 0.16);
+
+  /* Glass surfaces — neutral frost */
+  --glass-bg:       rgba(255, 255, 255, 0.70);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.88);
+  --glass-border:   rgba(255, 255, 255, 0.70);
+  --glass-stroke:   rgba(10, 10, 10, 0.06);
+  --glass-blur:     20px;
+  --glass-saturate: 180%;
+
+  /* Accent = foreground (monochrome) */
+  --accent:         #0a0a0a;
+  --accent-hover:   #000000;
+  --accent-soft:    rgba(10, 10, 10, 0.06);
+  --accent-text:    #0a0a0a;
+
+  /* Hero gradient — soft neutral halo */
+  --grad-hero: radial-gradient(
+    ellipse 90% 60% at 50% 0%,
+    rgba(10, 10, 10, 0.04) 0%,
+    transparent 60%
+  ), linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+
+  /* Functional status — unchanged, carry over */
+  --status-paid-bg:    rgba(16, 185, 129, 0.12);
+  --status-paid-fg:    #047857;
+  --status-due-bg:     rgba(245, 158, 11, 0.15);
+  --status-due-fg:     #b45309;
+  --status-failed-bg:  rgba(239, 68, 68, 0.12);
+  --status-failed-fg:  #b91c1c;
+  --status-info-bg:    rgba(59, 130, 246, 0.12);
+  --status-info-fg:    #1d4ed8;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Pure black canvas per reference */
+  --bg-app:       #000000;
+  --bg-surface:   #0a0a0a;
+  --bg-muted:     #161616;
+  --bg-elevated:  #121212;
+
+  --text-primary:   #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted:     #71717a;
+  --text-on-brand:  #0a0a0a;
+
+  --border-subtle:  rgba(255, 255, 255, 0.08);
+  --border-strong:  rgba(255, 255, 255, 0.18);
+
+  --glass-bg:       rgba(18, 18, 18, 0.60);
+  --glass-bg-heavy: rgba(10, 10, 10, 0.85);
+  --glass-border:   rgba(255, 255, 255, 0.10);
+  --glass-stroke:   rgba(255, 255, 255, 0.05);
+  --glass-blur:     20px;
+  --glass-saturate: 140%;
+
+  /* Accent inverts — white pops on black */
+  --accent:         #ffffff;
+  --accent-hover:   #f4f4f5;
+  --accent-soft:    rgba(255, 255, 255, 0.08);
+  --accent-text:    #ffffff;
+
+  --grad-hero: radial-gradient(
+    ellipse 80% 50% at 50% 0%,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 60%
+  ), linear-gradient(180deg, #000000 0%, #0a0a0a 100%);
+
+  --status-paid-bg:    rgba(16, 185, 129, 0.14);
+  --status-paid-fg:    #34d399;
+  --status-due-bg:     rgba(245, 158, 11, 0.18);
+  --status-due-fg:     #fbbf24;
+  --status-failed-bg:  rgba(239, 68, 68, 0.18);
+  --status-failed-fg:  #f87171;
+  --status-info-bg:    rgba(59, 130, 246, 0.18);
+  --status-info-fg:    #60a5fa;
+}

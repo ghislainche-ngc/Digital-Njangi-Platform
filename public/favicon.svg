@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- White background to match the new logo -->
+  <rect width="64" height="64" rx="10" fill="#ffffff"/>
+  <!-- Calligraphic NB monogram — simplified for favicon legibility -->
+  <!-- N -->
+  <path d="M10 48 L10 16 L30 44 L30 16" fill="none" stroke="#0a0a0a" stroke-width="3.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- B spine -->
+  <path d="M34 16 L34 48" fill="none" stroke="#0a0a0a" stroke-width="3.5"
+        stroke-linecap="round"/>
+  <!-- B upper bowl -->
+  <path d="M34 16 Q52 16 52 26 Q52 32 34 32" fill="none" stroke="#0a0a0a" stroke-width="3.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- B lower bowl (slightly wider — echoes calligraphic weight) -->
+  <path d="M34 32 Q54 32 54 40 Q54 48 34 48" fill="none" stroke="#0a0a0a" stroke-width="3.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

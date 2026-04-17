@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Rotation calendar — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'member', title: 'Rotation calendar' });
+      const schedule = [
+        { pos: 1,  name: 'Claire Biya',        when: 'Jan 28', status: 'paid' },
+        { pos: 2,  name: 'Fatou Ngo',          when: 'Feb 28', status: 'paid' },
+        { pos: 3,  name: 'Jean-Pierre Mbarga', when: 'Mar 28', status: 'paid' },
+        { pos: 4,  name: 'Marie Tchinda',      when: 'Apr 28', status: 'info', label: 'Next' },
+        { pos: 5,  name: 'Pa Ngwa',            when: 'May 28', status: 'upcoming' },
+        { pos: 6,  name: 'Alice Fotso',        when: 'Jun 28', status: 'upcoming' },
+        { pos: 7,  name: 'You',                when: 'Jul 28', status: 'me' },
+        { pos: 8,  name: '—',                  when: 'Aug 28', status: 'upcoming' },
+        { pos: 9,  name: '—',                  when: 'Sep 28', status: 'upcoming' },
+      ].map(r => {
+        const rowClass = r.status === 'me' ? 'ring-2 ring-[var(--accent)] bg-[var(--accent-soft)]' : '';
+        const numClass = r.status === 'paid' ? 'bg-emerald-500/20 text-emerald-500' : r.status === 'info' ? 'accent-bg text-[var(--text-on-brand)]' : 'bg-[var(--bg-muted)] muted';
+        const nameClass = r.status === 'upcoming' ? 'muted' : '';
+        const chip = r.label ? `<span class="chip chip-info">${r.label}</span>` : r.status === 'paid' ? '<span class="chip chip-paid">Done</span>' : '';
+        return `
+          <li class="flex items-center justify-between p-3 rounded-xl ${rowClass}">
+            <div class="flex items-center gap-3">
+              <div class="h-8 w-8 rounded-full grid place-items-center text-xs font-bold ${numClass}">${r.pos}</div>
+              <span class="font-medium ${nameClass}">${r.name}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs muted">${r.when}</span>
+              ${chip}
+            </div>
+          </li>
+        `;
+      }).join('');
+      mountContent(`
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="glass-card p-6 lg:col-span-1">
+            <p class="text-xs uppercase tracking-widest muted">My payout turn</p>
+            <p class="mt-2 font-display text-4xl font-bold">Position 7</p>
+            <p class="mt-1 text-sm muted">Estimated Jul 28, 2026</p>
+            <div class="mt-5 h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden">
+              <div class="h-full accent-bg" style="width: 43%"></div>
+            </div>
+            <p class="mt-2 text-xs muted">Cycle 4 of 14 · 43% complete</p>
+
+            <div class="mt-6 p-3 rounded-xl bg-[var(--bg-muted)]">
+              <p class="text-xs muted">Rotation type</p>
+              <p class="font-semibold text-sm mt-1">Random draw</p>
+              <p class="text-xs muted mt-2">System selects next recipient from unpaid members each cycle.</p>
+            </div>
+          </div>
+
+          <div class="lg:col-span-2 glass-card p-6">
+            <h2 class="font-display text-xl font-bold mb-4">Full rotation schedule</h2>
+            <ol class="space-y-2">${schedule}</ol>
+          </div>
+        </div>
+
+        <p class="mt-6 text-xs muted">PR-23/24/25: rotation order visible to all · PR-32: full payout history.</p>
+      `);
+    </script>
+  </body>
+</html>

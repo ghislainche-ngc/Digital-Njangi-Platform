@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+    <title>Social fund — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data x-init="$store.theme.init()" x-cloak class="relative">
+    <div id="app-shell"></div>
+    <script type="module">
+      import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      renderShell({ role: 'treasurer', title: 'Social fund' });
+      const activity = [
+        ['Apr 10', 'Deposit', 'Monthly contribution × 14',        '+ 14 000', 'paid'],
+        ['Apr 02', 'Withdrawal', 'Condolence · family of Mr Etonde','− 30 000', 'info'],
+        ['Mar 10', 'Deposit', 'Monthly contribution × 14',        '+ 14 000', 'paid'],
+        ['Feb 18', 'Withdrawal', 'Birth celebration · Marie T.',    '− 25 000', 'info'],
+        ['Feb 10', 'Deposit', 'Monthly contribution × 14',        '+ 14 000', 'paid'],
+      ].map(r => `
+        <li class="flex items-center justify-between py-3">
+          <div>
+            <p class="text-sm font-medium">${r[2]}</p>
+            <p class="text-xs muted">${r[0]} · ${r[1]}</p>
+          </div>
+          <span class="chip chip-${r[4]} font-mono">${r[3]}</span>
+        </li>
+      `).join('');
+      mountContent(`
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="lg:col-span-2 glass-card p-6">
+            <p class="text-xs uppercase tracking-widest muted">Current balance</p>
+            <p class="mt-2 font-display text-5xl font-bold">85 000 FCFA</p>
+            <p class="mt-1 text-sm muted">Emergency fund for births, weddings, bereavement.</p>
+
+            <div class="mt-6 flex gap-3">
+              <button class="btn-primary">+ Deposit</button>
+              <button class="btn-ghost">− Withdraw</button>
+            </div>
+
+            <h3 class="font-semibold text-sm mt-8 mb-3">Recent activity</h3>
+            <ul class="divide-y divide-[var(--border-subtle)]">${activity}</ul>
+          </div>
+
+          <div class="glass-card p-6">
+            <h3 class="font-display text-lg font-bold mb-3">Contribution rule</h3>
+            <p class="text-sm muted">Each member adds 1 000 FCFA to the social fund at every cycle. Withdrawals require President approval.</p>
+
+            <div class="mt-6">
+              <label class="text-xs font-semibold uppercase tracking-wider muted">Per-cycle amount (FCFA)</label>
+              <input class="glass-input mt-1" type="number" value="1000" />
+            </div>
+            <div class="mt-4">
+              <label class="text-xs font-semibold uppercase tracking-wider muted">Approval threshold</label>
+              <input class="glass-input mt-1" type="number" value="10000" />
+              <p class="mt-1 text-xs muted">Withdrawals above require President sign-off.</p>
+            </div>
+
+            <button class="btn-primary w-full mt-6">Save rules</button>
+          </div>
+        </div>
+
+        <p class="mt-4 text-xs muted">PR-39: separate social fund, deposits, withdrawals, current balance.</p>
+      `);
+    </script>
+  </body>
+</html>
