@@ -1,0 +1,51 @@
+### NAAS — Groups & Members API manual tests
+### Replace {{token}} with a JWT from /auth/login
+
+@baseUrl = http://localhost:3000
+@contentType = application/json
+@token = PASTE_JWT_HERE
+@groupId = PASTE_GROUP_ID_HERE
+
+### ──── Create group ─────────────────────────────────────────────────
+
+POST {{baseUrl}}/groups
+Content-Type: {{contentType}}
+Authorization: Bearer {{token}}
+
+{
+  "name": "Équipe Solidarité 2026",
+  "contribution_amount": 15000,
+  "frequency": "monthly",
+  "rotation_type": "fixed",
+  "penalty_per_day": 500
+}
+
+### ──── Get group details ─────────────────────────────────────────────
+
+GET {{baseUrl}}/groups/{{groupId}}
+Authorization: Bearer {{token}}
+
+### ──── Update group settings ────────────────────────────────────────
+
+PATCH {{baseUrl}}/groups/{{groupId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{token}}
+
+{
+  "penalty_per_day": 1000
+}
+
+### ──── List members ─────────────────────────────────────────────────
+
+GET {{baseUrl}}/groups/{{groupId}}/members
+Authorization: Bearer {{token}}
+
+### ──── Invite member ────────────────────────────────────────────────
+
+POST {{baseUrl}}/groups/{{groupId}}/invitations
+Content-Type: {{contentType}}
+Authorization: Bearer {{token}}
+
+{
+  "phone": "+237699000099"
+}

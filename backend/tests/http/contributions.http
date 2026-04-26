@@ -1,0 +1,34 @@
+### NAAS — Contributions API manual tests
+
+@baseUrl = http://localhost:3000
+@contentType = application/json
+@token = PASTE_JWT_HERE
+@groupId = PASTE_GROUP_ID_HERE
+@contributionId = PASTE_CONTRIBUTION_ID_HERE
+
+### ──── List all contributions (current cycle) ───────────────────────
+
+GET {{baseUrl}}/groups/{{groupId}}/contributions
+Authorization: Bearer {{token}}
+
+### ──── My contribution status ───────────────────────────────────────
+
+GET {{baseUrl}}/groups/{{groupId}}/contributions/mine
+Authorization: Bearer {{token}}
+
+### ──── Record cash payment (Treasurer) ─────────────────────────────
+
+POST {{baseUrl}}/groups/{{groupId}}/contributions/cash
+Content-Type: {{contentType}}
+Authorization: Bearer {{token}}
+
+{
+  "memberId": "PASTE_MEMBER_USER_ID",
+  "amount": 10000,
+  "note": "Paid in cash at meeting"
+}
+
+### ──── Retry failed MoMo deduction (Treasurer) ─────────────────────
+
+POST {{baseUrl}}/groups/{{groupId}}/contributions/{{contributionId}}/retry
+Authorization: Bearer {{token}}

@@ -1,9 +1,43 @@
+# ─── Dependencies ───────────────────────────────────────
 node_modules/
-dist/
+
+# ─── Environment files — NEVER commit these ─────────────
 .env
-.env.*.local
 .env.local
-*.log
-.DS_Store
-.vite/
+.env.production
+.env.test
+*.env
+
+# ─── Build output ────────────────────────────────────────
+dist/
+build/
+
+# ─── Test artifacts ──────────────────────────────────────
 coverage/
+
+# ─── OS files ────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Editor / IDE ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Logs ────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── PM2 ─────────────────────────────────────────────────
+.pm2/
+
+# ─── Vite ────────────────────────────────────────────────
+.vite/
+
+# ─── Claude Code internal (not for team) ─────────────────
+.claude/
+.claude-flow/
+.mcp.json

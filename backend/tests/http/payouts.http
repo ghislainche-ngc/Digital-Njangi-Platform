@@ -1,0 +1,37 @@
+### NAAS — Payouts API manual tests
+
+@baseUrl = http://localhost:3000
+@contentType = application/json
+@token = PASTE_JWT_HERE
+@groupId = PASTE_GROUP_ID_HERE
+@payoutId = PASTE_PAYOUT_ID_HERE
+
+### ──── List all payouts ─────────────────────────────────────────────
+
+GET {{baseUrl}}/groups/{{groupId}}/payouts
+Authorization: Bearer {{token}}
+
+### ──── Current cycle payout status ─────────────────────────────────
+
+GET {{baseUrl}}/groups/{{groupId}}/payouts/current
+Authorization: Bearer {{token}}
+
+### ──── Nominate recipient (President Decides mode only) ─────────────
+
+POST {{baseUrl}}/groups/{{groupId}}/payouts/nominate
+Content-Type: {{contentType}}
+Authorization: Bearer {{token}}
+
+{
+  "recipientId": "PASTE_RECIPIENT_USER_ID"
+}
+
+### ──── Approve payout (President) ──────────────────────────────────
+
+POST {{baseUrl}}/groups/{{groupId}}/payouts/{{payoutId}}/approve
+Authorization: Bearer {{token}}
+
+### ──── Execute payout (Treasurer) ──────────────────────────────────
+
+POST {{baseUrl}}/groups/{{groupId}}/payouts/{{payoutId}}/execute
+Authorization: Bearer {{token}}

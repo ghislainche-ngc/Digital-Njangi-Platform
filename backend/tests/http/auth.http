@@ -1,0 +1,42 @@
+### NAAS — Auth API manual tests
+### Use with VS Code REST Client extension or IntelliJ HTTP Client
+
+@baseUrl = http://localhost:3000
+@contentType = application/json
+
+### ──── Register ────────────────────────────────────────────────────
+
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "alice@njangi.cm",
+  "phone": "+237677000001",
+  "full_name": "Alice Mbah",
+  "password": "SecurePass123!",
+  "language": "fr"
+}
+
+### ──── Verify OTP ───────────────────────────────────────────────────
+
+POST {{baseUrl}}/auth/verify-otp
+Content-Type: {{contentType}}
+
+{
+  "phone": "+237677000001",
+  "code": "123456"
+}
+
+### ──── Login ────────────────────────────────────────────────────────
+
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "alice@njangi.cm",
+  "password": "SecurePass123!"
+}
+
+### ──── Health check ─────────────────────────────────────────────────
+
+GET {{baseUrl}}/health
