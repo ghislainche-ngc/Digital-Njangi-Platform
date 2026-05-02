@@ -65,7 +65,7 @@ describe('RandomDrawStrategy', () => {
     // Each member should be selected ~20% of the time; allow ±10% tolerance
     MEMBERS.forEach(m => {
       expect(counts[m.user_id]).toBeGreaterThan(750);
-      expect(counts[m.user_id]).toLessThan(1250);
+      expect(counts[m.user_id]).toBeLessThan(1250);
     });
   });
 });
