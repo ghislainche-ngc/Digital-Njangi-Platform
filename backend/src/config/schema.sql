@@ -9,8 +9,18 @@ CREATE TABLE users (
   email TEXT UNIQUE NOT NULL,
   phone TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
   language TEXT DEFAULT 'en' CHECK (language IN ('en', 'fr')),
   telegram_chat_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- OTP verification codes (10-minute expiry)
+CREATE TABLE otp_verifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone TEXT NOT NULL,
+  code TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '10 minutes',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -161,3 +171,4 @@ ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fines                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE social_fund_events   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE otp_verifications    ENABLE ROW LEVEL SECURITY;
