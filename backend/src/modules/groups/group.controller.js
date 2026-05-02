@@ -1,26 +1,42 @@
 'use strict';
 
 const groupService = require('./group.service');
+const { createGroupSchema, updateGroupSchema } = require('./group.validation');
 
 const createGroup = async (req, res, next) => {
   try {
-    const group = await groupService.createGroup(req.user.sub, req.body);
+    const { error, value } = createGroupSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message, code: 'VALIDATION_ERROR' });
+
+    const group = await groupService.createGroup(req.user.sub, value);
     return res.status(201).json(group);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
 };
 
 const getGroup = async (req, res, next) => {
   try {
     const group = await groupService.getGroup(req.params.groupId);
     return res.status(200).json(group);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
 };
 
 const updateSettings = async (req, res, next) => {
   try {
-    const group = await groupService.updateSettings(req.params.groupId, req.body);
+    const { error, value } = updateGroupSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message, code: 'VALIDATION_ERROR' });
+
+    const group = await groupService.updateSettings(req.params.groupId, value);
     return res.status(200).json(group);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
 };
 
 module.exports = { createGroup, getGroup, updateSettings };
