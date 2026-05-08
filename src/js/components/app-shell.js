@@ -104,7 +104,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
       <!-- Sidebar -->
       <aside class="hidden md:flex md:flex-col w-64 glass-card-heavy rounded-none border-r border-subtle p-4 gap-1">
         <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg px-3 py-3">
-          <img src="/logo.png" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1"/>
+          <img src="/logo.svg" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1"/>
           <span x-text="$t('brand.name')"></span>
         </a>
         <div class="mt-2 px-3 pb-2 text-xs uppercase tracking-widest muted">${role}</div>
