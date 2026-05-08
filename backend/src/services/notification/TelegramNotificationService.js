@@ -23,13 +23,29 @@ class TelegramNotificationService extends NotificationService {
    * @param {string} message
    */
   async send(chatId, message) {
-    // TODO (Dev C):
-    // POST https://api.telegram.org/bot{TOKEN}/sendMessage
-    // Body: { chat_id: chatId, text: message, parse_mode: 'HTML' }
-    // Return { success: true, messageId } or { success: false, error }
-    // NEVER throw — return error so sendBulk doesn't break
-    void chatId; void message;
-    throw new Error('Not implemented');
+    try {
+      const axios = require('axios');
+      const url = `${this.apiUrl}/sendMessage`;
+
+      const response = await axios.post(url, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML'
+      });
+
+      return {
+        success: true,
+        messageId: response.data.result.message_id
+      };
+    } catch (error) {
+      console.error('Telegram Error:', error.response?.data || error.message);
+
+      // We return success: false instead of throwing to keep the system running
+      return {
+        success: false,
+        error: error.response?.data?.description || error.message
+      };
+    }
   }
 }
 
