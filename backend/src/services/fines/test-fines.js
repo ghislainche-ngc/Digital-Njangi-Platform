@@ -1,18 +1,35 @@
-const FineService = require('./FineService');
-const fines = new FineService();
+const TelegramService = require('../notification/TelegramNotificationService');
 
-async function runTest() {
-    console.log("--- Starting Fine Module Test ---");
-    
-    try {
-        // This triggers the logic we wrote
-        const result = await fines.createFine("User_Glory", "LATE_ARRIVAL");
+class SocialFundService {
+    constructor() {
+        this.monthlyDues = 1000; // Example: 1000 XAF per month
+        this.notifier = new TelegramService();
+    }
+
+    /**
+     * Record a payment into the social fund
+     */
+    async recordPayment(memberId, amount) {
+        const payment = {
+            memberId,
+            amount,
+            date: new Date().toISOString(),
+            type: 'SOCIAL_FUND'
+        };
+
+        console.log(`💰 Social Fund payment recorded: ${amount} XAF for ${memberId}`);
+
+        // Notify the member
+        const message = `🤝 *Social Fund Update*\nThank you ${memberId}!\nPayment of ${amount} XAF received.`;
         
-        console.log("✅ Success!");
-        console.log("Fine Details:", result);
-    } catch (error) {
-        console.log("❌ Test finished with a status check:", error.message);
+        try {
+            await this.notifier.sendNotification(memberId, message);
+        } catch (err) {
+            console.log("Notification skipped for social payment.");
+        }
+
+        return payment;
     }
 }
 
-runTest();
+module.exports = SocialFundService;
