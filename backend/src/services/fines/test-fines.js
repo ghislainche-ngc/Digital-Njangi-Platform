@@ -1,16 +1,43 @@
-const FineService = require('./FineService');
-const fines = new FineService();
+// 1. Import the Telegram service
+const TelegramService = require('../notification/TelegramNotificationService');
 
-async function runTest() {
-    console.log("--- Starting Fine Module Test ---");
-    
-    // Simulate creating a fine for a member
-    const lateFine = await fines.createFine("Member_001", "LATE_ARRIVAL");
-    console.log(`Success! Amount: ${lateFine.amount} ${fines.currency}`);
+const FINE_TYPES = {
+    LATE_ARRIVAL: 500,
+    MISSING_MEETING: 2000,
+    LATE_CONTRIBUTION: 1000
+};
 
-    // Check total owed
-    const total = await fines.getTotalOwed("Member_001", [lateFine]);
-    console.log(`Total Owed for Member_001: ${total} ${fines.currency}`);
+class FineService {
+    constructor() {
+        this.currency = "XAF";
+        // 2. Initialize the notification service
+        this.notifier = new TelegramService();
+    }
+
+    async createFine(memberId, type, customAmount = null) {
+        const amount = customAmount || FINE_TYPES[type] || 0;
+        
+        if (amount === 0) throw new Error("Invalid fine type.");
+
+        const newFine = {
+            memberId,
+            amount,
+            type,
+            createdAt: new Date().toISOString()
+        };
+
+        // 3. Send the notification!
+        const message = `🚨 *New Fine Issued*\nMember: ${memberId}\nAmount: ${amount} ${this.currency}\nReason: ${type.replace('_', ' ')}`;
+        
+        try {
+            await this.notifier.sendNotification(memberId, message);
+            console.log("✅ Fine created and Notification sent!");
+        } catch (err) {
+            console.log("⚠️ Fine created, but notification failed (check your .env/Token).");
+        }
+
+        return newFine;
+    }
 }
 
-runTest();
+module.exports = FineService;
