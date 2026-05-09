@@ -1,35 +1,27 @@
-const TelegramService = require('../notification/TelegramNotificationService');
+const FineService = require('./fines/FineService');
+const SocialFundService = require('./socialFund/SocialFundService');
 
-class SocialFundService {
-    constructor() {
-        this.monthlyDues = 1000; // Example: 1000 XAF per month
-        this.notifier = new TelegramService();
-    }
+async function generateMemberReport(memberId) {
+    const fines = new FineService();
+    const social = new SocialFundService();
 
-    /**
-     * Record a payment into the social fund
-     */
-    async recordPayment(memberId, amount) {
-        const payment = {
-            memberId,
-            amount,
-            date: new Date().toISOString(),
-            type: 'SOCIAL_FUND'
-        };
+    console.log(`\n--- 📊 GENERATING REPORT FOR: ${memberId} ---`);
 
-        console.log(`💰 Social Fund payment recorded: ${amount} XAF for ${memberId}`);
+    // 1. Check Fines
+    const lateFine = await fines.createFine(memberId, "LATE_ARRIVAL");
+    
+    // 2. Record Social Fund Payment
+    const payment = await social.recordPayment(memberId, 1000);
 
-        // Notify the member
-        const message = `🤝 *Social Fund Update*\nThank you ${memberId}!\nPayment of ${amount} XAF received.`;
-        
-        try {
-            await this.notifier.sendNotification(memberId, message);
-        } catch (err) {
-            console.log("Notification skipped for social payment.");
-        }
-
-        return payment;
-    }
+    // 3. The "Dashboard" View
+    console.log("\n--- 📋 MEMBER STATUS ---");
+    console.table([
+        { Category: "Fines Owed", Value: `${lateFine.amount} XAF` },
+        { Category: "Social Fund", Value: `${payment.amount} XAF (Received)` },
+        { Category: "Account Status", Value: "✅ Active" }
+    ]);
+    
+    console.log("------------------------------------------\n");
 }
 
-module.exports = SocialFundService;
+generateMemberReport("User_Glory");
