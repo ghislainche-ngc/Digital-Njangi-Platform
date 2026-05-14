@@ -10,10 +10,11 @@ const POLL_TIMEOUT_MS = 30000;
 /**
  * MTNMoMoService — MTN Mobile Money Collection & Disbursement API.
  *
- * Sandbox base URL: https://sandbox.momodeveloper.mtn.com
- * Set X-Target-Environment: sandbox header for all requests.
- *
- * @task Dev B — Task B-01
+ * OOP Pillars:
+ *   - Inheritance: extends PaymentProvider (abstract base)
+ *   - Polymorphism: overrides charge(), disburse(), getStatus(), refund()
+ *   - Encapsulation: private _getCollectionToken(), _getDisbursementToken(), _pollStatus()
+ *   - Abstraction: callers use charge(phone, amount) without knowing MoMo internals
  */
 class MTNMoMoService extends PaymentProvider {
   constructor(config) {
@@ -22,63 +23,216 @@ class MTNMoMoService extends PaymentProvider {
     this.apiUser = config.apiUser;
     this.apiKey = config.apiKey;
     this.targetEnv = config.targetEnv || 'sandbox';
+    this.callbackUrl = config.callbackUrl || '';
   }
 
   /**
-   * Step 1: Get a Bearer token from the Collection API.
+   * @private
+   * Obtain a Bearer token from the Collection API using Basic Auth.
    */
   async _getCollectionToken() {
-    // TODO (Dev B): POST /collection/token/ with Basic Auth
-    // Return Bearer token string
-    throw new Error('Not implemented');
-  }
+    const credentials = Buffer.from(`${this.apiUser}:${this.apiKey}`).toString('base64');
 
-  async _getDisbursementToken() {
-    // TODO (Dev B): POST /disbursement/token/ with Basic Auth
-    throw new Error('Not implemented');
+    const res = await fetch(`${MOMO_BASE}/collection/token/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`MoMo Collection token failed (${res.status}): ${body}`);
+    }
+
+    const data = await res.json();
+    return data.access_token;
   }
 
   /**
-   * Poll until status is SUCCESSFUL, FAILED, or timeout.
+   * @private
+   * Obtain a Bearer token from the Disbursement API using Basic Auth.
+   */
+  async _getDisbursementToken() {
+    const credentials = Buffer.from(`${this.apiUser}:${this.apiKey}`).toString('base64');
+
+    const res = await fetch(`${MOMO_BASE}/disbursement/token/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`MoMo Disbursement token failed (${res.status}): ${body}`);
+    }
+
+    const data = await res.json();
+    return data.access_token;
+  }
+
+  /**
+   * @private
+   * Poll a MoMo endpoint until the transaction resolves or times out.
+   * @returns {Promise<'SUCCESSFUL'|'FAILED'|'TIMEOUT'>}
    */
   async _pollStatus(endpoint, referenceId, token) {
     const deadline = Date.now() + POLL_TIMEOUT_MS;
+
     while (Date.now() < deadline) {
-      // TODO (Dev B): GET /collection/v1_0/requesttopay/{referenceId}
-      // If status !== PENDING, return it
+      const res = await fetch(`${MOMO_BASE}${endpoint}/${referenceId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Target-Environment': this.targetEnv,
+          'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status !== 'PENDING') return data.status;
+      }
+
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
+
     return 'TIMEOUT';
   }
 
+  /**
+   * Debit a member's mobile wallet (collection).
+   * @param {string} phone — E.164, e.g. +237677000001
+   * @param {number} amount — amount in FCFA
+   * @returns {Promise<{ success: boolean, externalRef: string, status: string }>}
+   */
   async charge(phone, amount) {
-    // TODO (Dev B):
-    // 1. _getCollectionToken()
-    // 2. POST /collection/v1_0/requesttopay
-    //    Headers: { Authorization: Bearer token, X-Reference-Id: uuidv4(),
-    //               X-Target-Environment: sandbox, Ocp-Apim-Subscription-Key }
-    //    Body: { amount, currency: 'EUR', externalId: uuidv4(), payer: { partyIdType: 'MSISDN', partyId: phone }, payerMessage, payeeNote }
-    // 3. Poll until resolved
-    const externalRef = uuidv4(); // placeholder until implemented
-    void externalRef;
-    void MOMO_BASE;
-    throw new Error('Not implemented');
+    const token = await this._getCollectionToken();
+    const referenceId = uuidv4();
+
+    const res = await fetch(`${MOMO_BASE}/collection/v1_0/requesttopay`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Reference-Id': referenceId,
+        'X-Target-Environment': this.targetEnv,
+        'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+        'Content-Type': 'application/json',
+        ...(this.callbackUrl && { 'X-Callback-Url': this.callbackUrl }),
+      },
+      body: JSON.stringify({
+        amount: String(amount),
+        currency: 'EUR',
+        externalId: referenceId,
+        payer: { partyIdType: 'MSISDN', partyId: phone.replace('+', '') },
+        payerMessage: 'NjangiBridge contribution payment',
+        payeeNote: 'Njangi contribution',
+      }),
+    });
+
+    if (!res.ok && res.status !== 202) {
+      const body = await res.text();
+      throw new Error(`MoMo charge request failed (${res.status}): ${body}`);
+    }
+
+    const status = await this._pollStatus(
+      '/collection/v1_0/requesttopay',
+      referenceId,
+      token
+    );
+
+    return {
+      success: status === 'SUCCESSFUL',
+      externalRef: referenceId,
+      status,
+    };
   }
 
+  /**
+   * Credit a member's mobile wallet (disbursement / payout).
+   * @param {string} phone — E.164
+   * @param {number} amount — amount in FCFA
+   * @returns {Promise<{ success: boolean, externalRef: string, status: string }>}
+   */
   async disburse(phone, amount) {
-    // TODO (Dev B): similar to charge but uses /disbursement/v1_0/transfer
-    void phone; void amount;
-    throw new Error('Not implemented');
+    const token = await this._getDisbursementToken();
+    const referenceId = uuidv4();
+
+    const res = await fetch(`${MOMO_BASE}/disbursement/v1_0/transfer`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Reference-Id': referenceId,
+        'X-Target-Environment': this.targetEnv,
+        'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+        'Content-Type': 'application/json',
+        ...(this.callbackUrl && { 'X-Callback-Url': this.callbackUrl }),
+      },
+      body: JSON.stringify({
+        amount: String(amount),
+        currency: 'EUR',
+        externalId: referenceId,
+        payee: { partyIdType: 'MSISDN', partyId: phone.replace('+', '') },
+        payerMessage: 'NjangiBridge payout disbursement',
+        payeeNote: 'Njangi payout',
+      }),
+    });
+
+    if (!res.ok && res.status !== 202) {
+      const body = await res.text();
+      throw new Error(`MoMo disburse request failed (${res.status}): ${body}`);
+    }
+
+    const status = await this._pollStatus(
+      '/disbursement/v1_0/transfer',
+      referenceId,
+      token
+    );
+
+    return {
+      success: status === 'SUCCESSFUL',
+      externalRef: referenceId,
+      status,
+    };
   }
 
+  /**
+   * Check status of a previously submitted collection request.
+   * @param {string} externalRef — the X-Reference-Id from charge()
+   * @returns {Promise<'SUCCESSFUL'|'FAILED'|'PENDING'>}
+   */
   async getStatus(externalRef) {
-    // TODO (Dev B): GET /collection/v1_0/requesttopay/{externalRef}
-    void externalRef;
-    throw new Error('Not implemented');
+    const token = await this._getCollectionToken();
+
+    const res = await fetch(
+      `${MOMO_BASE}/collection/v1_0/requesttopay/${externalRef}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Target-Environment': this.targetEnv,
+          'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`MoMo getStatus failed (${res.status}): ${body}`);
+    }
+
+    const data = await res.json();
+    return data.status;
   }
 
+  /**
+   * Refund is not natively supported by MoMo — use disbursement as workaround.
+   */
   async refund(_externalRef) {
-    throw new Error('Not implemented');
+    throw new Error('MoMo does not support native refunds. Use disburse() instead.');
   }
 }
 
