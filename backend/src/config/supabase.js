@@ -1,6 +1,6 @@
 'use strict';
 
-const { createClient } = require('@supabase/supabase-js');
+const DBConnect = require('./DBConnect');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
@@ -13,9 +13,21 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 /**
- * Service-role client — bypasses RLS.
- * Use ONLY in trusted server-side code, never expose to frontend.
+ * Database connection — Singleton instance of DBConnect.
+ *
+ * Provides both the OOP CRUD interface (db.findAll, db.create, etc.)
+ * and the raw Supabase client (db.getClient()) for advanced queries.
+ *
+ * Usage:
+ *   const { db, supabase } = require('../config/supabase');
+ *   // OOP way (preferred):
+ *   const users = await db.findAll('users', { status: 'active' });
+ *   // Legacy way (backward-compatible):
+ *   const { data } = await supabase.from('users').select('*');
  */
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const db = DBConnect.getInstance(supabaseUrl, supabaseServiceKey);
 
-module.exports = { supabase };
+// Backward compatibility — existing code imports { supabase }
+const supabase = db.getClient();
+
+module.exports = { db, supabase, DBConnect };
