@@ -2,6 +2,7 @@
 
 const TelegramNotificationService = require('./TelegramNotificationService');
 const SMSNotificationService = require('./SMSNotificationService');
+const MockNotificationService = require('./MockNotificationService');
 
 /**
  * Bilingual message templates (EN/FR).
@@ -39,9 +40,31 @@ const templates = {
 
 /**
  * Factory — returns the appropriate notification service.
- * Primary: Telegram. Fallback: SMS.
+ * Primary: Telegram. Fallback: SMS. Tests/local dev: Mock.
  */
 const getTelegramService = () => new TelegramNotificationService();
 const getSMSService = () => new SMSNotificationService();
+const getMockService = () => new MockNotificationService();
 
-module.exports = { getTelegramService, getSMSService, templates };
+/**
+ * Resolve the active notification service for the given channel.
+ * Set NOTIFICATION_DRIVER=mock (or run tests) to swap in the mock — one line,
+ * no other code changes. Demonstrates the factory pattern.
+ *
+ * @param {'telegram'|'sms'} [channel='telegram']
+ * @returns {NotificationService}
+ */
+const getNotificationService = (channel = 'telegram') => {
+  if (process.env.NOTIFICATION_DRIVER === 'mock' || process.env.NODE_ENV === 'test') {
+    return getMockService();
+  }
+  return channel === 'sms' ? getSMSService() : getTelegramService();
+};
+
+module.exports = {
+  getTelegramService,
+  getSMSService,
+  getMockService,
+  getNotificationService,
+  templates,
+};
