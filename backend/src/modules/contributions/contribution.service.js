@@ -1,49 +1,398 @@
 'use strict';
 
 const { supabase } = require('../../config/supabase');
+const { getProvider } = require('../../services/payment/index');
+const { AuditService, AuditEvents } = require('../../services/audit/AuditService');
+const { templates } = require('../../services/notification/index');
+
+const auditService = new AuditService(supabase);
 
 /**
- * ContributionService — MoMo deductions, cash payments, retries.
+ * ContributionService — handles MoMo deductions, cash payments, listing,
+ * and retry logic for failed payments.
  *
- * @task Dev B — Task B-02
+ * OOP Pillars:
+ *   - Encapsulation: internal helpers (_logTransaction, _getActiveCycle) hidden
+ *   - Abstraction: callers use recordCashPayment() without knowing DB internals
+ *   - Dependency Injection: payment provider is resolved via Factory at runtime
  */
 class ContributionService {
-  constructor(paymentProvider, notificationService, auditService) {
-    this.paymentProvider = paymentProvider;
-    this.notificationService = notificationService;
-    this.auditService = auditService;
+  /**
+   * List all contributions for a group, optionally filtered by cycle or status.
+   */
+  async listContributions(groupId, filters = {}) {
+    let query = supabase
+      .from('contributions')
+      .select('*, users!contributions_user_id_fkey(full_name, phone, email)')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: false });
+
+    if (filters.cycleId) query = query.eq('cycle_id', filters.cycleId);
+    if (filters.status) query = query.eq('status', filters.status);
+
+    const offset = ((filters.page || 1) - 1) * (filters.limit || 20);
+    query = query.range(offset, offset + (filters.limit || 20) - 1);
+
+    const { data, error } = await query;
+    if (error) throw this._dbError('listContributions', error);
+    return data;
   }
 
   /**
-   * Initiate a MoMo deduction for a pending contribution.
-   * Retries once automatically if first attempt fails.
+   * Get the authenticated member's own contributions in a group.
    */
-  async initiateMoMoDeduction(contributionId) {
-    // TODO (Dev B):
-    // 1. Get contribution record + member phone
-    // 2. Get payment provider for their gateway (mtn/orange)
-    // 3. provider.charge(phone, amount)
-    // 4. Log in payment_transactions
-    // 5. Update contribution status
-    // 6. Trigger notification
-    // 7. If failed, retry once
-    throw new Error('Not implemented');
+  async getMyContributions(groupId, userId) {
+    const { data, error } = await supabase
+      .from('contributions')
+      .select('*, cycles(cycle_number, start_date, end_date)')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw this._dbError('getMyContributions', error);
+    return data;
   }
 
   /**
-   * Record a cash payment made by a member.
-   * Fires FRAUD ALERT if Treasurer records their own payment.
+   * Record a cash payment made by a member (Treasurer only).
+   *
+   * ANTI-FRAUD RULE: Treasurer cannot record their own cash payment.
+   * This is hardcoded and must never be bypassed.
    */
-  async recordCashPayment(groupId, memberId, recordedBy) {
-    // TODO (Dev B):
-    // ANTI-FRAUD RULE — hardcoded, must never be bypassable:
+  async recordCashPayment(groupId, memberId, recordedBy, amount, notes) {
     if (recordedBy === memberId) {
-      // Fire fraud alert to President
-      // await this.notificationService.send(presidentPhone, templates.fraudAlert(treasurerName));
-      // await this.auditService.log(groupId, recordedBy, 'FRAUD_ALERT', { memberId });
+      await auditService.log(
+        groupId,
+        recordedBy,
+        AuditEvents.FRAUD_ALERT_SELF_CASH_PAYMENT,
+        { memberId, amount, notes }
+      );
+
+      const err = new Error('Treasurer cannot record their own cash payment.');
+      err.statusCode = 403;
+      err.code = 'FRAUD_SELF_PAYMENT';
+      throw err;
     }
-    throw new Error('Not implemented');
+
+    const cycle = await this._getActiveCycle(groupId);
+    if (!cycle) {
+      const err = new Error('No active cycle found for this group.');
+      err.statusCode = 400;
+      err.code = 'NO_ACTIVE_CYCLE';
+      throw err;
+    }
+
+    const { data: existing } = await supabase
+      .from('contributions')
+      .select('id, status')
+      .eq('cycle_id', cycle.id)
+      .eq('user_id', memberId)
+      .single();
+
+    if (existing && existing.status === 'confirmed') {
+      const err = new Error('Member has already contributed for this cycle.');
+      err.statusCode = 409;
+      err.code = 'ALREADY_CONTRIBUTED';
+      throw err;
+    }
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('contributions')
+        .update({
+          status: 'confirmed',
+          payment_method: 'cash',
+          amount,
+          recorded_by: recordedBy,
+          confirmed_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+        .select();
+
+      if (error) throw this._dbError('recordCashPayment (update)', error);
+
+      await auditService.log(groupId, recordedBy, AuditEvents.CASH_PAYMENT_RECORDED, {
+        contributionId: existing.id,
+        memberId,
+        amount,
+        notes,
+      });
+
+      return data[0];
+    }
+
+    const { data, error } = await supabase
+      .from('contributions')
+      .insert({
+        cycle_id: cycle.id,
+        user_id: memberId,
+        group_id: groupId,
+        amount,
+        status: 'confirmed',
+        payment_method: 'cash',
+        recorded_by: recordedBy,
+        confirmed_at: new Date().toISOString(),
+      })
+      .select();
+
+    if (error) throw this._dbError('recordCashPayment (insert)', error);
+
+    await auditService.log(groupId, recordedBy, AuditEvents.CASH_PAYMENT_RECORDED, {
+      contributionId: data[0].id,
+      memberId,
+      amount,
+      notes,
+    });
+
+    return data[0];
+  }
+
+  /**
+   * Initiate a MoMo/Orange deduction for a pending contribution.
+   * Creates the contribution record if it doesn't exist, then charges the wallet.
+   * Retries once automatically on first failure.
+   */
+  async initiateMobilePayment(groupId, userId, gateway) {
+    const cycle = await this._getActiveCycle(groupId);
+    if (!cycle) {
+      const err = new Error('No active cycle found for this group.');
+      err.statusCode = 400;
+      err.code = 'NO_ACTIVE_CYCLE';
+      throw err;
+    }
+
+    const { data: group } = await supabase
+      .from('njangi_groups')
+      .select('contribution_amount')
+      .eq('id', groupId)
+      .single();
+
+    const amount = group.contribution_amount;
+
+    const { data: user } = await supabase
+      .from('users')
+      .select('phone, full_name')
+      .eq('id', userId)
+      .single();
+
+    let contribution = await this._getOrCreatePendingContribution(
+      cycle.id, userId, groupId, amount, gateway
+    );
+
+    if (contribution.status === 'confirmed') {
+      const err = new Error('Contribution already confirmed for this cycle.');
+      err.statusCode = 409;
+      err.code = 'ALREADY_CONTRIBUTED';
+      throw err;
+    }
+
+    await supabase
+      .from('contributions')
+      .update({ status: 'processing' })
+      .eq('id', contribution.id);
+
+    const provider = getProvider(gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo');
+    let result;
+
+    try {
+      result = await provider.charge(user.phone, amount);
+    } catch (chargeErr) {
+      result = { success: false, externalRef: null, status: 'FAILED' };
+    }
+
+    await this._logTransaction({
+      referenceType: 'contribution',
+      referenceId: contribution.id,
+      gateway: gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo',
+      externalRef: result.externalRef,
+      phone: user.phone,
+      amount,
+      direction: 'debit',
+      status: result.success ? 'success' : 'failed',
+    });
+
+    if (!result.success) {
+      try {
+        result = await provider.charge(user.phone, amount);
+        await this._logTransaction({
+          referenceType: 'contribution',
+          referenceId: contribution.id,
+          gateway: gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo',
+          externalRef: result.externalRef,
+          phone: user.phone,
+          amount,
+          direction: 'debit',
+          status: result.success ? 'success' : 'failed',
+          attempts: 2,
+        });
+      } catch {
+        result = { success: false, externalRef: null, status: 'FAILED' };
+      }
+    }
+
+    const finalStatus = result.success ? 'confirmed' : 'failed';
+    await supabase
+      .from('contributions')
+      .update({
+        status: finalStatus,
+        ...(result.success && { confirmed_at: new Date().toISOString() }),
+      })
+      .eq('id', contribution.id);
+
+    const eventType = result.success
+      ? AuditEvents.CONTRIBUTION_CONFIRMED
+      : AuditEvents.CONTRIBUTION_FAILED;
+
+    await auditService.log(groupId, userId, eventType, {
+      contributionId: contribution.id,
+      amount,
+      gateway,
+      externalRef: result.externalRef,
+    });
+
+    return {
+      contributionId: contribution.id,
+      status: finalStatus,
+      externalRef: result.externalRef,
+      amount,
+    };
+  }
+
+  /**
+   * Retry a previously failed contribution payment.
+   */
+  async retryPayment(groupId, contributionId, gateway, requestedBy) {
+    const { data: contribution, error } = await supabase
+      .from('contributions')
+      .select('*')
+      .eq('id', contributionId)
+      .eq('group_id', groupId)
+      .single();
+
+    if (error || !contribution) {
+      const err = new Error('Contribution not found.');
+      err.statusCode = 404;
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+
+    if (contribution.status === 'confirmed') {
+      const err = new Error('Contribution already confirmed.');
+      err.statusCode = 409;
+      err.code = 'ALREADY_CONFIRMED';
+      throw err;
+    }
+
+    return this.initiateMobilePayment(groupId, contribution.user_id, gateway);
+  }
+
+  /**
+   * Get contribution statistics for a group's current cycle.
+   */
+  async getStats(groupId) {
+    const cycle = await this._getActiveCycle(groupId);
+    if (!cycle) return { totalExpected: 0, totalCollected: 0, pending: 0, failed: 0 };
+
+    const { data: members } = await supabase
+      .from('memberships')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('status', 'active');
+
+    const { data: contributions } = await supabase
+      .from('contributions')
+      .select('status, amount')
+      .eq('cycle_id', cycle.id);
+
+    const { data: group } = await supabase
+      .from('njangi_groups')
+      .select('contribution_amount')
+      .eq('id', groupId)
+      .single();
+
+    const totalExpected = (members?.length || 0) * (group?.contribution_amount || 0);
+    const confirmed = contributions?.filter(c => c.status === 'confirmed') || [];
+    const totalCollected = confirmed.reduce((sum, c) => sum + Number(c.amount), 0);
+    const pending = contributions?.filter(c => c.status === 'pending').length || 0;
+    const failed = contributions?.filter(c => c.status === 'failed').length || 0;
+
+    return {
+      cycleId: cycle.id,
+      cycleNumber: cycle.cycle_number,
+      totalMembers: members?.length || 0,
+      totalExpected,
+      totalCollected,
+      pending,
+      confirmed: confirmed.length,
+      failed,
+      collectionRate: totalExpected > 0
+        ? Math.round((totalCollected / totalExpected) * 100)
+        : 0,
+    };
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────────
+
+  async _getActiveCycle(groupId) {
+    const { data } = await supabase
+      .from('cycles')
+      .select('*')
+      .eq('group_id', groupId)
+      .eq('status', 'active')
+      .order('cycle_number', { ascending: false })
+      .limit(1)
+      .single();
+
+    return data || null;
+  }
+
+  async _getOrCreatePendingContribution(cycleId, userId, groupId, amount, paymentMethod) {
+    const { data: existing } = await supabase
+      .from('contributions')
+      .select('*')
+      .eq('cycle_id', cycleId)
+      .eq('user_id', userId)
+      .single();
+
+    if (existing) return existing;
+
+    const { data, error } = await supabase
+      .from('contributions')
+      .insert({
+        cycle_id: cycleId,
+        user_id: userId,
+        group_id: groupId,
+        amount,
+        status: 'pending',
+        payment_method: paymentMethod,
+      })
+      .select()
+      .single();
+
+    if (error) throw this._dbError('_getOrCreatePendingContribution', error);
+    return data;
+  }
+
+  async _logTransaction(txn) {
+    await supabase.from('payment_transactions').insert({
+      reference_type: txn.referenceType,
+      reference_id: txn.referenceId,
+      gateway: txn.gateway,
+      external_ref: txn.externalRef,
+      phone: txn.phone,
+      amount: txn.amount,
+      direction: txn.direction,
+      status: txn.status,
+      attempts: txn.attempts || 1,
+    });
+  }
+
+  _dbError(operation, error) {
+    const err = new Error(`[ContributionService] ${operation} failed: ${error.message}`);
+    err.statusCode = 500;
+    err.code = 'DB_ERROR';
+    return err;
   }
 }
 
-module.exports = ContributionService;
+module.exports = new ContributionService();
