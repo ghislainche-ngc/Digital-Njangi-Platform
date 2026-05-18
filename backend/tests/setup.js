@@ -23,11 +23,6 @@ global.testGroup = {
   penalty_per_day: 500,
 };
 
-// Suppress console.error noise in tests — still logged on failure
-beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-});
-
-afterEach(() => {
-  jest.restoreAllMocks();
-});
+// Console suppression is handled per-test file where needed.
+// This file runs via setupFiles (before test framework), so
+// beforeEach/afterEach are not available here.
