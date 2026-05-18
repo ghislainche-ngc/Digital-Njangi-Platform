@@ -19,6 +19,25 @@ const reportService = new ReportService(db, pdfService);
  *   description: Ledger, summaries, personal history, PDF export
  */
 
+/**
+ * @swagger
+ * /groups/{groupId}/reports/ledger:
+ *   get:
+ *     summary: Get the full group financial ledger
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Ledger entries returned }
+ *       401: { description: Not authenticated }
+ *       403: { description: Not a member of this group }
+ *       500: { description: Server error }
+ */
 router.get('/:groupId/reports/ledger', auth, tenant, async (req, res) => {
   try {
     const ledger = await reportService.getLedger(req.params.groupId);
@@ -28,6 +47,25 @@ router.get('/:groupId/reports/ledger', auth, tenant, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /groups/{groupId}/reports/summary:
+ *   get:
+ *     summary: Get a financial summary for the group
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Group financial summary returned }
+ *       401: { description: Not authenticated }
+ *       403: { description: Not a member of this group }
+ *       500: { description: Server error }
+ */
 router.get('/:groupId/reports/summary', auth, tenant, async (req, res) => {
   try {
     const summary = await reportService.getSummary(req.params.groupId);
@@ -37,6 +75,25 @@ router.get('/:groupId/reports/summary', auth, tenant, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /groups/{groupId}/reports/my-history:
+ *   get:
+ *     summary: Get the authenticated member's personal transaction history
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Personal history returned }
+ *       401: { description: Not authenticated }
+ *       403: { description: Not a member of this group }
+ *       500: { description: Server error }
+ */
 router.get('/:groupId/reports/my-history', auth, tenant, async (req, res) => {
   try {
     const history = await reportService.getPersonalHistory(req.params.groupId, req.user.sub);
@@ -46,6 +103,25 @@ router.get('/:groupId/reports/my-history', auth, tenant, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /groups/{groupId}/reports/export:
+ *   post:
+ *     summary: Generate and export a PDF report (President and Treasurer only)
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: PDF report generated, public download URL returned }
+ *       401: { description: Not authenticated }
+ *       403: { description: Insufficient permissions }
+ *       500: { description: Server error }
+ */
 // PDF export — President and Treasurer only
 router.post(
   '/:groupId/reports/export',
