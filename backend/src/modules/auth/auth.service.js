@@ -1,25 +1,17 @@
 'use strict';
 
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../../config/supabase');
 
 const SALT_ROUNDS = 12;
 const JWT_EXPIRY = '24h';
+const OTP_LENGTH = 6;
+const OTP_EXPIRY_MINUTES = 10;
 
-/**
- * AuthService — all authentication business logic lives here.
- * Controllers are thin wrappers that call these methods.
- *
- * @task Dev A — Task A-03
- */
 class AuthService {
-  /**
-   * Register a new user. Hashes password, stores in DB, sends OTP via SMS.
-   * @returns {{ message: string }} — does NOT return the JWT until OTP verified
-   */
   async register({ email, phone, full_name, password, language = 'en' }) {
-    // Check for existing email or phone
     const { data: existing } = await supabase
       .from('users')
       .select('id')
@@ -43,16 +35,15 @@ class AuthService {
 
     if (error) throw error;
 
-    // TODO (Dev A): trigger SMS OTP via NotificationService
-    // await notificationService.sendOTP(phone);
+    const otpCode = await this._generateAndStoreOTP(phone);
 
-    return { message: 'Registration successful. Check your phone for the OTP code.', userId: user.id };
+    return {
+      message: 'Registration successful. Check your phone for the OTP code.',
+      userId: user.id,
+      otpCode: process.env.NODE_ENV === 'development' ? otpCode : undefined,
+    };
   }
 
-  /**
-   * Verify a 6-digit OTP and issue JWT.
-   * @returns {{ token: string, user: object }}
-   */
   async verifyOTP({ phone, code }) {
     const { data: record } = await supabase
       .from('otp_verifications')
@@ -69,7 +60,6 @@ class AuthService {
       throw err;
     }
 
-    // Invalidate used OTP
     await supabase.from('otp_verifications').delete().eq('id', record.id);
 
     const { data: user } = await supabase
@@ -82,10 +72,6 @@ class AuthService {
     return { token, user };
   }
 
-  /**
-   * Log in with email + password. Returns JWT.
-   * @returns {{ token: string, user: object }}
-   */
   async login({ email, password }) {
     const { data: user } = await supabase
       .from('users')
@@ -112,11 +98,20 @@ class AuthService {
     return { token, user: { id: user.id, email: user.email, full_name: user.full_name } };
   }
 
-  /**
-   * Signs a JWT with standard NAAS payload.
-   * @param {object} user
-   * @returns {string}
-   */
+  async _generateAndStoreOTP(phone) {
+    const code = String(crypto.randomInt(100000, 999999));
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+
+    await supabase.from('otp_verifications').delete().eq('phone', phone);
+
+    const { error } = await supabase
+      .from('otp_verifications')
+      .insert({ phone, code, expires_at: expiresAt });
+
+    if (error) throw error;
+    return code;
+  }
+
   _signToken(user) {
     return jwt.sign(
       { sub: user.id, email: user.email },

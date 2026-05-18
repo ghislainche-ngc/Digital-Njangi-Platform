@@ -19,14 +19,20 @@ class AuditService {
    * @param {object} payload — any relevant context (amounts, reasons, etc.)
    */
   async log(groupId, userId, eventType, payload = {}) {
-    const { error } = await this.db
-      .from('audit_events')
-      .insert({ group_id: groupId, user_id: userId, event_type: eventType, payload });
+    try {
+      const { error } = await this.db
+        .from('audit_events')
+        .insert({ group_id: groupId, user_id: userId, event_type: eventType, payload });
 
-    if (error) {
-      // Never crash the main flow — audit is best-effort
+      if (error) {
+        // Never crash the main flow — audit is best-effort
+        // eslint-disable-next-line no-console
+        console.error('[Audit] Failed to log event:', error.message);
+      }
+    } catch (err) {
+      // A rejected insert (e.g. network error) must never crash the main flow
       // eslint-disable-next-line no-console
-      console.error('[Audit] Failed to log event:', error.message);
+      console.error('[Audit] Failed to log event:', err.message);
     }
   }
 }

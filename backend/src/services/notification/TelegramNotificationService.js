@@ -19,17 +19,35 @@ class TelegramNotificationService extends NotificationService {
   }
 
   /**
+   * Send a message via the Telegram Bot API.
+   * NEVER throws — returns an error object so sendBulk() keeps going.
+   *
    * @param {string} chatId — user's Telegram chat_id (stored in users.telegram_chat_id)
    * @param {string} message
+   * @returns {Promise<{success: boolean, messageId?: number, error?: string}>}
    */
   async send(chatId, message) {
-    // TODO (Dev C):
-    // POST https://api.telegram.org/bot{TOKEN}/sendMessage
-    // Body: { chat_id: chatId, text: message, parse_mode: 'HTML' }
-    // Return { success: true, messageId } or { success: false, error }
-    // NEVER throw — return error so sendBulk doesn't break
-    void chatId; void message;
-    throw new Error('Not implemented');
+    if (!this.token) {
+      return { success: false, error: 'TELEGRAM_BOT_TOKEN is not configured.' };
+    }
+
+    try {
+      const response = await fetch(`${this.apiUrl}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }),
+      });
+
+      const body = await response.json();
+
+      if (!response.ok || !body.ok) {
+        return { success: false, error: body.description || `HTTP ${response.status}` };
+      }
+
+      return { success: true, messageId: body.result.message_id };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   }
 }
 

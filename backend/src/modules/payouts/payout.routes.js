@@ -5,155 +5,113 @@ const router = express.Router({ mergeParams: true });
 const auth = require('../../middleware/auth.middleware');
 const tenant = require('../../middleware/tenant.middleware');
 const { requireRole } = require('../../middleware/role.middleware');
+const ctrl = require('./payout.controller');
 
 /**
  * @swagger
  * tags:
  *   name: Payouts
- *   description: 5-step payout engine with eligibility checks
+ *   description: 5-step payout engine — rotation, eligibility, approval, execution
  */
 
 /**
  * @swagger
  * /groups/{groupId}/payouts:
  *   get:
- *     summary: List all payouts for a group
+ *     summary: List all payouts for a group (filterable by cycle/status)
  *     tags: [Payouts]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: groupId
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: cycleId
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [pending, approved, processing, completed, failed, blocked] }
  *     responses:
- *       200: { description: List of payouts returned }
- *       401: { description: Not authenticated }
- *       403: { description: Not a member of this group }
- *       500: { description: Server error }
+ *       200: { description: List of payouts }
  */
-// GET /groups/:groupId/payouts
-router.get('/:groupId/payouts', auth, tenant, (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev B Task B-04' });
-});
+router.get('/:groupId/payouts', auth, tenant, ctrl.listPayouts);
 
 /**
  * @swagger
  * /groups/{groupId}/payouts/current:
  *   get:
- *     summary: Get the current cycle's payout
+ *     summary: Get current cycle's payout status and eligibility
  *     tags: [Payouts]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: groupId
- *         required: true
- *         schema: { type: string }
+ *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: Current payout returned }
- *       401: { description: Not authenticated }
- *       403: { description: Not a member of this group }
- *       500: { description: Server error }
+ *       200: { description: Current payout status }
  */
-// GET /groups/:groupId/payouts/current
-router.get('/:groupId/payouts/current', auth, tenant, (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev B Task B-04' });
-});
+router.get('/:groupId/payouts/current', auth, tenant, ctrl.getCurrentPayout);
 
 /**
  * @swagger
  * /groups/{groupId}/payouts/nominate:
  *   post:
- *     summary: Nominate a member for the current payout (President only, President Decides mode)
+ *     summary: President nominates a recipient (president-decides rotation mode)
  *     tags: [Payouts]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: groupId
- *         required: true
- *         schema: { type: string }
+ *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [memberId]
+ *             required: [recipientId]
  *             properties:
- *               memberId: { type: string }
- *               reason:   { type: string, example: "Member has an urgent medical need" }
+ *               recipientId: { type: string, format: uuid }
+ *               deliveryMethod: { type: string, enum: [momo_mtn, momo_orange, cash, bank] }
+ *               notes: { type: string }
  *     responses:
- *       201: { description: Member nominated for payout }
- *       400: { description: Validation error }
- *       401: { description: Not authenticated }
- *       403: { description: Insufficient permissions }
- *       409: { description: A nominee already exists for this cycle }
- *       500: { description: Server error }
+ *       201: { description: Payout nomination created }
  */
-// POST /groups/:groupId/payouts/nominate (President only — President Decides mode)
-router.post('/:groupId/payouts/nominate', auth, tenant, requireRole('president'), (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev B Task B-04' });
-});
+router.post('/:groupId/payouts/nominate', auth, tenant, requireRole('president'), ctrl.nominate);
 
 /**
  * @swagger
  * /groups/{groupId}/payouts/{id}/approve:
  *   post:
- *     summary: Approve a pending payout (President only)
+ *     summary: President approves a pending payout
  *     tags: [Payouts]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: groupId
- *         required: true
- *         schema: { type: string }
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200: { description: Payout approved }
- *       400: { description: Payout not in an approvable state }
- *       401: { description: Not authenticated }
- *       403: { description: Insufficient permissions }
- *       500: { description: Server error }
+ *       400: { description: Collection threshold not met }
  */
-// POST /groups/:groupId/payouts/:id/approve (President)
-router.post('/:groupId/payouts/:id/approve', auth, tenant, requireRole('president'), (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev B Task B-04' });
-});
+router.post('/:groupId/payouts/:id/approve', auth, tenant, requireRole('president'), ctrl.approve);
 
 /**
  * @swagger
  * /groups/{groupId}/payouts/{id}/execute:
  *   post:
- *     summary: Execute an approved payout disbursement (Treasurer only)
+ *     summary: Treasurer executes (disburses) an approved payout
  *     tags: [Payouts]
- *     security:
- *       - bearerAuth: []
+ *     security: [{ bearerAuth: [] }]
  *     parameters:
- *       - in: path
- *         name: groupId
- *         required: true
- *         schema: { type: string }
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               deliveryMethod: { type: string, enum: [momo_mtn, momo_orange, cash, bank] }
  *     responses:
  *       200: { description: Payout executed }
- *       400: { description: Payout not approved or eligibility check failed }
- *       401: { description: Not authenticated }
- *       403: { description: Insufficient permissions }
- *       409: { description: Payout already executed }
- *       500: { description: Server error }
  */
-// POST /groups/:groupId/payouts/:id/execute (Treasurer)
-router.post('/:groupId/payouts/:id/execute', auth, tenant, requireRole('treasurer'), (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev B Task B-04' });
-});
+router.post('/:groupId/payouts/:id/execute', auth, tenant, requireRole('treasurer'), ctrl.execute);
 
 module.exports = router;

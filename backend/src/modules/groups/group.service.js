@@ -2,38 +2,124 @@
 
 const { supabase } = require('../../config/supabase');
 
-/**
- * GroupService — create and manage Njangi groups.
- *
- * @task Dev A — Task A-05
- */
 class GroupService {
-  /**
-   * Create a new group. Assigns creator as President. Creates Cycle 1.
-   */
   async createGroup(userId, groupData) {
-    // TODO (Dev A): implement
-    // 1. Insert into njangi_groups (created_by = userId)
-    // 2. Insert membership: { user_id: userId, role: 'president', rotation_position: 1 }
-    // 3. Insert first cycle: { cycle_number: 1, start_date: today, status: 'active' }
-    throw new Error('Not implemented');
+    const { data: group, error: groupError } = await supabase
+      .from('njangi_groups')
+      .insert({
+        name: groupData.name,
+        contribution_amount: groupData.contribution_amount,
+        frequency: groupData.frequency || 'monthly',
+        rotation_type: groupData.rotation_type,
+        penalty_per_day: groupData.penalty_per_day || 0,
+        payout_threshold_pct: groupData.payout_threshold_pct || 100,
+        approval_threshold: groupData.approval_threshold || 0,
+        created_by: userId,
+      })
+      .select()
+      .single();
+
+    if (groupError) throw groupError;
+
+    const { data: membership, error: memError } = await supabase
+      .from('memberships')
+      .insert({
+        user_id: userId,
+        group_id: group.id,
+        role: 'president',
+        rotation_position: 1,
+      })
+      .select()
+      .single();
+
+    if (memError) throw memError;
+
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    const { data: cycle, error: cycleError } = await supabase
+      .from('cycles')
+      .insert({
+        group_id: group.id,
+        cycle_number: 1,
+        start_date: today.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        status: 'active',
+      })
+      .select()
+      .single();
+
+    if (cycleError) throw cycleError;
+
+    return { group, membership, cycle };
   }
 
-  /**
-   * Get a group with member count and current cycle.
-   */
   async getGroup(groupId) {
-    // TODO (Dev A): implement
-    throw new Error('Not implemented');
+    const { data: group, error: groupError } = await supabase
+      .from('njangi_groups')
+      .select('*')
+      .eq('id', groupId)
+      .single();
+
+    if (groupError || !group) {
+      const err = new Error('Group not found.');
+      err.statusCode = 404;
+      err.code = 'GROUP_NOT_FOUND';
+      throw err;
+    }
+
+    const { count } = await supabase
+      .from('memberships')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', groupId)
+      .eq('status', 'active');
+
+    const { data: activeCycle } = await supabase
+      .from('cycles')
+      .select('*')
+      .eq('group_id', groupId)
+      .eq('status', 'active')
+      .single();
+
+    return { ...group, memberCount: count || 0, activeCycle: activeCycle || null };
   }
 
-  /**
-   * Update group settings. Blocks rotation type change mid-cycle.
-   */
   async updateSettings(groupId, data) {
-    // TODO (Dev A): implement
-    // If rotation_type is being changed, check current cycle status
-    throw new Error('Not implemented');
+    if (data.rotation_type) {
+      const { data: activeCycle } = await supabase
+        .from('cycles')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('status', 'active')
+        .single();
+
+      if (activeCycle) {
+        const err = new Error('Cannot change rotation type while a cycle is active.');
+        err.statusCode = 400;
+        err.code = 'ROTATION_LOCKED';
+        throw err;
+      }
+    }
+
+    const allowedFields = [
+      'name', 'contribution_amount', 'frequency', 'rotation_type',
+      'penalty_per_day', 'payout_threshold_pct', 'approval_threshold',
+    ];
+    const updateData = {};
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) updateData[field] = data[field];
+    }
+
+    const { data: updated, error } = await supabase
+      .from('njangi_groups')
+      .update(updateData)
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return updated;
   }
 }
 

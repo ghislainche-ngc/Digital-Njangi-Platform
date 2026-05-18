@@ -6,6 +6,12 @@ const auth = require('../../middleware/auth.middleware');
 const tenant = require('../../middleware/tenant.middleware');
 const { requireRole } = require('../../middleware/role.middleware');
 
+const { db } = require('../../config/supabase');
+const pdfService = require('../../services/pdf/PDFService');
+const ReportService = require('./report.service');
+
+const reportService = new ReportService(db, pdfService);
+
 /**
  * @swagger
  * tags:
@@ -32,8 +38,13 @@ const { requireRole } = require('../../middleware/role.middleware');
  *       403: { description: Not a member of this group }
  *       500: { description: Server error }
  */
-router.get('/:groupId/reports/ledger', auth, tenant, (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-05' });
+router.get('/:groupId/reports/ledger', auth, tenant, async (req, res) => {
+  try {
+    const ledger = await reportService.getLedger(req.params.groupId);
+    res.json(ledger);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'REPORT_ERROR' });
+  }
 });
 
 /**
@@ -55,8 +66,13 @@ router.get('/:groupId/reports/ledger', auth, tenant, (_req, res) => {
  *       403: { description: Not a member of this group }
  *       500: { description: Server error }
  */
-router.get('/:groupId/reports/summary', auth, tenant, (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-05' });
+router.get('/:groupId/reports/summary', auth, tenant, async (req, res) => {
+  try {
+    const summary = await reportService.getSummary(req.params.groupId);
+    res.json(summary);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'REPORT_ERROR' });
+  }
 });
 
 /**
@@ -78,8 +94,13 @@ router.get('/:groupId/reports/summary', auth, tenant, (_req, res) => {
  *       403: { description: Not a member of this group }
  *       500: { description: Server error }
  */
-router.get('/:groupId/reports/my-history', auth, tenant, (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-05' });
+router.get('/:groupId/reports/my-history', auth, tenant, async (req, res) => {
+  try {
+    const history = await reportService.getPersonalHistory(req.params.groupId, req.user.sub);
+    res.json(history);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'REPORT_ERROR' });
+  }
 });
 
 /**
@@ -95,26 +116,26 @@ router.get('/:groupId/reports/my-history', auth, tenant, (_req, res) => {
  *         name: groupId
  *         required: true
  *         schema: { type: string }
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               type:      { type: string, enum: [ledger, summary], example: summary }
- *               from_date: { type: string, format: date, example: "2026-01-01" }
- *               to_date:   { type: string, format: date, example: "2026-06-30" }
  *     responses:
- *       200: { description: PDF report generated }
- *       400: { description: Validation error }
+ *       200: { description: PDF report generated, public download URL returned }
  *       401: { description: Not authenticated }
  *       403: { description: Insufficient permissions }
  *       500: { description: Server error }
  */
 // PDF export — President and Treasurer only
-router.post('/:groupId/reports/export', auth, tenant, requireRole('president', 'treasurer'), (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-05' });
-});
+router.post(
+  '/:groupId/reports/export',
+  auth,
+  tenant,
+  requireRole('president', 'treasurer'),
+  async (req, res) => {
+    try {
+      const url = await reportService.generatePDFReport(req.params.groupId);
+      res.json({ url });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message, code: 'REPORT_ERROR' });
+    }
+  }
+);
 
 module.exports = router;

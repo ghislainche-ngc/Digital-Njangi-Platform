@@ -5,6 +5,11 @@ const router = express.Router({ mergeParams: true });
 const auth = require('../../middleware/auth.middleware');
 const tenant = require('../../middleware/tenant.middleware');
 const { requireRole } = require('../../middleware/role.middleware');
+const FineService = require('./fine.service');
+const { db } = require('../../config/supabase');
+const { AuditService } = require('../../services/audit/AuditService');
+
+const fineService = new FineService(db, new AuditService(db.getClient()));
 
 /**
  * @swagger
@@ -32,8 +37,13 @@ const { requireRole } = require('../../middleware/role.middleware');
  *       403: { description: Not a member of this group }
  *       500: { description: Server error }
  */
-router.get('/:groupId/fines', auth, tenant, (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-03' });
+router.get('/:groupId/fines', auth, tenant, async (req, res) => {
+  try {
+    const fines = await db.findAll('fines', { group_id: req.params.groupId });
+    res.json(fines);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'FINE_ERROR' });
+  }
 });
 
 /**
@@ -55,8 +65,13 @@ router.get('/:groupId/fines', auth, tenant, (_req, res) => {
  *       403: { description: Not a member of this group }
  *       500: { description: Server error }
  */
-router.get('/:groupId/fines/mine', auth, tenant, (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-03' });
+router.get('/:groupId/fines/mine', auth, tenant, async (req, res) => {
+  try {
+    const fines = await fineService.getMemberUnpaidFines(req.params.groupId, req.user.sub);
+    res.json(fines);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'FINE_ERROR' });
+  }
 });
 
 /**
@@ -90,8 +105,20 @@ router.get('/:groupId/fines/mine', auth, tenant, (_req, res) => {
  *       403: { description: Insufficient permissions }
  *       500: { description: Server error }
  */
-router.post('/:groupId/fines', auth, tenant, requireRole('treasurer'), (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-03' });
+router.post('/:groupId/fines', auth, tenant, requireRole('treasurer'), async (req, res) => {
+  try {
+    const { memberId, amount, reason } = req.body;
+    const fine = await fineService.recordFine(
+      req.params.groupId,
+      memberId,
+      amount,
+      reason,
+      req.user.sub
+    );
+    res.status(201).json(fine);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'FINE_ERROR' });
+  }
 });
 
 /**
@@ -118,18 +145,23 @@ router.post('/:groupId/fines', auth, tenant, requireRole('treasurer'), (_req, re
  *           schema:
  *             type: object
  *             properties:
- *               method: { type: string, enum: [cash, momo], example: cash }
- *               note:   { type: string, example: "Paid in cash at meeting" }
+ *               paymentMethod: { type: string, enum: [cash, momo], example: cash }
  *     responses:
  *       200: { description: Fine marked as paid }
  *       400: { description: Fine already paid or invalid state }
  *       401: { description: Not authenticated }
  *       403: { description: Insufficient permissions }
- *       409: { description: Fine already settled }
+ *       404: { description: Fine not found }
  *       500: { description: Server error }
  */
-router.patch('/:groupId/fines/:id/pay', auth, tenant, requireRole('treasurer'), (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-03' });
+router.patch('/:groupId/fines/:id/pay', auth, tenant, requireRole('treasurer'), async (req, res) => {
+  try {
+    const { paymentMethod } = req.body;
+    const fine = await fineService.markPaid(req.params.id, req.user.sub, paymentMethod);
+    res.json(fine);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'FINE_ERROR' });
+  }
 });
 
 /**
@@ -150,24 +182,31 @@ router.patch('/:groupId/fines/:id/pay', auth, tenant, requireRole('treasurer'), 
  *         required: true
  *         schema: { type: string }
  *     requestBody:
- *       required: false
+ *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [reason]
  *             properties:
  *               reason: { type: string, example: "Member had a valid emergency" }
  *     responses:
  *       200: { description: Fine waived }
- *       400: { description: Fine already paid or invalid state }
+ *       400: { description: A reason is required to waive a fine }
  *       401: { description: Not authenticated }
  *       403: { description: Insufficient permissions }
- *       409: { description: Fine already settled }
+ *       404: { description: Fine not found }
  *       500: { description: Server error }
  */
 // Waiver — President only
-router.patch('/:groupId/fines/:id/waive', auth, tenant, requireRole('president'), (_req, res) => {
-  res.status(501).json({ message: 'Not implemented — Dev C Task C-03' });
+router.patch('/:groupId/fines/:id/waive', auth, tenant, requireRole('president'), async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const fine = await fineService.waiveFine(req.params.id, req.user.sub, reason);
+    res.json(fine);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message, code: 'FINE_ERROR' });
+  }
 });
 
 module.exports = router;
