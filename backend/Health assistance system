@@ -1,0 +1,83 @@
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.time.LocalDateTime;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+public class AppointmentReminderService {
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    // Starts the background thread loop
+    public void startReminderCheck() {
+        // Runs the checkReminders task every 60 seconds, with an initial delay of 0 seconds
+        scheduler.scheduleAtFixedRate(this::checkRemindersFromDatabase, 0, 60, TimeUnit.SECONDS);
+    }
+
+    private void checkRemindersFromDatabase() {
+        // 1. Define the timeframe (e.g., look for appointments happening in the next 30 minutes)
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime threshold = now.plusMinutes(30);
+
+        // 2. Query your MySQL Database
+        String query = "SELECT a.appointment_id, p.name AS patient_name, a.appointment_time " +
+                       "FROM appointments a " +
+                       "JOIN patients p ON a.patient_id = p.id " +
+                       "WHERE a.appointment_time BETWEEN ? AND ? AND a.reminder_sent = 0";
+
+        try (Connection conn = DatabaseConnection.getConnection(); // Your DB connection utility
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setObject(1, now);
+            stmt.setObject(2, threshold);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                int appointmentId = rs.getInt("appointment_id");
+                String patientName = rs.getString("patient_name");
+                String apptTime = rs.getTimestamp("appointment_time").toString();
+
+                // 3. Trigger UI Alert safely on the JavaFX Thread
+                Platform.runLater(() -> {
+                    showAlert(patientName, apptTime);
+                });
+
+                // 4. Update database so the user isn't spammed with the same reminder next minute
+                updateReminderStatus(appointmentId);
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error fetching reminders: " + e.getMessage());
+        }
+    }
+
+    private void updateReminderStatus(int appointmentId) {
+        String updateQuery = "UPDATE appointments SET reminder_sent = 1 WHERE appointment_id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(updateQuery)) {
+            stmt.setInt(1, appointmentId);
+            stmt.executeUpdate();
+        } catch (Exception e) {
+            System.err.println("Error updating reminder status: " + e.getMessage());
+        }
+    }
+
+    private void showAlert(String patientName, String time) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Upcoming Appointment Reminder");
+        alert.setHeaderText("Upcoming Appointment!");
+        alert.setContentText("Patient " + patientName + " has an appointment scheduled at " + time);
+        alert.show();
+    }
+
+    // Call this when the application closes to shut down the background thread cleanly
+    public void stopService() {
+        if (scheduler != null && !scheduler.isShutdown()) {
+            scheduler.shutdown();
+        }
+    }
+}

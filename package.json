@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "alpinejs": "^3.14.1"
+    "alpinejs": "^3.14.1",
+    "axios": "^1.16.0",
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
