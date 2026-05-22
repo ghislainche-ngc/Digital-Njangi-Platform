@@ -30,3 +30,7 @@ coverage/
 
 # Temp files
 *.tmp
+
+# AI assistant local guidance files (kept local, not pushed to remote)
+CLAUDE.md
+AGENTS.md
