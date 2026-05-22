@@ -3,7 +3,6 @@
 const { supabase } = require('../../config/supabase');
 const { getProvider } = require('../../services/payment/index');
 const { AuditService, AuditEvents } = require('../../services/audit/AuditService');
-const { templates } = require('../../services/notification/index');
 
 const auditService = new AuditService(supabase);
 
@@ -175,7 +174,7 @@ class ContributionService {
       .eq('id', userId)
       .single();
 
-    let contribution = await this._getOrCreatePendingContribution(
+    const contribution = await this._getOrCreatePendingContribution(
       cycle.id, userId, groupId, amount, gateway
     );
 
@@ -261,7 +260,7 @@ class ContributionService {
   /**
    * Retry a previously failed contribution payment.
    */
-  async retryPayment(groupId, contributionId, gateway, requestedBy) {
+  async retryPayment(groupId, contributionId, gateway, _requestedBy) {
     const { data: contribution, error } = await supabase
       .from('contributions')
       .select('*')
