@@ -38,12 +38,21 @@ describe('campaySignature.verifyWebhookSignature', () => {
     expect(verifyWebhookSignature(undefined, KEY)).toBeNull();
   });
 
-  it('rejects tokens signed with a non-HS256 algorithm (algorithm confusion guard)', () => {
-    // 'none' algorithm token — a classic JWT vulnerability if not pinned.
-    const noneToken = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')
-      + '.'
-      + Buffer.from(JSON.stringify({ reference: 'abc' })).toString('base64url')
-      + '.';
-    expect(verifyWebhookSignature(noneToken, KEY)).toBeNull();
+  it('returns null when webhookKey is empty or missing', () => {
+    const token = jwt.sign({ reference: 'abc' }, KEY, { algorithm: 'HS256' });
+    expect(verifyWebhookSignature(token, '')).toBeNull();
+    expect(verifyWebhookSignature(token, undefined)).toBeNull();
+    expect(verifyWebhookSignature(token, null)).toBeNull();
+  });
+
+  it('rejects an alg:none token whose pin would otherwise be bypassed (algorithm confusion guard)', () => {
+    // Build an alg:none token WITH a non-empty signature segment so the
+    // algorithm-pinning check is the gate that rejects it (not the
+    // "signature required" check that fires when the segment is empty).
+    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ reference: 'abc' })).toString('base64url');
+    const fakeSig = Buffer.from('not-a-real-signature').toString('base64url');
+    const algNoneToken = `${header}.${payload}.${fakeSig}`;
+    expect(verifyWebhookSignature(algNoneToken, KEY)).toBeNull();
   });
 });
