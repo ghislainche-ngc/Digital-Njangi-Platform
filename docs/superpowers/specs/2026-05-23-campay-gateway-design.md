@@ -14,7 +14,12 @@
 
 Add **Campay** ([campay.net](https://campay.net)) as a third `PaymentProvider` implementation alongside `MTNMoMoService` and `OrangeMoneyService`. Njangi groups can opt to route their **member-contribution collection** through Campay's aggregator API, which covers MTN Mobile Money and Orange Money in Cameroon under one HTTP integration with automatic operator detection from the phone prefix.
 
-Unlike Monetbil (the previously evaluated provider), Campay's API includes a documented **disbursement endpoint** (`/api/withdraw/`), so `CampayService.disburse()` is a real implementation — not a stub-that-throws. However, **payouts to njangi winners still route through the recipient's native MTN/Orange direct API**, not through Campay, for reliability reasons (one fewer hop, no aggregator dependency, no aggregator fees). `CampayService.disburse()` is still exposed and tested; it's just not currently chosen by the payout router.
+Unlike Monetbil (the previously evaluated provider), Campay's API includes a documented **disbursement endpoint** (`/api/withdraw/`), so `CampayService.disburse()` is a real implementation — not a stub-that-throws. Payouts use a **two-tier routing scheme** so admins can opt their group into Campay disbursement when they want it, and the system defaults to direct-rail routing otherwise:
+
+- A new nullable column `njangi_groups.preferred_payout_gateway` lets a group's president set the payout rail explicitly.
+- When the column is `NULL` (the default for every existing group), payouts fall back to **phone-prefix routing** — the recipient's native MTN/Orange direct API. This preserves today's behavior.
+- When the column is `'campay'`, payouts go through `CampayService.disburse()` (the `/api/withdraw/` endpoint).
+- `'mtn_momo'` and `'orange_money'` are also accepted column values, but only sensible for single-operator groups. (If the column says `mtn_momo` and a recipient is on Orange, MTN's API will reject — that constraint is the admin's responsibility to honor.)
 
 Collection completion is handled by **both** Campay's notification webhook (primary — the moment Campay knows the final status) **and** synchronous polling against `/api/transaction/(reference)/` (fallback — covers webhook drops or short outages of our public URL). Webhook authenticity is verified by **JWT signature** using the `CAMPAY_WEBHOOK_KEY` configured per Campay app.
 
@@ -26,7 +31,7 @@ Monetbil's onboarding required submission of business identification documents f
 
 - **G1.** Members in groups that opt in can have contributions debited via Campay's `POST /api/collect/`. Existing MTN/Orange direct flows are preserved unchanged for groups that do not opt in.
 - **G2.** Group admins can change a group's preferred collection rail at runtime via `PATCH /api/groups/:groupId/gateway`.
-- **G3.** Payout routing is deterministic: payouts are always sent to the recipient's native operator (MTN or Orange) via the existing direct APIs. Campay is never chosen for payouts in Phase 1, even though `CampayService.disburse()` works.
+- **G3.** Payout routing is **two-tier and explicit**. A group's `preferred_payout_gateway` column (nullable) is consulted first; when set, payouts use that gateway directly (including `'campay'`). When `NULL`, payouts fall back to phone-prefix routing through the recipient's native MTN/Orange direct API. The phone-prefix fallback preserves today's behavior for every existing group.
 - **G4.** Strengthen the OOP demonstration for the SEN2241 panel: a third concrete `PaymentProvider` subclass with all four methods (`charge`, `disburse`, `getStatus`, `refund`) implemented or honestly declined, showing Liskov substitutability.
 - **G5.** No changes to the `PaymentProvider` interface — existing callers (`ContributionService`, `PayoutEngine`) interact polymorphically.
 - **G6.** **Webhook completion path.** A new `/api/payments/campay/notify` endpoint (GET *and* POST, per Campay docs) accepts Campay's payment notifications, verifies the JWT signature using `CAMPAY_WEBHOOK_KEY`, and updates the contribution ledger idempotently. The webhook is the primary completion mechanism; polling is the fallback.
@@ -34,7 +39,7 @@ Monetbil's onboarding required submission of business identification documents f
 ## 3. Non-goals (Phase 2 / future work)
 
 - **N1.** Card (Visa/Mastercard) payments. Campay, like Monetbil, processes Momo only — neither provider supports cards. A real card integration would require a different processor (Flutterwave/Paystack), and Stripe is blocked by Cameroon merchant unavailability.
-- **N2.** Routing payouts through Campay's `/withdraw/` endpoint. The endpoint works, but for Phase 1 we keep payouts on MTN/Orange direct for reliability (fewer hops, no aggregator dependency). Re-evaluable in Phase 2 if direct MTN/Orange disbursement proves unreliable.
+- **N2.** ~~Routing payouts through Campay~~ — **moved into scope.** Originally deferred to Phase 2 for reliability concerns; reconsidered during brainstorming. Now configurable per-group via `preferred_payout_gateway` (default `NULL` → phone-prefix direct routing, preserving the original reliability story for groups that don't opt in).
 - **N3.** Multi-country support — Campay is Cameroon-only and NAAS is Cameroon-only.
 - **N4.** Automatic retries on `TIMEOUT`/`PENDING` results. Phase 1 records the pending state; the webhook resolves it later if/when it arrives, or admin resolves it manually.
 - **N5.** A frontend "Payment settings" UI for the gateway-change endpoint. The endpoint itself ships in Phase 1; the UI is frontend scope.
@@ -52,19 +57,23 @@ Monetbil's onboarding required submission of business identification documents f
                 ▼                     ▼                     ▼
         MTNMoMoService        OrangeMoneyService       CampayService
         charge ✓               charge ✓                 charge ✓
-        disburse ✓             disburse ✓               disburse ✓ (works, but
-        getStatus ✓            getStatus ✓                          never chosen
-        refund ✗               refund ✗                             by PayoutEngine
-                                                          getStatus ✓ in Phase 1)
+        disburse ✓             disburse ✓               disburse ✓ (chosen when
+        getStatus ✓            getStatus ✓                          preferred_payout
+        refund ✗               refund ✗                             _gateway='campay')
+                                                          getStatus ✓
                                                           refund ✗
 
-  Collection rail per group :  njangi_groups.preferred_gateway
-                                  ('mtn_momo' | 'orange_money' | 'campay')
-                                  → factory.getProvider(...)
-  Payout rail per recipient :  phoneRouter.resolvePayoutGateway(phone)
-                                  ('mtn_momo' | 'orange_money')
-                                  → factory.getProvider(...)
-                                  Campay is NEVER chosen.
+  Collection rail (per group) :  njangi_groups.preferred_gateway
+                                    ('mtn_momo' | 'orange_money' | 'campay')
+                                    → factory.getProvider(...)
+
+  Payout rail (two-tier)      :  IF njangi_groups.preferred_payout_gateway IS NOT NULL
+                                    → factory.getProvider(that column)
+                                 ELSE
+                                    → factory.getProvider(
+                                        phoneRouter.resolvePayoutGateway(recipient.phone)
+                                      )
+                                    (always 'mtn_momo' or 'orange_money')
 
   Completion for Campay charges (BOTH paths converge on the same ledger update):
        ┌──────────────────────────────────┐         ┌──────────────────────────────┐
@@ -80,10 +89,10 @@ Monetbil's onboarding required submission of business identification documents f
                          already-terminal rows are no-op'd)
 ```
 
-The two routing concerns remain deliberately separated:
+The collection and payout routing concerns remain deliberately separated, with the payout side now having two configurable layers:
 
-- **Collection routing** is a configuration decision (admin-set, per-group).
-- **Payout routing** is a physics decision (the recipient's wallet lives on exactly one operator).
+- **Collection routing** is a configuration decision (admin-set, per-group, via `preferred_gateway`).
+- **Payout routing** is admin-configurable too, via `preferred_payout_gateway`. When unset, the system falls back to phone-prefix routing — the recipient's native operator. This default preserves today's behavior for every group that doesn't opt in.
 
 The two completion paths (polling + webhook) are deliberately redundant. Whichever path arrives first writes the terminal status; the other's later arrival is a no-op because the ledger update is idempotent on `external_reference`. **Campay also dedupes server-side on `external_reference`**, so retries to `/collect/` with the same UUID return the original result — making the dual-path safe even if both fire requests against Campay.
 
@@ -96,7 +105,7 @@ Extends `PaymentProvider`. Mirrors the shape of the existing two services so the
 **Public methods (all four behave correctly):**
 
 - `charge(phone, amount, paymentRef)` — normalizes the phone (`+237...` → `237...`), stringifies the amount, calls `POST /api/collect/` with `external_reference = paymentRef` (the caller's contribution UUID), then polls `GET /api/transaction/<reference>/` until terminal. Returns `{ success, externalRef, status }`. Campay dedupes server-side on `external_reference`, so retries are inherently safe.
-- `disburse(phone, amount, paymentRef)` — analogous to `charge`, hits `POST /api/withdraw/` with the recipient's phone in the `to` field. Returns the same shape. **Not invoked by `PayoutEngine` in Phase 1** (per §3 N2), but available, tested, and panel-demonstrable as polymorphic LSP-correct behavior.
+- `disburse(phone, amount, paymentRef)` — analogous to `charge`, hits `POST /api/withdraw/` with the recipient's phone in the `to` field. Returns the same shape. **Invoked by `PayoutEngine` when the group's `preferred_payout_gateway = 'campay'`** (see §5.6, §6.2).
 - `getStatus(externalRef)` — single `GET /api/transaction/<externalRef>/` call. Returns the mapped status string.
 - `refund(_externalRef)` — throws `Error('Campay does not support native refunds')`. (Same as the other two providers.)
 
@@ -188,9 +197,10 @@ Adds a `campay` block to the `config` object and a `case 'campay':` to `getProvi
 
 ### 5.4 `backend/src/modules/groups/group.service.js` *(modified — extend existing)*
 
-Add `updateGateway(groupId, gateway)`. Follows the module's existing convention (uses the imported `supabase` client directly):
+Add **two** service methods. Both follow the module's existing convention (use the imported `supabase` client directly):
 
 ```js
+// Collection-gateway update. Same as the original design.
 async updateGateway(groupId, gateway) {
   if (!['mtn_momo', 'orange_money', 'campay'].includes(gateway)) {
     const e = new Error('invalid gateway');
@@ -210,15 +220,38 @@ async updateGateway(groupId, gateway) {
   }
   return data;
 }
+
+// Payout-gateway update. Accepts null to clear the column
+// (falls back to phone-prefix routing).
+async updatePayoutGateway(groupId, payoutGateway) {
+  if (payoutGateway !== null &&
+      !['mtn_momo', 'orange_money', 'campay'].includes(payoutGateway)) {
+    const e = new Error('invalid payout gateway');
+    e.statusCode = 400;
+    throw e;
+  }
+  const { data, error } = await supabase
+    .from('njangi_groups')
+    .update({ preferred_payout_gateway: payoutGateway })
+    .eq('id', groupId)
+    .select()
+    .single();
+  if (error || !data) {
+    const e = new Error('group not found');
+    e.statusCode = error ? 500 : 404;
+    throw e;
+  }
+  return data;
+}
 ```
 
-A controller wrapper is added to `group.controller.js`, and validation to `group.validation.js`, both following the existing patterns.
+Controller wrappers are added to `group.controller.js`, and validation rules to `group.validation.js`, both following the existing patterns.
 
-### 5.5 `backend/src/modules/groups/group.routes.js` *(modified — add one route)*
+### 5.5 `backend/src/modules/groups/group.routes.js` *(modified — add two routes)*
 
 ```
 PATCH /groups/:groupId/gateway
-  ⨯ auth                          (existing — backend/src/middleware/auth.middleware.js)
+  ⨯ auth                          (existing)
   ⨯ tenant                        (existing — sets req.membership)
   ⨯ requireRole('president')      (existing — same pattern as PATCH /groups/:groupId)
   ⨯ body validation               ({ gateway: 'mtn_momo' | 'orange_money' | 'campay' })
@@ -226,13 +259,26 @@ PATCH /groups/:groupId/gateway
   ⨯ auditService.log(groupId, callerUserId, 'GATEWAY_CHANGED',
                      { from: oldGateway, to: gateway })
   ⨯ 200 { ...group }
+
+PATCH /groups/:groupId/payout-gateway
+  ⨯ auth
+  ⨯ tenant
+  ⨯ requireRole('president')
+  ⨯ body validation               ({ payout_gateway: 'mtn_momo' | 'orange_money'
+                                                   | 'campay' | null })
+  ⨯ updatePayoutGateway controller → group.service.updatePayoutGateway(id, payout_gateway)
+  ⨯ auditService.log(groupId, callerUserId, 'PAYOUT_GATEWAY_CHANGED',
+                     { from: oldPayoutGateway, to: payoutGateway })
+  ⨯ 200 { ...group }
 ```
 
-Full URL: `PATCH /api/groups/:groupId/gateway` (verifying the `app.js` mount). The `requireRole('president')` line mirrors line 102 of the existing `group.routes.js`. Swagger annotation added inline in the same JSDoc style as surrounding routes.
+Full URLs: `PATCH /api/groups/:groupId/gateway` and `PATCH /api/groups/:groupId/payout-gateway`. Both guarded identically by `requireRole('president')` mirroring line 102 of the existing `group.routes.js`. Swagger annotations added inline in the same JSDoc style as surrounding routes.
 
-### 5.6 `backend/src/engines/PayoutEngine.js` *(modified — constructor signature change + one disburse line)*
+**Why two endpoints instead of one with combined body?** Separation of concerns: each endpoint updates one column, validates one field, audits one event. A combined endpoint would need partial-update logic (which fields are present? do we no-op when both absent?) and a single audit event covering two possibly different changes. Two narrow endpoints are simpler to test, document via Swagger, and reason about.
 
-The current constructor takes a single `paymentProvider` instance. To dispatch by recipient phone prefix, that parameter is replaced with `paymentFactory`:
+### 5.6 `backend/src/engines/PayoutEngine.js` *(modified — constructor change + two-tier routing)*
+
+The current constructor takes a single `paymentProvider` instance. To dispatch by group-configured rail OR phone prefix, that parameter is replaced with `paymentFactory`:
 
 ```js
 // before:
@@ -242,25 +288,44 @@ constructor(contributionService, paymentProvider, notificationService, auditServ
 constructor(contributionService, paymentFactory, notificationService, auditService, fineService)
 ```
 
-Then inside `execute()`'s step 2:
+Then inside `execute()`'s step 2, the **two-tier resolution** decides which provider's `disburse()` to call:
 
 ```js
-const gateway  = phoneRouter.resolvePayoutGateway(recipient.phone);  // mtn_momo | orange_money
+// Tier 1: explicit group setting wins
+let gateway = group.preferred_payout_gateway;
+
+// Tier 2: fall back to phone-prefix routing (mtn_momo or orange_money)
+if (!gateway) {
+  gateway = phoneRouter.resolvePayoutGateway(recipient.phone);
+}
+
 const provider = this.paymentFactory.getProvider(gateway);
 const result   = await provider.disburse(recipient.phone, payout.amount, payout.id);
 ```
 
-This is a **breaking constructor change** — existing `PayoutEngine` instantiations and tests must be updated. The current implementation has step 2 stubbed (TODO comment), so the impact is limited to the test surface and any wiring code that constructs the engine.
+This is a **breaking constructor change** — existing `PayoutEngine` instantiations and tests must be updated to pass `paymentFactory` instead of `paymentProvider`. The current implementation has step 2 stubbed (TODO comment), so the impact is limited to the test surface and any wiring code that constructs the engine.
+
+**Eligibility check.** The existing `_checkWalletLinked` eligibility step already validates the recipient has a phone number. No new eligibility check is added for the gateway field — an admin who sets `preferred_payout_gateway = 'mtn_momo'` for an Orange-prefixed recipient gets a runtime error from the MTN API, which surfaces through the existing error path. We don't preemptively reject admin configurations that *might* fail.
 
 ### 5.7 Database migration *(new SQL file alongside `backend/src/config/schema.sql`)*
+
+Adds **two** columns to `njangi_groups`:
 
 ```sql
 ALTER TABLE njangi_groups
   ADD COLUMN preferred_gateway text NOT NULL DEFAULT 'mtn_momo'
     CHECK (preferred_gateway IN ('mtn_momo', 'orange_money', 'campay'));
+
+ALTER TABLE njangi_groups
+  ADD COLUMN preferred_payout_gateway text NULL
+    CHECK (preferred_payout_gateway IS NULL
+           OR preferred_payout_gateway IN ('mtn_momo', 'orange_money', 'campay'));
 ```
 
-The default is `'mtn_momo'` so existing groups continue to behave identically until an admin opts them in. Lives in `backend/src/config/migrations/2026-05-23-add-preferred-gateway.sql` (creating the folder if not present) and is also reflected in `schema.sql` for fresh setups.
+- **`preferred_gateway`** — collection rail. `NOT NULL`, default `'mtn_momo'`. Every existing group keeps using MTN MoMo direct for collection until an admin opts them into Campay or Orange.
+- **`preferred_payout_gateway`** — payout rail. **Nullable.** `NULL` means "fall back to phone-prefix routing" — the existing behavior. Setting it to `'campay'` makes payouts go via `CampayService.disburse()`. Setting it to `'mtn_momo'` or `'orange_money'` is allowed but only sensible for single-operator groups.
+
+Lives in `backend/src/config/migrations/2026-05-23-add-preferred-gateway.sql` (creating the folder if not present) and is also reflected in `schema.sql` for fresh setups.
 
 ### 5.8 `backend/.env.example` *(modified)*
 
@@ -407,7 +472,7 @@ ContributionService.recordContribution(groupId, memberId, amount, contributionId
 
 **Idempotency.** `external_reference` is the NAAS contribution UUID. Campay dedupes server-side: a retry with the same `external_reference` returns the **original result**, not an error. No pre-flight ledger check needed (in contrast to Monetbil which rejected duplicates).
 
-### 6.2 Payout — Campay is never chosen in Phase 1
+### 6.2 Payout — two-tier routing
 
 ```
 PayoutEngine.execute(groupId, recipientId)
@@ -416,19 +481,38 @@ PayoutEngine.execute(groupId, recipientId)
   checkEligibility(...)   → all 4 checks pass
         │
         ▼
-  phoneRouter.resolvePayoutGateway('+237677000001') → 'mtn_momo'
-        │       (NEVER 'campay' — Phase 1 design choice)
-        ▼
-  factory.getProvider('mtn_momo') → MTNMoMoService
+  Load group.preferred_payout_gateway
         │
+        ├─ IF column is set ───────────────────────────────────┐
+        │     gateway = group.preferred_payout_gateway          │
+        │     (one of 'mtn_momo' | 'orange_money' | 'campay')   │
+        │                                                       │
+        └─ ELSE (column is NULL — the default) ─────────────────┤
+              gateway = phoneRouter.resolvePayoutGateway(       │
+                          recipient.phone)                       │
+              (always 'mtn_momo' or 'orange_money';              │
+               throws .statusCode = 400 on unknown prefix)       │
+                                                                 │
+        ▼ ────────────────────────────────────────────────────── ┘
+  provider = factory.getProvider(gateway)
+        │       → MTNMoMoService | OrangeMoneyService | CampayService
         ▼
-  MTNMoMoService.disburse(phone, amount)    ← unchanged
+  provider.disburse(recipient.phone, payout.amount, payout.id)
         │
         ▼
   Update ledger → advance rotation → notify members
 ```
 
-### 6.3 Admin endpoint — `PATCH /api/groups/:groupId/gateway`
+**Worked examples:**
+
+- Group with `preferred_payout_gateway = NULL`, recipient phone `+23767...` → phone-prefix routing → `MTNMoMoService.disburse`.
+- Group with `preferred_payout_gateway = NULL`, recipient phone `+23769...` → phone-prefix routing → `OrangeMoneyService.disburse`.
+- Group with `preferred_payout_gateway = 'campay'`, any recipient → `CampayService.disburse` (Campay auto-detects the operator from the phone).
+- Group with `preferred_payout_gateway = 'mtn_momo'`, recipient phone `+23769...` (Orange) → `MTNMoMoService.disburse` is called against an Orange number; MTN's API will likely reject; the existing error path surfaces the failure. Admin's responsibility to use this setting only for single-operator groups.
+
+### 6.3 Admin endpoints — gateway and payout-gateway
+
+**Collection gateway** — `PATCH /api/groups/:groupId/gateway`
 
 ```
 PATCH /api/groups/:groupId/gateway
@@ -444,6 +528,25 @@ Body: { "gateway": "campay" }
                      { from: oldGateway, to: gateway })
   ─ 200 { id, name, preferred_gateway, ... }
 ```
+
+**Payout gateway** — `PATCH /api/groups/:groupId/payout-gateway`
+
+```
+PATCH /api/groups/:groupId/payout-gateway
+Authorization: Bearer <jwt>
+Body: { "payout_gateway": "campay" }    // or { "payout_gateway": null } to clear
+
+  ─ auth
+  ─ tenant
+  ─ requireRole('president')
+  ─ body.payout_gateway ∈ { 'mtn_momo', 'orange_money', 'campay', null }
+  ─ group.service.updatePayoutGateway(groupId, payout_gateway)
+  ─ auditService.log(groupId, callerUserId, 'PAYOUT_GATEWAY_CHANGED',
+                     { from: oldPayoutGateway, to: payoutGateway })
+  ─ 200 { id, name, preferred_payout_gateway, ... }
+```
+
+Sending `{ "payout_gateway": null }` clears the column and reverts the group to phone-prefix payout routing (the default behavior).
 
 ### 6.4 Webhook — `GET/POST /api/payments/campay/notify`
 
@@ -492,6 +595,10 @@ Project convention: services throw errors with `.statusCode`; route handlers res
 | `PATCH gateway` — invalid value                                    | Route validation                     | 400 `{ error: 'invalid gateway', allowed: [...] }`.                                                                       |
 | `PATCH gateway` — caller not president                             | `requireRole('president')`           | 403 `{ error: 'only group president can change payment gateway' }`.                                                       |
 | `PATCH gateway` — group not found                                  | `group.service.updateGateway`        | Throw `.statusCode = 404`.                                                                                                |
+| `PATCH payout-gateway` — invalid value                             | Route validation                     | 400 `{ error: 'invalid payout gateway', allowed: ['mtn_momo','orange_money','campay',null] }`.                            |
+| `PATCH payout-gateway` — caller not president                      | `requireRole('president')`           | 403.                                                                                                                      |
+| `PATCH payout-gateway` — group not found                           | `group.service.updatePayoutGateway`  | Throw `.statusCode = 404`.                                                                                                |
+| Payout — `preferred_payout_gateway='mtn_momo'` but recipient on Orange | `MTNMoMoService.disburse` (upstream) | MTN API rejects (4xx). Existing error path surfaces it as `.statusCode = 502` with the operator's message. Admin's misconfiguration. |
 | Webhook — JWT signature invalid                                    | `payments.controller`                | 401 `'invalid signature'`, log warning. **Do not process the body.**                                                      |
 | Webhook — unknown `external_reference`                             | `paymentsService.applyTerminalStatus`| Log warning (could be a webhook arriving before our DB insert is committed). Return 200 anyway so Campay doesn't retry.   |
 | Webhook — contribution already terminal                            | `paymentsService.applyTerminalStatus`| No-op. Return 200. (Race with polling — expected.)                                                                        |
@@ -535,15 +642,24 @@ Unit tests are mock-first (London school); integration tests are skip-guarded ag
 - Throws when `CAMPAY_APP_USERNAME` or `CAMPAY_APP_PASSWORD` is unset.
 
 **`backend/tests/unit/group.service.test.js`** *(extend)*
-- `updateGateway('group-uuid', 'campay')` issues the correct Supabase update on `njangi_groups`; mock the `supabase` import.
+- `updateGateway('group-uuid', 'campay')` issues the correct Supabase update on `njangi_groups.preferred_gateway`; mock the `supabase` import.
 - Invalid gateway value → throws `.statusCode = 400` before hitting Supabase.
 - Group not found → throws `.statusCode = 404`.
+- `updatePayoutGateway('group-uuid', 'campay')` updates `preferred_payout_gateway`.
+- `updatePayoutGateway('group-uuid', null)` clears the column (sets it to null).
+- `updatePayoutGateway` with an invalid string → `.statusCode = 400`.
+- `updatePayoutGateway` on a non-existent group → `.statusCode = 404`.
 
 **PayoutEngine tests** *(extend `backend/tests/unit/payout.service.test.js`)*
 - Update constructor wiring across all existing PayoutEngine instantiations to pass `paymentFactory` instead of `paymentProvider`.
-- **Critical regression:** a group with `preferred_gateway: 'campay'` and an MTN-prefixed recipient must call `MTNMoMoService.disburse`, **never** `CampayService.disburse`. Asserted via mocks on `phoneRouter` and `paymentFactory.getProvider`.
-- Orange-prefixed recipient → `OrangeMoneyService.disburse`.
-- Unrecognized prefix → `resolvePayoutGateway` throws `.statusCode = 400`; eligibility check surfaces the failure; `disburse` never called.
+- **Two-tier routing matrix** — assert the exact provider call for each combination:
+  - `preferred_payout_gateway = NULL`, MTN-prefix recipient → `MTNMoMoService.disburse`.
+  - `preferred_payout_gateway = NULL`, Orange-prefix recipient → `OrangeMoneyService.disburse`.
+  - `preferred_payout_gateway = NULL`, unrecognized prefix → `resolvePayoutGateway` throws `.statusCode = 400`; `disburse` never called.
+  - `preferred_payout_gateway = 'campay'`, any recipient → `CampayService.disburse`.
+  - `preferred_payout_gateway = 'mtn_momo'`, any recipient → `MTNMoMoService.disburse` (phone prefix ignored — admin's choice).
+  - `preferred_payout_gateway = 'orange_money'`, any recipient → `OrangeMoneyService.disburse` (phone prefix ignored).
+- Critical regression: when `preferred_payout_gateway = NULL` AND `preferred_gateway = 'campay'`, payouts must still go via phone-prefix routing (collection rail does NOT leak into payout rail).
 
 **`backend/tests/unit/payments.service.test.js`** *(new — for the new module)*
 - `applyTerminalStatus` updates a `PENDING` contribution to `SUCCESSFUL`; writes audit log.
@@ -553,10 +669,14 @@ Unit tests are mock-first (London school); integration tests are skip-guarded ag
 ### 8.2 Integration (skip-guarded — only run with `backend/.env.test`)
 
 **Gateway endpoint tests added to existing `backend/tests/integration/group.api.test.js`** *(extend)*
-- `PATCH /api/groups/:groupId/gateway` with president JWT → 200, row updated, audit log written.
-- Non-president JWT → 403.
+- `PATCH /api/groups/:groupId/gateway` with president JWT → 200, `preferred_gateway` updated, `GATEWAY_CHANGED` audit log written.
+- Same endpoint with non-president JWT → 403.
 - Invalid `gateway` value → 400.
 - Non-existent group ID → 404.
+- `PATCH /api/groups/:groupId/payout-gateway` with president JWT and `{ "payout_gateway": "campay" }` → 200, column set, `PAYOUT_GATEWAY_CHANGED` audit log written.
+- Same endpoint with `{ "payout_gateway": null }` → 200, column cleared.
+- Non-president JWT → 403.
+- Invalid `payout_gateway` value → 400.
 
 **`backend/tests/integration/campay.webhook.integration.test.js`** *(new)*
 - Valid GET with a JWT signed by the test key → 200; matching contribution row is updated.
@@ -585,7 +705,6 @@ Add `docs/smoke-tests/campay.md` listing the manual steps:
 See §3 (Non-goals) for the full table. Headline items recapped:
 
 - Card payments (Visa/Mastercard) — no Cameroon Momo aggregator processes cards; needs a different processor (Flutterwave/Paystack) or international expansion.
-- Campay disbursement via `/withdraw/` as the payout rail — works in code, deliberately not chosen for Phase 1.
 - Multi-country expansion.
 - Automatic retries on `TIMEOUT`.
 - Frontend "Payment settings" UI for the gateway-change endpoint.
@@ -611,10 +730,11 @@ See §3 (Non-goals) for the full table. Headline items recapped:
 None — all clarifying questions resolved during brainstorming:
 
 - Gateway choice scope → per group, admin-set column. ✓
-- Payout routing → always by recipient's phone prefix; Campay never chosen for payouts in Phase 1. ✓
+- Payout routing → **two-tier**: explicit `preferred_payout_gateway` column wins; phone-prefix fallback when null. ✓ *(updated from earlier "always phone-prefix" choice during second review.)*
 - Cards in Phase 1 → no. ✓
 - Stripe / Clerk Billing → no. ✓
-- API endpoint for gateway change → yes, `PATCH /api/groups/:groupId/gateway`. ✓
+- API endpoints for gateway change → two endpoints: `PATCH /api/groups/:groupId/gateway` and `PATCH /api/groups/:groupId/payout-gateway`. ✓
 - Webhook + polling completion → both, with idempotent ledger update as the join point. ✓
 - Signature module → standalone `campaySignature.js`, JWT-based. ✓
 - Pivot from Monetbil → Campay confirmed and documented (§1, §10). ✓
+- `preferred_payout_gateway` value space → `'mtn_momo' | 'orange_money' | 'campay' | NULL`; null is the default and means phone-prefix routing. ✓
