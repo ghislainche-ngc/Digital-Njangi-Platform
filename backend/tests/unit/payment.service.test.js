@@ -64,6 +64,66 @@ describe('CampayService', () => {
     const service = new CampayService({ username: 'u', password: 'p' });
     await expect(service.refund('any-ref')).rejects.toThrow(/does not support native refunds/);
   });
+
+  describe('_getToken token caching', () => {
+    let service;
+    let fetchSpy;
+
+    beforeEach(() => {
+      service = new CampayService({
+        username: 'u', password: 'p', baseUrl: 'https://demo.campay.net/api',
+      });
+      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ token: 'tok-abc', expires_in: 3600 }),
+      });
+    });
+
+    afterEach(() => {
+      fetchSpy.mockRestore();
+    });
+
+    it('fetches a token on first call', async () => {
+      const tok = await service._getToken();
+      expect(tok).toBe('tok-abc');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://demo.campay.net/api/token/',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'u', password: 'p' }),
+        })
+      );
+    });
+
+    it('reuses the cached token on subsequent calls within expiry', async () => {
+      await service._getToken();
+      await service._getToken();
+      await service._getToken();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('refetches when the cached token is within 5 minutes of expiry', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-05-23T12:00:00Z'));
+      await service._getToken();
+      // Advance 55 minutes — still in the "5 min before expiry" refresh window.
+      jest.setSystemTime(new Date('2026-05-23T12:55:01Z'));
+      await service._getToken();
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      jest.useRealTimers();
+    });
+
+    it('throws .statusCode=502 when /token/ returns an error response', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: false, status: 401, text: async () => 'invalid credentials',
+      });
+      await expect(service._getToken()).rejects.toThrow(expect.objectContaining({
+        statusCode: 502,
+        message: expect.stringContaining('Campay token request failed'),
+      }));
+    });
+  });
 });
 
 describe('getProvider factory', () => {
