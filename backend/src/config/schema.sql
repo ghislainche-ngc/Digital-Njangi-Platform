@@ -172,3 +172,22 @@ ALTER TABLE fines                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE social_fund_events   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE otp_verifications    ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
+-- Campay payment gateway columns (added 2026-05-23)
+-- ============================================================
+
+-- Collection rail. NOT NULL with a safe default so every existing group
+-- keeps behaving identically until an admin opts them in.
+ALTER TABLE njangi_groups
+  ADD COLUMN preferred_gateway text NOT NULL DEFAULT 'mtn_momo'
+    CHECK (preferred_gateway IN ('mtn_momo', 'orange_money', 'campay'));
+
+-- Payout rail. NULLABLE — NULL means "fall back to phone-prefix routing"
+-- (the existing behavior). Setting it to 'campay' opts the group into
+-- Campay disbursement; 'mtn_momo' / 'orange_money' force a specific
+-- direct API (only sensible for single-operator groups).
+ALTER TABLE njangi_groups
+  ADD COLUMN preferred_payout_gateway text NULL
+    CHECK (preferred_payout_gateway IS NULL
+           OR preferred_payout_gateway IN ('mtn_momo', 'orange_money', 'campay'));
