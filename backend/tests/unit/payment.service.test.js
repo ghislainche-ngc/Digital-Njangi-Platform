@@ -124,6 +124,203 @@ describe('CampayService', () => {
       }));
     });
   });
+
+  describe('charge', () => {
+    let service;
+    let fetchSpy;
+
+    beforeEach(() => {
+      service = new CampayService({
+        username: 'u', password: 'p', baseUrl: 'https://demo.campay.net/api',
+      });
+      fetchSpy = jest.spyOn(global, 'fetch');
+    });
+
+    afterEach(() => {
+      fetchSpy.mockRestore();
+      jest.useRealTimers();
+    });
+
+    function mockToken() {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ token: 'tok', expires_in: 3600 }),
+      });
+    }
+    function mockCollect(reference = 'campay-ref-1') {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ reference, ussd_code: '*126#', operator: 'mtn' }),
+      });
+    }
+    function mockStatus(status, extras = {}) {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ reference: 'campay-ref-1', status, ...extras }),
+      });
+    }
+
+    it('happy path: charge resolves to SUCCESSFUL', async () => {
+      mockToken();
+      mockCollect('campay-ref-1');
+      mockStatus('SUCCESSFUL', { operator: 'MTN', operator_reference: '00X' });
+
+      const result = await service.charge('+237677000001', 5000, 'contrib-uuid-1');
+
+      expect(result).toEqual(expect.objectContaining({
+        success: true,
+        externalRef: 'campay-ref-1',
+        status: 'SUCCESSFUL',
+      }));
+
+      const collectCall = fetchSpy.mock.calls[1];
+      expect(collectCall[0]).toBe('https://demo.campay.net/api/collect/');
+      const body = JSON.parse(collectCall[1].body);
+      expect(body).toEqual({
+        amount: '5000',
+        currency: 'XAF',
+        from: '237677000001',
+        description: expect.any(String),
+        external_reference: 'contrib-uuid-1',
+      });
+      expect(collectCall[1].headers.Authorization).toBe('Token tok');
+    });
+
+    it('failed status maps to FAILED, success=false, no throw', async () => {
+      mockToken();
+      mockCollect();
+      mockStatus('FAILED', { reason: 'Insufficient funds' });
+
+      const result = await service.charge('+237677000001', 100, 'contrib-uuid-2');
+      expect(result).toEqual(expect.objectContaining({
+        success: false, status: 'FAILED',
+      }));
+    });
+
+    it('TIMEOUT when polling never resolves within 30s', async () => {
+      jest.useFakeTimers();
+      mockToken();
+      mockCollect();
+      fetchSpy.mockResolvedValue({
+        ok: true, json: async () => ({ reference: 'campay-ref-1', status: 'PENDING' }),
+      });
+
+      const promise = service.charge('+237677000001', 5000, 'contrib-uuid-3');
+      await jest.advanceTimersByTimeAsync(31_000);
+
+      const result = await promise;
+      expect(result).toEqual(expect.objectContaining({
+        success: false, status: 'TIMEOUT', externalRef: 'campay-ref-1',
+      }));
+    });
+
+    it('throws .statusCode=502 when /collect/ returns 4xx', async () => {
+      mockToken();
+      fetchSpy.mockResolvedValueOnce({
+        ok: false, status: 400, text: async () => '{"error":"bad amount"}',
+      });
+      await expect(service.charge('+237677000001', 0, 'contrib-uuid-4'))
+        .rejects.toThrow(expect.objectContaining({ statusCode: 502 }));
+    });
+
+    it('throws .statusCode=400 (without calling fetch) for non-Cameroon phone', async () => {
+      await expect(service.charge('+233241234567', 5000, 'contrib-uuid-5'))
+        .rejects.toThrow(expect.objectContaining({ statusCode: 400 }));
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('disburse', () => {
+    let service;
+    let fetchSpy;
+
+    beforeEach(() => {
+      service = new CampayService({
+        username: 'u', password: 'p', baseUrl: 'https://demo.campay.net/api',
+      });
+      fetchSpy = jest.spyOn(global, 'fetch');
+    });
+    afterEach(() => { fetchSpy.mockRestore(); });
+
+    it('happy path: disburse resolves to SUCCESSFUL via /withdraw/', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ token: 'tok', expires_in: 3600 }),
+      });
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ reference: 'wd-ref-1', status: 'PENDING' }),
+      });
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ reference: 'wd-ref-1', status: 'SUCCESSFUL' }),
+      });
+
+      const result = await service.disburse('+237677000001', 2500, 'payout-uuid-1');
+      expect(result).toEqual(expect.objectContaining({
+        success: true, externalRef: 'wd-ref-1', status: 'SUCCESSFUL',
+      }));
+
+      const withdrawCall = fetchSpy.mock.calls[1];
+      expect(withdrawCall[0]).toBe('https://demo.campay.net/api/withdraw/');
+      const body = JSON.parse(withdrawCall[1].body);
+      expect(body).toEqual({
+        amount: '2500',
+        to: '237677000001',
+        description: expect.any(String),
+        external_reference: 'payout-uuid-1',
+      });
+    });
+
+    it('throws .statusCode=502 when /withdraw/ returns 4xx', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ token: 'tok', expires_in: 3600 }),
+      });
+      fetchSpy.mockResolvedValueOnce({
+        ok: false, status: 403,
+        text: async () => '{"error":"withdrawals not enabled"}',
+      });
+      await expect(service.disburse('+237677000001', 100, 'payout-uuid-2'))
+        .rejects.toThrow(expect.objectContaining({ statusCode: 502 }));
+    });
+
+    it('throws .statusCode=400 (without calling fetch) for non-Cameroon phone', async () => {
+      await expect(service.disburse('+233241234567', 100, 'payout-uuid-3'))
+        .rejects.toThrow(expect.objectContaining({ statusCode: 400 }));
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getStatus', () => {
+    let service;
+    let fetchSpy;
+
+    beforeEach(() => {
+      service = new CampayService({ username: 'u', password: 'p' });
+      fetchSpy = jest.spyOn(global, 'fetch');
+    });
+    afterEach(() => { fetchSpy.mockRestore(); });
+
+    it('returns the status from a single /transaction/<ref>/ call', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ token: 'tok', expires_in: 3600 }),
+      });
+      fetchSpy.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ reference: 'r-1', status: 'SUCCESSFUL', amount: 5 }),
+      });
+
+      const status = await service.getStatus('r-1');
+      expect(status).toBe('SUCCESSFUL');
+      expect(fetchSpy.mock.calls[1][0]).toBe('https://demo.campay.net/api/transaction/r-1/');
+    });
+
+    it('throws .statusCode=502 on upstream error', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, json: async () => ({ token: 'tok', expires_in: 3600 }),
+      });
+      fetchSpy.mockResolvedValueOnce({
+        ok: false, status: 404, text: async () => 'not found',
+      });
+      await expect(service.getStatus('r-1'))
+        .rejects.toThrow(expect.objectContaining({ statusCode: 502 }));
+    });
+  });
 });
 
 describe('getProvider factory', () => {
