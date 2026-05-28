@@ -22,6 +22,25 @@ class GroupService {
   }
 
   async createGroup(userId, groupData) {
+    const tier = groupData.subscription_tier || 'starter';
+    const amount = Number(groupData.contribution_amount);
+
+    if (tier === 'starter' && amount > 10000) {
+      const err = new Error('Starter plan contribution amount cannot exceed 10,000 FCFA. Please upgrade to a higher plan.');
+      err.statusCode = 400;
+      err.code = 'TIER_LIMIT_BREACHED';
+      throw err;
+    }
+    if (tier === 'growth' && amount > 100000) {
+      const err = new Error('Growth plan contribution amount cannot exceed 100,000 FCFA. Please upgrade to Enterprise plan.');
+      err.statusCode = 400;
+      err.code = 'TIER_LIMIT_BREACHED';
+      throw err;
+    }
+
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + 30);
+
     const { data: group, error: groupError } = await supabase
       .from('njangi_groups')
       .insert({
@@ -32,12 +51,12 @@ class GroupService {
         penalty_per_day: groupData.penalty_per_day || 0,
         payout_threshold_pct: groupData.payout_threshold_pct || 100,
         approval_threshold: groupData.approval_threshold || 0,
+        subscription_tier: tier,
+        subscription_expires_at: expiry.toISOString(),
         created_by: userId,
       })
       .select()
       .single();
-
-    if (groupError) throw groupError;
 
     const { data: membership, error: memError } = await supabase
       .from('memberships')
@@ -120,9 +139,34 @@ class GroupService {
       }
     }
 
+    if (data.contribution_amount !== undefined || data.subscription_tier !== undefined) {
+      const { data: current } = await supabase
+        .from('njangi_groups')
+        .select('subscription_tier, contribution_amount')
+        .eq('id', groupId)
+        .single();
+      
+      const newTier = data.subscription_tier !== undefined ? data.subscription_tier : (current?.subscription_tier || 'starter');
+      const newAmount = data.contribution_amount !== undefined ? Number(data.contribution_amount) : (current?.contribution_amount || 0);
+
+      if (newTier === 'starter' && newAmount > 10000) {
+        const err = new Error('Starter plan contribution amount cannot exceed 10,000 FCFA. Please upgrade to a higher plan.');
+        err.statusCode = 400;
+        err.code = 'TIER_LIMIT_BREACHED';
+        throw err;
+      }
+      if (newTier === 'growth' && newAmount > 100000) {
+        const err = new Error('Growth plan contribution amount cannot exceed 100,000 FCFA. Please upgrade to Enterprise plan.');
+        err.statusCode = 400;
+        err.code = 'TIER_LIMIT_BREACHED';
+        throw err;
+      }
+    }
+
     const allowedFields = [
       'name', 'contribution_amount', 'frequency', 'rotation_type',
       'penalty_per_day', 'payout_threshold_pct', 'approval_threshold',
+      'subscription_tier',
     ];
     const updateData = {};
     for (const field of allowedFields) {
@@ -199,6 +243,54 @@ class GroupService {
       throw e;
     }
     return data;
+  }
+
+  async renewSubscription(groupId, gateway) {
+    const { data: group, error: fetchError } = await supabase
+      .from('njangi_groups')
+      .select('*')
+      .eq('id', groupId)
+      .single();
+
+    if (fetchError || !group) {
+      const e = new Error('Group not found');
+      e.statusCode = 404;
+      e.code = 'GROUP_NOT_FOUND';
+      throw e;
+    }
+
+    const planCosts = { starter: 0, growth: 5000, enterprise: 15000 };
+    const cost = planCosts[group.subscription_tier] || 0;
+
+    // Simulate payment transaction for paid tiers
+    if (cost > 0) {
+      if (!['mtn_momo', 'orange_money', 'campay'].includes(gateway)) {
+        const e = new Error('Valid billing gateway required (mtn_momo, orange_money, or campay).');
+        e.statusCode = 400;
+        e.code = 'VALIDATION_ERROR';
+        throw e;
+      }
+      // Here in production we'd invoke the PaymentProvider disburse/charge client
+      // For this SaaS demo we auto-confirm the payment and record the audit trail
+    }
+
+    const currentExpiry = group.subscription_expires_at ? new Date(group.subscription_expires_at) : new Date();
+    const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+    const newExpiry = new Date(baseDate);
+    newExpiry.setDate(newExpiry.getDate() + 30);
+
+    const { data: updated, error: updateError } = await supabase
+      .from('njangi_groups')
+      .update({
+        subscription_status: 'active',
+        subscription_expires_at: newExpiry.toISOString(),
+      })
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+    return updated;
   }
 }
 

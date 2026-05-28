@@ -85,7 +85,7 @@
                       <option value="president">President decides</option>
                     </select>
                   </div>
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-3 gap-4">
                     <div>
                       <label class="text-xs font-semibold uppercase tracking-wider muted">Penalty/day</label>
                       <input name="penalty_per_day" type="number" min="0" class="glass-input mt-1" value="0" />
@@ -93,6 +93,14 @@
                     <div>
                       <label class="text-xs font-semibold uppercase tracking-wider muted">Approval %</label>
                       <input name="approval_threshold" type="number" min="0" max="100" class="glass-input mt-1" value="0" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">SaaS Plan</label>
+                      <select name="subscription_tier" class="glass-input mt-1">
+                        <option value="starter">Starter</option>
+                        <option value="growth">Growth</option>
+                        <option value="enterprise">Enterprise</option>
+                      </select>
                     </div>
                   </div>
                   <button type="submit" class="btn-primary w-full">+ New group</button>

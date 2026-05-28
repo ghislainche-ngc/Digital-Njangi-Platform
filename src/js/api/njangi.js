@@ -184,3 +184,11 @@ export async function exportPDFReport(groupId) {
 export async function getMyContributions(groupId) {
   return api.get(`/groups/${groupId}/contributions/mine`);
 }
+
+export async function updateSettings(groupId, payload) {
+  return api.patch(`/groups/${groupId}`, payload);
+}
+
+export async function renewSubscription(groupId, gateway) {
+  return api.post(`/groups/${groupId}/billing/renew`, { gateway });
+}
