@@ -8,6 +8,7 @@ const ORANGE_PREFIXES = ['655', '656', '657', '658', '659',
                          '685', '686', '687', '688', '689', '69'];
 
 // Sort descending by length so 3-char prefixes match before 2-char ones.
+// Example: '650' must be checked before '65' so '650123...' matches MTN, not Orange.
 const SORTED_MTN = [...MTN_PREFIXES].sort((a, b) => b.length - a.length);
 const SORTED_ORANGE = [...ORANGE_PREFIXES].sort((a, b) => b.length - a.length);
 
