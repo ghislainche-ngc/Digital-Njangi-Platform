@@ -68,7 +68,15 @@ class AuthService {
       .single();
 
     const token = this._signToken(user);
-    return { token, user };
+    const membership = await this._getPrimaryMembership(user.id);
+    return {
+      token,
+      user: {
+        ...user,
+        role: membership?.role || 'member',
+        group_id: membership?.group_id || null,
+      },
+    };
   }
 
   async login({ email, password }) {
@@ -94,7 +102,17 @@ class AuthService {
     }
 
     const token = this._signToken(user);
-    return { token, user: { id: user.id, email: user.email, full_name: user.full_name } };
+    const membership = await this._getPrimaryMembership(user.id);
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: membership?.role || 'member',
+        group_id: membership?.group_id || null,
+      },
+    };
   }
 
   async _generateAndStoreOTP(phone) {
@@ -117,6 +135,17 @@ class AuthService {
       process.env.JWT_SECRET,
       { expiresIn: JWT_EXPIRY }
     );
+  }
+
+  async _getPrimaryMembership(userId) {
+    const { data } = await supabase
+      .from('memberships')
+      .select('group_id, role')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single();
+
+    return data || null;
   }
 }
 

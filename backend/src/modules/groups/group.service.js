@@ -3,6 +3,24 @@
 const { supabase } = require('../../config/supabase');
 
 class GroupService {
+  async listMyGroups(userId) {
+    const { data, error } = await supabase
+      .from('memberships')
+      .select('group_id, role, rotation_position, status, njangi_groups(*)')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('joined_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map((membership) => ({
+      id: membership.group_id,
+      role: membership.role,
+      rotation_position: membership.rotation_position,
+      ...membership.njangi_groups,
+    }));
+  }
+
   async createGroup(userId, groupData) {
     const { data: group, error: groupError } = await supabase
       .from('njangi_groups')

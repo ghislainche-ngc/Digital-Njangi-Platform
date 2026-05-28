@@ -19,7 +19,7 @@
       import { redirectByRole, destinationFor } from '/src/js/auth/role-redirect.js';
       window.loginPage = () => ({
         method: 'password',
-        form: { email: '', password: '', otp: '' },
+        form: { email: '', password: '', phone: '', code: '' },
         loading: false,
         error: '',
         preview(role) { return destinationFor(role); },
@@ -27,10 +27,13 @@
           this.error = '';
           this.loading = true;
           try {
-            const endpoint = this.method === 'otp' ? '/api/auth/otp-verify' : '/api/auth/login';
-            const { token, user } = await api.post(endpoint, this.form);
+            const endpoint = this.method === 'otp' ? '/auth/verify-otp' : '/auth/login';
+            const payload = this.method === 'otp'
+              ? { phone: this.form.phone, code: this.form.code }
+              : { email: this.form.email, password: this.form.password };
+            const { token, user } = await api.post(endpoint, payload);
             session.set(token, user);
-            redirectByRole(user.role);
+            redirectByRole(user.role || 'member');
           } catch (err) {
             this.error = err.message || 'Login failed';
           } finally {
@@ -102,11 +105,21 @@
         </div>
 
         <form @submit.prevent="submit" class="mt-6 space-y-4">
-          <div>
+          <div x-show="method === 'password'">
             <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('login.email')"></label>
             <input
-              x-model="form.email" type="email" required autocomplete="email"
+              x-model="form.email" type="email" autocomplete="email"
+              :required="method === 'password'" :disabled="method !== 'password'"
               class="glass-input mt-1" placeholder="you@example.com"
+            />
+          </div>
+
+          <div x-show="method === 'otp'">
+            <label class="text-xs font-semibold uppercase tracking-wider muted">Phone</label>
+            <input
+              x-model="form.phone" type="tel" required autocomplete="tel"
+              :required="method === 'otp'" :disabled="method !== 'otp'"
+              class="glass-input mt-1" placeholder="+237677000001"
             />
           </div>
 
@@ -117,6 +130,7 @@
             </div>
             <input
               x-model="form.password" type="password" autocomplete="current-password"
+              :required="method === 'password'" :disabled="method !== 'password'"
               class="glass-input mt-1" placeholder="••••••••"
             />
           </div>
@@ -124,7 +138,8 @@
           <div x-show="method === 'otp'">
             <label class="text-xs font-semibold uppercase tracking-wider muted">OTP</label>
             <input
-              x-model="form.otp" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+              x-model="form.code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required
+              :required="method === 'otp'" :disabled="method !== 'otp'"
               class="glass-input mt-1 tracking-[0.5em] text-center font-mono" placeholder="••••••"
             />
           </div>

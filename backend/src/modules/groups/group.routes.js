@@ -5,7 +5,7 @@ const router = express.Router();
 const auth = require('../../middleware/auth.middleware');
 const tenant = require('../../middleware/tenant.middleware');
 const { requireRole } = require('../../middleware/role.middleware');
-const { createGroup, getGroup, updateSettings, updateGateway, updatePayoutGateway } = require('./group.controller');
+const { createGroup, listMyGroups, getGroup, updateSettings, updateGateway, updatePayoutGateway } = require('./group.controller');
 
 /**
  * @swagger
@@ -44,6 +44,9 @@ const { createGroup, getGroup, updateSettings, updateGateway, updatePayoutGatewa
  */
 // POST /groups — create a new group
 router.post('/', auth, createGroup);
+
+// GET /groups/mine — list groups the current user belongs to
+router.get('/mine', auth, listMyGroups);
 
 /**
  * @swagger

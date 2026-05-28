@@ -76,7 +76,7 @@ router.get('/:groupId/contributions/stats', auth, tenant, ctrl.getStats);
  *             type: object
  *             required: [gateway]
  *             properties:
- *               gateway: { type: string, enum: [momo_mtn, momo_orange] }
+ *               gateway: { type: string, enum: [momo_mtn, momo_orange, campay] }
  *     responses:
  *       202: { description: Payment initiated }
  */
@@ -121,7 +121,7 @@ router.post('/:groupId/contributions/cash', auth, tenant, requireRole('treasurer
  *             type: object
  *             required: [gateway]
  *             properties:
- *               gateway: { type: string, enum: [mtn_momo, orange_money] }
+ *               gateway: { type: string, enum: [mtn_momo, orange_money, campay] }
  *     responses:
  *       202: { description: Retry initiated }
  */

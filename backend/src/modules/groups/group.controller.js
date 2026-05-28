@@ -20,6 +20,16 @@ const createGroup = async (req, res, next) => {
   }
 };
 
+const listMyGroups = async (req, res, next) => {
+  try {
+    const groups = await groupService.listMyGroups(req.user.sub);
+    return res.status(200).json({ data: groups });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
 const getGroup = async (req, res, next) => {
   try {
     const group = await groupService.getGroup(req.params.groupId);
@@ -91,4 +101,4 @@ const updatePayoutGateway = async (req, res, next) => {
   }
 };
 
-module.exports = { createGroup, getGroup, updateSettings, updateGateway, updatePayoutGateway };
+module.exports = { createGroup, listMyGroups, getGroup, updateSettings, updateGateway, updatePayoutGateway };
