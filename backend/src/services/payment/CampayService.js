@@ -37,6 +37,36 @@ class CampayService extends PaymentProvider {
     return phone.replace(/^\+/, '');
   }
 
+  /**
+   * @private
+   * Get a Campay JWT, using in-memory cache when the cached token is still fresh.
+   * Refreshes 5 min before stated expiry to absorb clock skew + network latency.
+   */
+  async _getToken() {
+    const now = Date.now();
+    if (this._token && now < this._tokenExpiresAt - 5 * 60_000) {
+      return this._token;
+    }
+
+    const res = await fetch(`${this.baseUrl}/token/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: this.username, password: this.password }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      const err = new Error(`Campay token request failed (${res.status}): ${body}`);
+      err.statusCode = 502;
+      throw err;
+    }
+
+    const data = await res.json();
+    this._token = data.token;
+    this._tokenExpiresAt = now + (data.expires_in * 1000);
+    return this._token;
+  }
+
   async charge(_phone, _amount, _paymentRef) {
     throw new Error('CampayService.charge() not yet implemented');
   }
