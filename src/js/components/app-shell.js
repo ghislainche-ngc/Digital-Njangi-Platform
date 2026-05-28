@@ -150,7 +150,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
                   <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
                 </svg>
               </button>
-              <a href="/login.html" onclick="localStorage.removeItem('naas.jwt'); localStorage.removeItem('naas.user');" class="nav-link" x-text="$t('dashboard.logout')"></a>
+              <a href="/login.html" id="logout-link" class="nav-link" x-text="$t('dashboard.logout')"></a>
             </div>
           </div>
         </header>
@@ -160,6 +160,10 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
       </div>
     </div>
   `;
+
+  document.querySelector('#logout-link')?.addEventListener('click', () => {
+    session.clear();
+  });
 }
 
 export function mountContent(html) {

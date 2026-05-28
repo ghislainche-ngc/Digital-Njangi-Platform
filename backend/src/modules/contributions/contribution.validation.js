@@ -11,8 +11,8 @@ const recordCashSchema = Joi.object({
 });
 
 const retryPaymentSchema = Joi.object({
-  gateway: Joi.string().valid('mtn_momo', 'orange_money').required()
-    .messages({ 'any.only': 'Gateway must be mtn_momo or orange_money' }),
+  gateway: Joi.string().valid('mtn_momo', 'orange_money', 'campay').required()
+    .messages({ 'any.only': 'Gateway must be mtn_momo, orange_money, or campay' }),
 });
 
 const listContributionsSchema = Joi.object({

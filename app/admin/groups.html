@@ -15,56 +15,157 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { createGroup, groupLabel, resolveGroupContext, setStoredGroupId } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'admin', title: 'Njangi groups' });
-      const rows = [
-        { name: 'Les Amis de Yaoundé', plan: 'Growth', members: 14, mrr: '12 000', status: 'paid', statusLabel: 'Active' },
-        { name: 'Groupe Familial Mbarga', plan: 'Pro',    members: 25, mrr: '25 000', status: 'paid', statusLabel: 'Active' },
-        { name: 'Youth Savers Douala',   plan: 'Starter', members: 12, mrr: '5 000',  status: 'due',  statusLabel: 'Trial' },
-        { name: 'Bamenda Teachers',      plan: 'Growth',  members: 18, mrr: '12 000', status: 'paid', statusLabel: 'Active' },
-        { name: 'Buea Market Women',     plan: 'Starter', members: 9,  mrr: '0',      status: 'failed', statusLabel: 'Suspended' },
-      ].map(g => `
-        <tr>
-          <td class="px-5 py-3 font-medium">${g.name}</td>
-          <td>${g.plan}</td>
-          <td>${g.members}</td>
-          <td>${g.mrr}</td>
-          <td><span class="chip chip-${g.status}">${g.statusLabel}</span></td>
-          <td class="text-right pr-5">
-            <button class="nav-link text-xs">View</button>
-            <button class="nav-link text-xs text-red-500">Suspend</button>
-          </td>
-        </tr>
-      `).join('');
-      mountContent(`
-        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
-          <input type="search" placeholder="Search groups…" class="glass-input flex-1 min-w-[220px]" />
-          <select class="glass-input w-auto">
-            <option>All statuses</option>
-            <option>Active</option>
-            <option>Trial</option>
-            <option>Suspended</option>
-          </select>
-          <button class="btn-primary">+ New group</button>
-        </div>
 
-        <div class="glass-card p-0 overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+      const renderPage = async () => {
+        mountContent(`
+          <div class="glass-card p-6">Loading your groups…</div>
+        `);
+
+        try {
+          const { groups, activeGroupId } = await resolveGroupContext();
+          const totalMembers = groups.reduce((sum, group) => sum + Number(group.memberCount || 0), 0);
+          const rows = groups.length
+            ? groups.map((group) => `
+                <tr class="${group.id === activeGroupId ? 'bg-[var(--accent-soft)]/30' : ''}">
+                  <td class="px-5 py-3 font-medium">${escapeHtml(group.name)}</td>
+                  <td>${escapeHtml(group.frequency || 'monthly')}</td>
+                  <td>${Number(group.memberCount || 0)}</td>
+                  <td>${Number(group.contribution_amount || 0).toLocaleString()}</td>
+                  <td><span class="chip chip-${group.id === activeGroupId ? 'paid' : 'info'}">${group.id === activeGroupId ? 'Selected' : group.role || 'member'}</span></td>
+                  <td class="text-right pr-5">
+                    <button type="button" data-use-group="${escapeHtml(group.id)}" class="nav-link text-xs">Use</button>
+                  </td>
+                </tr>
+              `).join('')
+            : `
               <tr>
-                <th class="px-5 py-3">Group</th>
-                <th>Plan</th>
-                <th>Members</th>
-                <th>MRR (FCFA)</th>
-                <th>Status</th>
-                <th class="text-right pr-5">Actions</th>
+                <td colspan="6" class="px-5 py-8 text-center muted">You are not in any active groups yet.</td>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
-          </table>
-        </div>
+            `;
 
-        <p class="mt-4 text-xs muted">Showing 5 of 47 groups · Per PR-40 & PR-41: Platform Admin can view and suspend any group.</p>
-      `);
+          mountContent(`
+            <div class="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <section class="glass-card p-6">
+                <p class="text-xs uppercase tracking-widest muted">Create group</p>
+                <h2 class="mt-2 font-display text-2xl font-bold">Start a new Njangi</h2>
+                <p class="mt-2 text-sm muted">Create the group, then switch dashboards to the new group id.</p>
+                <form id="create-group-form" class="mt-6 space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Group name</label>
+                    <input name="name" required class="glass-input mt-1" placeholder="Les Amis de Yaoundé" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Contribution</label>
+                      <input name="contribution_amount" required type="number" min="1" class="glass-input mt-1" value="10000" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Frequency</label>
+                      <select name="frequency" class="glass-input mt-1">
+                        <option value="monthly">Monthly</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Rotation</label>
+                    <select name="rotation_type" class="glass-input mt-1">
+                      <option value="fixed">Fixed</option>
+                      <option value="random">Random</option>
+                      <option value="president">President decides</option>
+                    </select>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Penalty/day</label>
+                      <input name="penalty_per_day" type="number" min="0" class="glass-input mt-1" value="0" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Approval %</label>
+                      <input name="approval_threshold" type="number" min="0" max="100" class="glass-input mt-1" value="0" />
+                    </div>
+                  </div>
+                  <button type="submit" class="btn-primary w-full">+ New group</button>
+                  <p id="group-form-message" class="text-xs muted"></p>
+                </form>
+              </section>
+
+              <section class="glass-card p-0 overflow-hidden">
+                <div class="p-5 border-b border-[var(--border-subtle)] flex flex-wrap items-center gap-3 justify-between">
+                  <div>
+                    <p class="text-xs uppercase tracking-widest muted">My groups</p>
+                    <h2 class="font-display text-xl font-bold mt-1">${groups.length} group${groups.length === 1 ? '' : 's'}</h2>
+                  </div>
+                  <div class="text-sm muted">${totalMembers} active members total</div>
+                </div>
+                <table class="w-full text-sm">
+                  <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+                    <tr>
+                      <th class="px-5 py-3">Group</th>
+                      <th>Frequency</th>
+                      <th>Members</th>
+                      <th>Contribution</th>
+                      <th>Status</th>
+                      <th class="text-right pr-5">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+                </table>
+              </section>
+            </div>
+          `);
+
+          document.querySelectorAll('[data-use-group]').forEach((button) => {
+            button.addEventListener('click', () => {
+              setStoredGroupId(button.dataset.useGroup);
+              renderPage();
+            });
+          });
+
+          const form = document.querySelector('#create-group-form');
+          const message = document.querySelector('#group-form-message');
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            message.textContent = 'Creating group…';
+
+            const payload = Object.fromEntries(new FormData(form).entries());
+            payload.contribution_amount = Number(payload.contribution_amount);
+            payload.penalty_per_day = Number(payload.penalty_per_day || 0);
+            payload.approval_threshold = Number(payload.approval_threshold || 0);
+
+            try {
+              const created = await createGroup(payload);
+              const groupId = created?.group?.id || created?.data?.group?.id;
+              if (groupId) {
+                setStoredGroupId(groupId);
+              }
+              message.textContent = 'Group created successfully.';
+              form.reset();
+              renderPage();
+            } catch (error) {
+              message.textContent = error.message || 'Failed to create group.';
+            }
+          });
+        } catch (error) {
+          mountContent(`
+            <div class="glass-card p-6">
+              <p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load groups.')}</p>
+            </div>
+          `);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>
