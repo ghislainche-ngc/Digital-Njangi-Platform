@@ -121,6 +121,67 @@ class GroupService {
     if (error) throw error;
     return updated;
   }
+
+  async updateGateway(groupId, gateway) {
+    if (!['mtn_momo', 'orange_money', 'campay'].includes(gateway)) {
+      const e = new Error('invalid gateway');
+      e.statusCode = 400;
+      e.code = 'VALIDATION_ERROR';
+      throw e;
+    }
+
+    const { data, error } = await supabase
+      .from('njangi_groups')
+      .update({ preferred_gateway: gateway })
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error) {
+      const e = new Error('failed to update gateway');
+      e.statusCode = 500;
+      e.code = 'DB_ERROR';
+      throw e;
+    }
+    if (!data) {
+      const e = new Error('group not found');
+      e.statusCode = 404;
+      e.code = 'GROUP_NOT_FOUND';
+      throw e;
+    }
+    return data;
+  }
+
+  async updatePayoutGateway(groupId, payoutGateway) {
+    if (payoutGateway !== null &&
+        !['mtn_momo', 'orange_money', 'campay'].includes(payoutGateway)) {
+      const e = new Error('invalid payout gateway');
+      e.statusCode = 400;
+      e.code = 'VALIDATION_ERROR';
+      throw e;
+    }
+
+    const { data, error } = await supabase
+      .from('njangi_groups')
+      .update({ preferred_payout_gateway: payoutGateway })
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error) {
+      const e = new Error('failed to update payout gateway');
+      e.statusCode = 500;
+      e.code = 'DB_ERROR';
+      throw e;
+    }
+    if (!data) {
+      const e = new Error('group not found');
+      e.statusCode = 404;
+      e.code = 'GROUP_NOT_FOUND';
+      throw e;
+    }
+    return data;
+  }
 }
 
 module.exports = new GroupService();
