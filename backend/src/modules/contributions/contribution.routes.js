@@ -127,4 +127,72 @@ router.post('/:groupId/contributions/cash', auth, tenant, requireRole('treasurer
  */
 router.post('/:groupId/contributions/:id/retry', auth, tenant, requireRole('treasurer'), ctrl.retryPayment);
 
+const pdfService = require('../../services/pdf/PDFService');
+const { supabase } = require('../../config/supabase');
+
+/**
+ * @swagger
+ * /groups/{groupId}/contributions/{id}/receipt:
+ *   get:
+ *     summary: Download a PDF receipt for a contribution
+ *     tags: [Contributions]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: PDF receipt buffer returned }
+ *       403: { description: Forbidden }
+ *       404: { description: Not found }
+ */
+router.get('/:groupId/contributions/:id/receipt', auth, tenant, async (req, res, next) => {
+  try {
+    const { data: contribution, error } = await supabase
+      .from('contributions')
+      .select('*, users!contributions_user_id_fkey(full_name, email), cycles(cycle_number), njangi_groups(name)')
+      .eq('id', req.params.id)
+      .eq('group_id', req.params.groupId)
+      .single();
+
+    if (error || !contribution) {
+      return res.status(404).json({ error: 'Contribution not found', code: 'NOT_FOUND' });
+    }
+
+    // Role check: only the contributor themselves, or Treasurer/President of the group
+    if (
+      req.user.role !== 'treasurer' &&
+      req.user.role !== 'president' &&
+      contribution.user_id !== req.user.sub
+    ) {
+      return res.status(403).json({
+        error: 'Access denied. You do not have permission to view this receipt.',
+        code: 'FORBIDDEN',
+      });
+    }
+
+    const receiptData = {
+      memberName: contribution.users?.full_name || contribution.users?.email || 'Member',
+      amount: contribution.amount,
+      method: contribution.payment_method || 'momo',
+      date: contribution.confirmed_at || contribution.created_at,
+      groupName: contribution.njangi_groups?.name || 'Njangi Group',
+      cycleNumber: contribution.cycles?.cycle_number || 1,
+    };
+
+    const buffer = await pdfService.generateReceiptPDF(receiptData);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=receipt-${req.params.id}.pdf`);
+    return res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

@@ -3,6 +3,7 @@
    Keeps layout logic in one place so Dev A / Dev B don't repeat it. */
 
 import { session } from '/src/js/auth/session.js';
+import { destinationFor } from '/src/js/auth/role-redirect.js';
 
 // Every officer is also a contributing member of the Njangi — they pay into the
 // pot and sit in the rotation like everyone else. So President / Treasurer /
@@ -78,7 +79,23 @@ function iconSvg(name) {
 }
 
 export function renderShell({ role, title, mount = '#app-shell' } = {}) {
-  const user = session.user() || { name: 'Demo User', role };
+  /* ── Route guard: redirect unauthenticated or wrong-role users ── */
+  if (!session.isAuthenticated()) {
+    window.location.assign('/login.html');
+    return;
+  }
+  const sessionUser = session.user();
+  if (sessionUser && sessionUser.role && sessionUser.role !== role) {
+    // Officers (president/treasurer/secretary) can access member personal pages
+    const memberPersonalPaths = ['/app/member/history.html', '/app/member/rotation.html', '/app/member/ledger.html', '/app/member/profile.html'];
+    const isOfficerOnMemberPage = ['president', 'treasurer', 'secretary'].includes(sessionUser.role) && memberPersonalPaths.some(p => window.location.pathname.endsWith(p));
+    if (!isOfficerOnMemberPage) {
+      window.location.assign(destinationFor(sessionUser.role));
+      return;
+    }
+  }
+
+  const user = sessionUser || { name: 'Demo User', role };
   const items = NAV_BY_ROLE[role] || [];
   const initials = (user.name || 'U').split(' ').map(s => s[0]).slice(0, 2).join('');
   const path = window.location.pathname.replace(/\/+$/, '/');

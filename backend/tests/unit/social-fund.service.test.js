@@ -124,4 +124,32 @@ describe('SocialFundService', () => {
       }
     });
   });
+
+  describe('getEvents', () => {
+    it('returns empty array when there are no events', async () => {
+      db.findAll.mockResolvedValue([]);
+
+      const result = await service.getEvents(GROUP_ID);
+
+      expect(db.findAll).toHaveBeenCalledWith('social_fund_events', {
+        group_id: GROUP_ID,
+      });
+      expect(result).toEqual([]);
+    });
+
+    it('returns events sorted by created_at descending', async () => {
+      const mockEvents = [
+        { id: 'evt-1', created_at: '2026-04-10T12:00:00.000Z' },
+        { id: 'evt-2', created_at: '2026-04-12T12:00:00.000Z' },
+        { id: 'evt-3', created_at: '2026-04-11T12:00:00.000Z' },
+      ];
+      db.findAll.mockResolvedValue(mockEvents);
+
+      const result = await service.getEvents(GROUP_ID);
+
+      expect(result[0].id).toBe('evt-2');
+      expect(result[1].id).toBe('evt-3');
+      expect(result[2].id).toBe('evt-1');
+    });
+  });
 });
