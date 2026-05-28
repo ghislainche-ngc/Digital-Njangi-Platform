@@ -20,7 +20,7 @@ cron.schedule('0 9 * * *', async () => {
     // 2. For each: calculate days overdue × group.penalty_per_day
     // 3. Call fineService.recordFine(groupId, memberId, amount, 'Late payment', 'system')
     // 4. Notify member of fine applied
-    const { data: _overdue } = await supabase
+    await supabase
       .from('contributions')
       .select('*')
       .eq('status', 'failed');

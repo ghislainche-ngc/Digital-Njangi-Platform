@@ -42,7 +42,8 @@ function resolvePayoutGateway(phone) {
   if (operator === 'mtn') return 'mtn_momo';
   if (operator === 'orange') return 'orange_money';
 
-  const err = new Error(`Unrecognized phone prefix for payout routing: ${phone}`);
+  const maskedPhone = phone ? (phone.slice(0, 7) + '***') : 'undefined';
+  const err = new Error(`Unrecognized phone prefix for payout routing: ${maskedPhone}`);
   err.statusCode = 400;
   throw err;
 }
