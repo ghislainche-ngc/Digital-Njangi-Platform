@@ -23,7 +23,8 @@
         getMyContributions,
         getSocialFundBalance,
         initiateContributionPayment,
-        groupLabel
+        groupLabel,
+        createGroup
       } from '/src/js/api/njangi.js';
 
       const escapeHtml = (value) => String(value ?? '')
@@ -42,11 +43,93 @@
           const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
           if (!activeGroupId) {
             mountContent(`
-              <div class="glass-card p-6">
-                <p class="font-semibold">No group selected</p>
-                <p class="mt-2 text-sm muted">Please be invited or added to a group first.</p>
+              <div class="max-w-xl mx-auto space-y-6">
+                <!-- Welcome greeting -->
+                <div class="glass-card p-6 animate-fade-up">
+                  <h2 class="font-display text-2xl font-bold text-gradient">Welcome to NjangiBridge!</h2>
+                  <p class="mt-2 text-sm text-secondary-app">
+                    You are not currently in any Njangi groups. To start your own Njangi operation, fill in the form below to create your group workspace. You will automatically become the group's <strong>President</strong> and can invite other members, configure cycle schedules, and manage payout approvals.
+                  </p>
+                </div>
+
+                <!-- Create group form -->
+                <div class="glass-card p-6 animate-fade-up" style="animation-delay: 100ms;">
+                  <p class="text-xs uppercase tracking-widest muted font-semibold">Obtain a Space</p>
+                  <h2 class="mt-2 font-display text-xl font-bold">Start a new Njangi</h2>
+                  <form id="create-group-form" class="mt-6 space-y-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Group Name</label>
+                      <input name="name" required class="glass-input mt-1" placeholder="e.g., Les Amis de Yaoundé" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Contribution Amount</label>
+                        <input name="contribution_amount" required type="number" min="1" class="glass-input mt-1" value="10000" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Frequency</label>
+                        <select name="frequency" class="glass-input mt-1">
+                          <option value="monthly">Monthly</option>
+                          <option value="weekly">Weekly</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Rotation Type</label>
+                      <select name="rotation_type" class="glass-input mt-1">
+                        <option value="fixed">Fixed (Sequential order)</option>
+                        <option value="random">Random (Fair draw per cycle)</option>
+                        <option value="president">President decides</option>
+                      </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Penalty/day (FCFA)</label>
+                        <input name="penalty_per_day" type="number" min="0" class="glass-input mt-1" value="0" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Approval % Threshold</label>
+                        <input name="approval_threshold" type="number" min="0" max="100" class="glass-input mt-1" value="0" />
+                      </div>
+                    </div>
+                    <button type="submit" class="btn-primary w-full mt-4">+ Create Njangi Group</button>
+                    <p id="group-form-message" class="text-xs mt-2 text-center"></p>
+                  </form>
+                </div>
               </div>
             `);
+
+            // Setup form event listener
+            const form = document.querySelector('#create-group-form');
+            const message = document.querySelector('#group-form-message');
+            form.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              message.className = 'text-xs mt-2 text-center text-amber-500';
+              message.textContent = 'Creating group…';
+
+              const payload = Object.fromEntries(new FormData(form).entries());
+              payload.contribution_amount = Number(payload.contribution_amount);
+              payload.penalty_per_day = Number(payload.penalty_per_day || 0);
+              payload.approval_threshold = Number(payload.approval_threshold || 0);
+
+              try {
+                const created = await createGroup(payload);
+                const groupId = created?.group?.id || created?.data?.group?.id;
+                if (groupId) {
+                  setStoredGroupId(groupId);
+                }
+                message.className = 'text-xs mt-2 text-center text-emerald-500 font-bold';
+                message.textContent = 'Group created successfully! Redirecting...';
+                form.reset();
+                setTimeout(() => {
+                  renderPage();
+                }, 1500);
+              } catch (error) {
+                message.className = 'text-xs mt-2 text-center text-red-500';
+                message.textContent = error.message || 'Failed to create group.';
+              }
+            });
+
             return;
           }
 

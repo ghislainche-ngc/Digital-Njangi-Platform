@@ -1,4 +1,5 @@
 import { api } from './client.js';
+import { session } from '../auth/session.js';
 
 const GROUP_STORAGE_KEY = 'naas.groupId';
 
@@ -47,10 +48,20 @@ export async function resolveGroupContext() {
     setStoredGroupId(activeGroupId);
   }
 
+  const activeGroup = groups.find((group) => group.id === activeGroupId) || null;
+  if (activeGroup && activeGroup.role) {
+    const user = session.user();
+    if (user && user.role !== activeGroup.role) {
+      user.role = activeGroup.role;
+      user.group_id = activeGroupId;
+      session.set(session.token(), user);
+    }
+  }
+
   return {
     groups,
     activeGroupId,
-    activeGroup: groups.find((group) => group.id === activeGroupId) || null,
+    activeGroup,
   };
 }
 
