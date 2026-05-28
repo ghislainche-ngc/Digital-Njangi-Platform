@@ -7,6 +7,7 @@ const express = require('express');
 const cors = require('cors');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const { createRateLimiter } = require('./middleware/rateLimit.middleware');
 
 // Route imports — add each module as it is implemented
 const authRoutes = require('./modules/auth/auth.routes');
@@ -27,6 +28,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 500,
+  message: 'Too many requests. Please try again later.',
+}));
 
 // ─── Swagger / OpenAPI ────────────────────────────────────────────────────
 const swaggerSpec = swaggerJsdoc({

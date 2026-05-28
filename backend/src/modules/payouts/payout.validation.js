@@ -5,7 +5,7 @@ const Joi = require('joi');
 const nominateSchema = Joi.object({
   recipientId: Joi.string().uuid().required()
     .messages({ 'string.guid': 'recipientId must be a valid UUID' }),
-  deliveryMethod: Joi.string().valid('momo_mtn', 'momo_orange', 'cash', 'bank').default('momo_mtn'),
+  deliveryMethod: Joi.string().valid('momo_mtn', 'momo_orange', 'campay', 'cash', 'bank').default('momo_mtn'),
   notes: Joi.string().max(255).allow('').optional(),
 });
 
@@ -14,7 +14,7 @@ const approveSchema = Joi.object({
 });
 
 const executeSchema = Joi.object({
-  deliveryMethod: Joi.string().valid('momo_mtn', 'momo_orange', 'cash', 'bank').optional(),
+  deliveryMethod: Joi.string().valid('momo_mtn', 'momo_orange', 'campay', 'cash', 'bank').optional(),
 });
 
 const listPayoutsSchema = Joi.object({

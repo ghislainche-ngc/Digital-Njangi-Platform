@@ -355,7 +355,7 @@ class PayoutService {
     let result;
 
     try {
-      result = await provider.disburse(payout.users.phone, Number(payout.amount));
+      result = await provider.disburse(payout.users.phone, Number(payout.amount), payout.id);
     } catch (disbErr) {
       result = { success: false, externalRef: null, status: 'FAILED' };
     }

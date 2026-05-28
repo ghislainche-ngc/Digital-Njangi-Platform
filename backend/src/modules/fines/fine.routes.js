@@ -39,7 +39,7 @@ const fineService = new FineService(db, new AuditService(db.getClient()));
  */
 router.get('/:groupId/fines', auth, tenant, async (req, res) => {
   try {
-    const fines = await db.findAll('fines', { group_id: req.params.groupId });
+    const fines = await fineService.listGroupFines(req.params.groupId);
     res.json(fines);
   } catch (err) {
     res.status(err.statusCode || 500).json({ error: err.message, code: 'FINE_ERROR' });

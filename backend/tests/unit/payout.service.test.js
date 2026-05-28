@@ -135,7 +135,7 @@ describe('PayoutService', () => {
       await PayoutService.execute('g1', 'p1', 'exec-user');
 
       expect(getProvider).toHaveBeenCalledWith('campay');
-      expect(mockProvider.disburse).toHaveBeenCalledWith('+237677000001', 5000);
+      expect(mockProvider.disburse).toHaveBeenCalledWith('+237677000001', 5000, 'p1');
     });
 
     it('falls back to mtn_momo when preferred_payout_gateway is null', async () => {
@@ -318,7 +318,7 @@ describe('PayoutEngine — two-tier payout routing', () => {
     engine.recipient = recipientWith('+237672000001');
     await engine._dispatchDisburse();
     expect(paymentFactory.getProvider).toHaveBeenCalledWith('campay');
-    expect(campaySvc.disburse).toHaveBeenCalled();
+    expect(campaySvc.disburse).toHaveBeenCalledWith('+237672000001', 5000, 'p1');
     expect(mtnSvc.disburse).not.toHaveBeenCalled();
   });
 
@@ -344,5 +344,39 @@ describe('PayoutEngine — two-tier payout routing', () => {
     await engine._dispatchDisburse();
     expect(paymentFactory.getProvider).toHaveBeenCalledWith('mtn_momo');
     expect(campaySvc.disburse).not.toHaveBeenCalled();
+  });
+});
+
+describe('PayoutEngine — eligibility checks', () => {
+  let engine;
+
+  beforeEach(() => {
+    engine = new PayoutEngine({}, { getProvider: jest.fn() }, {}, { log: jest.fn() }, {
+      hasUnpaidFines: jest.fn(),
+    });
+  });
+
+  it('returns passed=false when the recipient has no linked phone', async () => {
+    const chain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: { phone: null }, error: null }),
+    };
+    mockFrom.mockReturnValue(chain);
+
+    const result = await engine._checkWalletLinked('user-1');
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toContain('no linked wallet');
+  });
+
+  it('returns passed=false when the recipient has unpaid fines', async () => {
+    engine.fineService.hasUnpaidFines.mockResolvedValue(true);
+
+    const result = await engine._checkNoUnpaidFines('group-1', 'user-1');
+
+    expect(engine.fineService.hasUnpaidFines).toHaveBeenCalledWith('group-1', 'user-1');
+    expect(result.passed).toBe(false);
+    expect(result.reason).toContain('unpaid fines');
   });
 });

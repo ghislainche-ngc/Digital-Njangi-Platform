@@ -3,6 +3,13 @@
 const express = require('express');
 const router = express.Router();
 const { register, verifyOTP, login } = require('./auth.controller');
+const { createRateLimiter } = require('../../middleware/rateLimit.middleware');
+
+const loginLimiter = createRateLimiter({
+	windowMs: 15 * 60 * 1000,
+	limit: 10,
+	message: 'Too many login attempts. Please try again later.',
+});
 
 /**
  * @swagger
@@ -79,6 +86,6 @@ router.post('/verify-otp', verifyOTP);
  *       200: { description: JWT token returned }
  *       401: { description: Invalid credentials }
  */
-router.post('/login', login);
+router.post('/login', loginLimiter, login);
 
 module.exports = router;

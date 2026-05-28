@@ -51,6 +51,24 @@ router.get('/:groupId/payouts/current', auth, tenant, ctrl.getCurrentPayout);
 
 /**
  * @swagger
+ * /groups/{groupId}/payouts/determine-next-recipient:
+ *   post:
+ *     summary: Determine the next recipient for fixed/random rotation groups
+ *     tags: [Payouts]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       201: { description: Next payout recipient created }
+ */
+router.post(
+	'/:groupId/payouts/determine-next-recipient',
+	auth,
+	tenant,
+	requireRole('president', 'treasurer'),
+	ctrl.determineNextRecipient
+);
+
+/**
+ * @swagger
  * /groups/{groupId}/payouts/nominate:
  *   post:
  *     summary: President nominates a recipient (president-decides rotation mode)
@@ -65,7 +83,7 @@ router.get('/:groupId/payouts/current', auth, tenant, ctrl.getCurrentPayout);
  *             required: [recipientId]
  *             properties:
  *               recipientId: { type: string, format: uuid }
- *               deliveryMethod: { type: string, enum: [momo_mtn, momo_orange, cash, bank] }
+ *               deliveryMethod: { type: string, enum: [momo_mtn, momo_orange, campay, cash, bank] }
  *               notes: { type: string }
  *     responses:
  *       201: { description: Payout nomination created }
@@ -108,7 +126,7 @@ router.post('/:groupId/payouts/:id/approve', auth, tenant, requireRole('presiden
  *           schema:
  *             type: object
  *             properties:
- *               deliveryMethod: { type: string, enum: [momo_mtn, momo_orange, cash, bank] }
+ *               deliveryMethod: { type: string, enum: [momo_mtn, momo_orange, campay, cash, bank] }
  *     responses:
  *       200: { description: Payout executed }
  */
