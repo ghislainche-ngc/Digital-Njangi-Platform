@@ -15,106 +15,175 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'member', title: 'My profile' });
-      mountContent(`
-        <div class="grid gap-6 lg:grid-cols-2">
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Personal info</h2>
-            <div class="flex items-center gap-4 mb-5">
-              <div class="h-16 w-16 rounded-full accent-bg text-[var(--text-on-brand)] grid place-items-center text-xl font-bold">FN</div>
-              <button class="btn-ghost text-sm">Change photo</button>
-            </div>
-            <div class="space-y-4">
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted">Full name</label>
-                <input class="glass-input mt-1" value="Fatou Ngo" />
-              </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Email</label>
-                  <input class="glass-input mt-1" type="email" value="fatou@example.cm" />
-                </div>
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Phone</label>
-                  <input class="glass-input mt-1" type="tel" value="+237 6XX XXX 004" />
-                </div>
-              </div>
-            </div>
-          </section>
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Wallets</h2>
-            <div class="space-y-3">
-              <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
-                <div class="h-10 w-10 rounded-lg bg-yellow-400 text-black grid place-items-center font-bold text-xs">MTN</div>
-                <div class="flex-1">
-                  <p class="font-semibold">MTN Mobile Money</p>
-                  <p class="text-xs muted font-mono">+237 6XX XXX 004 · verified</p>
-                </div>
-                <span class="chip chip-paid">Primary</span>
-              </div>
-              <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
-                <div class="h-10 w-10 rounded-lg bg-orange-500 text-white grid place-items-center font-bold text-xs">OM</div>
-                <div class="flex-1">
-                  <p class="font-semibold">Orange Money</p>
-                  <p class="text-xs muted">Not linked</p>
-                </div>
-                <button class="nav-link text-xs">Link</button>
-              </div>
-            </div>
-            <p class="mt-4 text-xs muted">PR-20: Orange Money as alternative payment channel.</p>
-          </section>
+      let isOrangeLinked = false;
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Notifications</h2>
-            <div class="space-y-4">
-              <label class="flex items-center justify-between">
-                <div>
-                  <p class="font-medium text-sm">Telegram</p>
-                  <p class="text-xs muted">Primary channel for reminders + confirmations</p>
-                </div>
-                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-              <label class="flex items-center justify-between">
-                <div>
-                  <p class="font-medium text-sm">SMS</p>
-                  <p class="text-xs muted">Fallback when offline</p>
-                </div>
-                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-              <label class="flex items-center justify-between">
-                <div>
-                  <p class="font-medium text-sm">Email receipts</p>
-                  <p class="text-xs muted">PDF copies emailed monthly</p>
-                </div>
-                <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-            </div>
-            <div class="mt-5 p-3 rounded-xl bg-[var(--bg-muted)] text-xs">
-              <p class="font-semibold">Telegram bot</p>
-              <p class="muted mt-1">Tap below to link your Telegram account to NjangiBridge.</p>
-              <button class="btn-ghost text-xs mt-3">Open @NjangiBridgeBot</button>
-            </div>
-          </section>
+      const renderPage = async () => {
+        const user = session.user() || {};
+        const name = user.name || user.full_name || 'Demo User';
+        const email = user.email || 'demo@naas.app';
+        const phone = user.phone || '+237 600 000 000';
+        const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase() || 'U';
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Security</h2>
-            <div class="space-y-4">
-              <button class="btn-ghost w-full text-left">Change password →</button>
-              <button class="btn-ghost w-full text-left">Enable SMS OTP (2FA) →</button>
-              <button class="btn-ghost w-full text-left">View login history →</button>
-            </div>
-            <p class="mt-6 text-xs text-red-500">
-              <a href="/login.html" onclick="localStorage.clear();">Sign out of NjangiBridge →</a>
-            </p>
-          </section>
-        </div>
+        mountContent(`
+          <form id="profile-form">
+            <div class="grid gap-6 lg:grid-cols-2">
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Personal info</h2>
+                <div class="flex items-center gap-4 mb-5">
+                  <div class="h-16 w-16 rounded-full accent-bg text-white grid place-items-center text-xl font-bold">${escapeHtml(initials)}</div>
+                  <button type="button" class="btn-ghost text-sm" id="btn-photo">Change photo</button>
+                </div>
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Full name</label>
+                    <input name="name" class="glass-input mt-1" required value="${escapeHtml(name)}" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Email</label>
+                      <input name="email" class="glass-input mt-1" type="email" required value="${escapeHtml(email)}" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Phone</label>
+                      <input name="phone" class="glass-input mt-1" type="tel" required value="${escapeHtml(phone)}" />
+                    </div>
+                  </div>
+                </div>
+              </section>
 
-        <div class="mt-6 flex justify-end gap-3">
-          <button class="btn-ghost">Cancel</button>
-          <button class="btn-primary">Save profile</button>
-        </div>
-      `);
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Wallets</h2>
+                <div class="space-y-3">
+                  <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-lg bg-yellow-400 text-black grid place-items-center font-bold text-xs">MTN</div>
+                    <div class="flex-1">
+                      <p class="font-semibold">MTN Mobile Money</p>
+                      <p class="text-xs muted font-mono">${escapeHtml(phone)} · verified</p>
+                    </div>
+                    <span class="chip chip-paid">Primary</span>
+                  </div>
+                  <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-lg bg-orange-500 text-white grid place-items-center font-bold text-xs">OM</div>
+                    <div class="flex-1">
+                      <p class="font-semibold">Orange Money</p>
+                      <p class="text-xs muted" id="om-status">${isOrangeLinked ? `${escapeHtml(phone)} · verified` : 'Not linked'}</p>
+                    </div>
+                    <button type="button" class="${isOrangeLinked ? 'chip chip-paid' : 'nav-link text-xs'}" id="btn-link-om">
+                      ${isOrangeLinked ? 'Primary Alternative' : 'Link'}
+                    </button>
+                  </div>
+                </div>
+                <p class="mt-4 text-xs muted">PR-20: Orange Money as alternative payment channel.</p>
+              </section>
+
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Notifications</h2>
+                <div class="space-y-4">
+                  <label class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-sm">Telegram</p>
+                      <p class="text-xs muted">Primary channel for reminders + confirmations</p>
+                    </div>
+                    <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+                  </label>
+                  <label class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-sm">SMS</p>
+                      <p class="text-xs muted">Fallback when offline</p>
+                    </div>
+                    <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+                  </label>
+                  <label class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-sm">Email receipts</p>
+                      <p class="text-xs muted">PDF copies emailed monthly</p>
+                    </div>
+                    <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
+                  </label>
+                </div>
+                <div class="mt-5 p-3 rounded-xl bg-[var(--bg-muted)] text-xs">
+                  <p class="font-semibold">Telegram bot</p>
+                  <p class="muted mt-1">Tap below to link your Telegram account to NjangiBridge.</p>
+                  <button type="button" class="btn-ghost text-xs mt-3">Open @NjangiBridgeBot</button>
+                </div>
+              </section>
+
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Security</h2>
+                <div class="space-y-4">
+                  <button type="button" class="btn-ghost w-full text-left">Change password →</button>
+                  <button type="button" class="btn-ghost w-full text-left">Enable SMS OTP (2FA) →</button>
+                  <button type="button" class="btn-ghost w-full text-left">View login history →</button>
+                </div>
+                <p class="mt-6 text-xs text-red-500">
+                  <a href="/login.html" id="btn-signout">Sign out of NjangiBridge →</a>
+                </p>
+              </section>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3 items-center">
+              <p id="profile-message" class="text-sm text-emerald-500 mr-4"></p>
+              <button type="button" id="btn-cancel" class="btn-ghost">Cancel</button>
+              <button type="submit" class="btn-primary">Save profile</button>
+            </div>
+          </form>
+        `);
+
+        // Form elements event listeners
+        document.querySelector('#profile-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const newName = formData.get('name');
+          const newEmail = formData.get('email');
+          const newPhone = formData.get('phone');
+
+          // Save back into session
+          const updatedUser = {
+            ...user,
+            name: newName,
+            full_name: newName,
+            email: newEmail,
+            phone: newPhone
+          };
+          localStorage.setItem('naas.user', JSON.stringify(updatedUser));
+
+          const msg = document.querySelector('#profile-message');
+          msg.textContent = 'Profile saved successfully!';
+          setTimeout(() => {
+            window.location.reload();
+          }, 800);
+        });
+
+        document.querySelector('#btn-cancel').addEventListener('click', () => {
+          renderPage();
+        });
+
+        document.querySelector('#btn-link-om').addEventListener('click', (e) => {
+          isOrangeLinked = !isOrangeLinked;
+          renderPage();
+        });
+
+        document.querySelector('#btn-photo').addEventListener('click', () => {
+          alert('Photo upload is simulated.');
+        });
+
+        document.querySelector('#btn-signout').addEventListener('click', () => {
+          session.clear();
+        });
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

@@ -22,7 +22,17 @@
         form: { email: '', password: '', phone: '', code: '' },
         loading: false,
         error: '',
-        preview(role) { return destinationFor(role); },
+        preview(role) {
+          session.set('mock-token', {
+            id: 'mock-id',
+            email: `mock-${role}@naas.app`,
+            name: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            full_name: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            role: role,
+            group_id: 'group-demo-123'
+          });
+          redirectByRole(role);
+        },
         async submit() {
           this.error = '';
           this.loading = true;
@@ -162,7 +172,7 @@
           <p class="text-xs uppercase tracking-widest muted">Preview a dashboard</p>
           <div class="mt-3 grid grid-cols-5 gap-2">
             <template x-for="role in ['admin','president','treasurer','secretary','member']" :key="role">
-              <a :href="preview(role)" class="nav-link justify-center text-xs capitalize" x-text="role"></a>
+              <button type="button" @click="preview(role)" class="nav-link justify-center text-xs capitalize" x-text="role"></button>
             </template>
           </div>
         </div>

@@ -137,3 +137,39 @@ export async function markFinePaid(groupId, fineId, paymentMethod = 'cash') {
 export async function waiveFine(groupId, fineId, reason) {
   return api.patch(`/groups/${groupId}/fines/${fineId}/waive`, { reason });
 }
+
+export async function getSocialFundBalance(groupId) {
+  return api.get(`/groups/${groupId}/social-fund`);
+}
+
+export async function listSocialFundEvents(groupId) {
+  return api.get(`/groups/${groupId}/social-fund/events`);
+}
+
+export async function recordSocialFundDeposit(groupId, amount, reason) {
+  return api.post(`/groups/${groupId}/social-fund/deposit`, { amount, reason });
+}
+
+export async function recordSocialFundWithdrawal(groupId, amount, reason) {
+  return api.post(`/groups/${groupId}/social-fund/withdrawal`, { amount, reason });
+}
+
+export async function getGroupLedger(groupId) {
+  return api.get(`/groups/${groupId}/reports/ledger`);
+}
+
+export async function getGroupSummary(groupId) {
+  return api.get(`/groups/${groupId}/reports/summary`);
+}
+
+export async function getMyHistory(groupId) {
+  return api.get(`/groups/${groupId}/reports/my-history`);
+}
+
+export async function exportPDFReport(groupId) {
+  return api.post(`/groups/${groupId}/reports/export`, {});
+}
+
+export async function getMyContributions(groupId) {
+  return api.get(`/groups/${groupId}/contributions/mine`);
+}

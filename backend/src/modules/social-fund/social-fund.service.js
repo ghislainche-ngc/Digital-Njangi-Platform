@@ -91,6 +91,17 @@ class SocialFundService {
 
     return Array.isArray(rows) ? rows[0] : rows;
   }
+
+  /**
+   * Get all social fund events for a group, sorted by created_at descending.
+   * @param {string} groupId
+   * @returns {Promise<Array<object>>}
+   */
+  async getEvents(groupId) {
+    const events = await this.db.findAll('social_fund_events', { group_id: groupId });
+    if (!events) return [];
+    return events.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
 }
 
 module.exports = SocialFundService;
