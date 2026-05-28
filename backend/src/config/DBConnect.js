@@ -110,7 +110,7 @@ class DBConnect {
    * @returns {Promise<object[]>} The inserted record(s)
    * @throws {Error} On database error
    */
-  async create(table, data, options = {}) {
+  async create(table, data, _options = {}) {
     this._ensureConnected();
     const query = this._client.from(table).insert(data).select();
 

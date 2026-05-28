@@ -7,7 +7,6 @@ const { supabase } = require('../../config/supabase');
 
 const SALT_ROUNDS = 12;
 const JWT_EXPIRY = '24h';
-const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 
 class AuthService {

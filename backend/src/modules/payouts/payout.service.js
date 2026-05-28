@@ -337,7 +337,20 @@ class PayoutService {
       .update({ status: 'processing', delivery_method: method })
       .eq('id', payoutId);
 
-    const gatewayKey = method === 'momo_orange' ? 'orange_money' : 'mtn_momo';
+    // Resolve gateway: group-level override first, then phone-prefix fallback.
+    const { data: group } = await supabase
+      .from('njangi_groups')
+      .select('preferred_payout_gateway')
+      .eq('id', groupId)
+      .single();
+
+    let gatewayKey;
+    if (group?.preferred_payout_gateway) {
+      gatewayKey = group.preferred_payout_gateway;
+    } else {
+      gatewayKey = method === 'momo_orange' ? 'orange_money' : 'mtn_momo';
+    }
+
     const provider = getProvider(gatewayKey);
     let result;
 
@@ -370,7 +383,7 @@ class PayoutService {
 
     if (error) throw this._dbError('execute (update)', error);
 
-    const eventType = result.success ? AuditEvents.PAYOUT_EXECUTED : AuditEvents.PAYOUT_BLOCKED;
+    const eventType = result.success ? AuditEvents.PAYOUT_EXECUTED : AuditEvents.PAYOUT_FAILED;
     await auditService.log(groupId, executedBy, eventType, {
       payoutId,
       recipientId: payout.recipient_id,

@@ -19,7 +19,7 @@ cron.schedule('0 8 * * *', async () => {
     // 1. Find groups whose next payment day is tomorrow
     // 2. For each group, send paymentReminder notification to all members
     //    via notificationService.sendBulk(memberIds, templates.paymentReminder(...))
-    const { data: _groups } = await supabase.from('njangi_groups').select('id').eq('status', 'active');
+    await supabase.from('njangi_groups').select('id').eq('status', 'active');
 
     // placeholder — implement above
   } catch (err) {
