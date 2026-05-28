@@ -12,7 +12,7 @@ const { handleCampayWebhook } = require('./campay.controller');
  *     description: |
  *       Receives async payment status updates from Campay.
  *       The request body must include a valid X-Campay-Signature
- *       header signed with the configured CAMPAY_WEBHOOK_KEY.
+ *       header signed with the configured APP_WEBHOOK_KEY.
  *     tags: [Webhooks]
  *     requestBody:
  *       required: true
