@@ -5,7 +5,7 @@ const router = express.Router();
 const auth = require('../../middleware/auth.middleware');
 const tenant = require('../../middleware/tenant.middleware');
 const { requireRole } = require('../../middleware/role.middleware');
-const { createGroup, getGroup, updateSettings } = require('./group.controller');
+const { createGroup, getGroup, updateSettings, updateGateway, updatePayoutGateway } = require('./group.controller');
 
 /**
  * @swagger
@@ -100,5 +100,79 @@ router.get('/:groupId', auth, tenant, getGroup);
  */
 // PATCH /groups/:groupId — update settings (President only)
 router.patch('/:groupId', auth, tenant, requireRole('president'), updateSettings);
+
+/**
+ * @swagger
+ * /groups/{groupId}/gateway:
+ *   patch:
+ *     summary: Change the group's preferred collection gateway (President only)
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [gateway]
+ *             properties:
+ *               gateway:
+ *                 type: string
+ *                 enum: [mtn_momo, orange_money, campay]
+ *                 example: campay
+ *     responses:
+ *       200: { description: Gateway updated }
+ *       400: { description: Validation error }
+ *       401: { description: Not authenticated }
+ *       403: { description: Not a group president }
+ *       404: { description: Group not found }
+ *       500: { description: Server error }
+ */
+router.patch('/:groupId/gateway', auth, tenant, requireRole('president'), updateGateway);
+
+/**
+ * @swagger
+ * /groups/{groupId}/payout-gateway:
+ *   patch:
+ *     summary: Change the group's preferred payout gateway (President only)
+ *     description: |
+ *       Setting payout_gateway to null reverts the group to phone-prefix
+ *       routing (the default). Setting it to 'campay' routes payouts via
+ *       Campay's /withdraw/ endpoint.
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [payout_gateway]
+ *             properties:
+ *               payout_gateway:
+ *                 type: [string, "null"]
+ *                 enum: [mtn_momo, orange_money, campay, null]
+ *                 example: campay
+ *     responses:
+ *       200: { description: Payout gateway updated }
+ *       400: { description: Validation error }
+ *       401: { description: Not authenticated }
+ *       403: { description: Not a group president }
+ *       404: { description: Group not found }
+ *       500: { description: Server error }
+ */
+router.patch('/:groupId/payout-gateway', auth, tenant, requireRole('president'), updatePayoutGateway);
 
 module.exports = router;
