@@ -1,6 +1,6 @@
 'use strict';
 
-const { verifyCampayWebhook } = require('../../src/services/payment/campaySignature');
+const { verifyWebhookSignature } = require('../../src/services/payment/campaySignature');
 const { handleCampayWebhook } = require('../../src/modules/webhooks/campay.controller');
 
 // Mock ContributionService
@@ -10,7 +10,7 @@ jest.mock('../../src/modules/contributions/contribution.service', () => ({
 const ContributionService = require('../../src/modules/contributions/contribution.service');
 
 jest.mock('../../src/services/payment/campaySignature', () => ({
-  verifyCampayWebhook: jest.fn(),
+  verifyWebhookSignature: jest.fn(),
 }));
 
 describe('Campay Webhook Controller', () => {
@@ -37,7 +37,7 @@ describe('Campay Webhook Controller', () => {
 
   it('returns 401 when signature is invalid', async () => {
     req.get.mockReturnValue('bad-sig');
-    verifyCampayWebhook.mockReturnValue(false);
+    verifyWebhookSignature.mockReturnValue(false);
     req.body = { reference: 'r1', status: 'SUCCESSFUL' };
     await handleCampayWebhook(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
@@ -46,7 +46,7 @@ describe('Campay Webhook Controller', () => {
 
   it('returns 400 when reference or status is missing', async () => {
     req.get.mockReturnValue('good-sig');
-    verifyCampayWebhook.mockReturnValue(true);
+    verifyWebhookSignature.mockReturnValue(true);
     req.body = { reference: 'r1' }; // missing status
     await handleCampayWebhook(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
@@ -54,7 +54,7 @@ describe('Campay Webhook Controller', () => {
 
   it('returns 200 and processes SUCCESSFUL webhook', async () => {
     req.get.mockReturnValue('good-sig');
-    verifyCampayWebhook.mockReturnValue(true);
+    verifyWebhookSignature.mockReturnValue(true);
     req.body = {
       reference: 'campay-ref-1',
       status: 'SUCCESSFUL',
@@ -89,7 +89,7 @@ describe('Campay Webhook Controller', () => {
 
   it('returns 500 (so Campay retries) on internal error', async () => {
     req.get.mockReturnValue('good-sig');
-    verifyCampayWebhook.mockReturnValue(true);
+    verifyWebhookSignature.mockReturnValue(true);
     req.body = { reference: 'campay-ref-1', status: 'SUCCESSFUL' };
     ContributionService.applyTerminalStatus.mockRejectedValue(new Error('DB down'));
 
