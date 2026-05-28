@@ -1,10 +1,12 @@
 'use strict';
 
+const { resolvePayoutGateway } = require('../services/payment/phoneRouter');
+
 /**
  * PayoutEngine — orchestrates the 5-step payout flow.
  *
  * Step 1: Run all 4 eligibility checks — ALL must pass or payout is BLOCKED
- * Step 2: Disburse funds via PaymentProvider
+ * Step 2: Disburse funds via PaymentProvider (two-tier routing)
  * Step 3: Update ledger (mark payout complete)
  * Step 4: Advance the rotation calendar
  * Step 5: Notify all group members
@@ -14,9 +16,9 @@
  * @task Dev B — Task B-04
  */
 class PayoutEngine {
-  constructor(contributionService, paymentProvider, notificationService, auditService, fineService) {
+  constructor(contributionService, paymentFactory, notificationService, auditService, fineService) {
     this.contributionService = contributionService;
-    this.paymentProvider = paymentProvider;
+    this.paymentFactory = paymentFactory;
     this.notificationService = notificationService;
     this.auditService = auditService;
     this.fineService = fineService;
@@ -34,9 +36,10 @@ class PayoutEngine {
       return { success: false, reason: eligibility.reason };
     }
 
-    // Step 2 — Disburse
-    // TODO (Dev B): get recipient phone, get payout amount, call paymentProvider.disburse()
-    // const result = await this.paymentProvider.disburse(recipient.phone, payout.amount);
+    // Step 2 — Disburse via the two-tier router.
+    // NOTE: this.group, this.recipient, and this.payout must be populated
+    // by the caller before invoking _dispatchDisburse().
+    // const result = await this._dispatchDisburse();
 
     // Step 3 — Update ledger
     // TODO (Dev B): mark payout record as completed with externalRef
@@ -47,7 +50,7 @@ class PayoutEngine {
     // Step 5 — Notify all members
     // TODO (Dev B): send payoutSent notification to every active member
 
-    throw new Error('PayoutEngine.execute() — steps 2-5 not implemented');
+    throw new Error('PayoutEngine.execute() — steps 2-5 not fully implemented');
   }
 
   /**
@@ -64,6 +67,19 @@ class PayoutEngine {
 
     const failed = checks.find(c => !c.passed);
     return failed || { passed: true };
+  }
+
+  /**
+   * @private
+   * Two-tier payout routing.
+   * Returns the provider's disburse result, or throws on routing failures.
+   */
+  async _dispatchDisburse() {
+    const gateway = this.group?.preferred_payout_gateway
+      || resolvePayoutGateway(this.recipient.phone);
+
+    const provider = this.paymentFactory.getProvider(gateway);
+    return provider.disburse(this.recipient.phone, this.payout.amount, this.payout.id);
   }
 
   async _checkPotCollected(groupId) {
