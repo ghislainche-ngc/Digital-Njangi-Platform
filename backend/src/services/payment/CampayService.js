@@ -67,16 +67,137 @@ class CampayService extends PaymentProvider {
     return this._token;
   }
 
-  async charge(_phone, _amount, _paymentRef) {
-    throw new Error('CampayService.charge() not yet implemented');
+  /**
+   * @private
+   * Poll GET /transaction/<reference>/ every 2 s, max 30 s. Returns the final
+   * status string ('SUCCESSFUL' | 'FAILED' | 'TIMEOUT').
+   */
+  async _pollStatus(reference, token) {
+    const POLL_INTERVAL_MS = 2_000;
+    const POLL_TIMEOUT_MS = 30_000;
+    const deadline = Date.now() + POLL_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      const res = await fetch(`${this.baseUrl}/transaction/${reference}/`, {
+        method: 'GET',
+        headers: { 'Authorization': `Token ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status && data.status !== 'PENDING') {
+          return data.status; // 'SUCCESSFUL' or 'FAILED'
+        }
+      }
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    return 'TIMEOUT';
   }
 
-  async disburse(_phone, _amount, _paymentRef) {
-    throw new Error('CampayService.disburse() not yet implemented');
+  /**
+   * Debit a Cameroon mobile-money wallet.
+   * @param {string} phone        — E.164, +237...
+   * @param {number} amount       — integer XAF
+   * @param {string} paymentRef   — caller's idempotent reference (e.g. contribution UUID)
+   * @returns {Promise<{success: boolean, externalRef: string, status: string}>}
+   */
+  async charge(phone, amount, paymentRef) {
+    const normalized = this._normalizePhone(phone);
+    const token = await this._getToken();
+
+    const collectRes = await fetch(`${this.baseUrl}/collect/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: String(amount),
+        currency: 'XAF',
+        from: normalized,
+        description: 'NjangiBridge contribution',
+        external_reference: paymentRef,
+      }),
+    });
+
+    if (!collectRes.ok) {
+      const body = await collectRes.text();
+      const err = new Error(`Campay /collect/ failed (${collectRes.status}): ${body}`);
+      err.statusCode = 502;
+      throw err;
+    }
+
+    const { reference } = await collectRes.json();
+    const status = await this._pollStatus(reference, token);
+
+    return {
+      success: status === 'SUCCESSFUL',
+      externalRef: reference,
+      status, // 'SUCCESSFUL' | 'FAILED' | 'TIMEOUT'
+    };
   }
 
-  async getStatus(_externalRef) {
-    throw new Error('CampayService.getStatus() not yet implemented');
+  /**
+   * Credit a mobile-money wallet (withdrawal / payout).
+   * Requires "Withdrawals through the API" to be enabled in the Campay dashboard.
+   *
+   * @param {string} phone        — E.164, +237...
+   * @param {number} amount       — integer XAF
+   * @param {string} paymentRef   — caller's idempotent reference (e.g. payout UUID)
+   * @returns {Promise<{success: boolean, externalRef: string, status: string}>}
+   */
+  async disburse(phone, amount, paymentRef) {
+    const normalized = this._normalizePhone(phone);
+    const token = await this._getToken();
+
+    const res = await fetch(`${this.baseUrl}/withdraw/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: String(amount),
+        to: normalized,
+        description: 'NjangiBridge payout',
+        external_reference: paymentRef,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      const err = new Error(`Campay /withdraw/ failed (${res.status}): ${body}`);
+      err.statusCode = 502;
+      throw err;
+    }
+
+    const { reference } = await res.json();
+    const status = await this._pollStatus(reference, token);
+    return {
+      success: status === 'SUCCESSFUL',
+      externalRef: reference,
+      status,
+    };
+  }
+
+  /**
+   * Look up the current status of a Campay transaction.
+   * @param {string} externalRef — the reference returned by charge/disburse
+   * @returns {Promise<string>}  'SUCCESSFUL' | 'FAILED' | 'PENDING'
+   */
+  async getStatus(externalRef) {
+    const token = await this._getToken();
+    const res = await fetch(`${this.baseUrl}/transaction/${externalRef}/`, {
+      method: 'GET',
+      headers: { 'Authorization': `Token ${token}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      const err = new Error(`Campay /transaction/ failed (${res.status}): ${body}`);
+      err.statusCode = 502;
+      throw err;
+    }
+    const data = await res.json();
+    return data.status;
   }
 
   async refund(_externalRef) {
