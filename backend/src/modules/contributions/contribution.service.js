@@ -190,11 +190,12 @@ class ContributionService {
       .update({ status: 'processing' })
       .eq('id', contribution.id);
 
-    const provider = getProvider(gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo');
+    const gatewayMap = { momo_orange: 'orange_money', momo_mtn: 'mtn_momo', campay: 'campay' };
+    const provider = getProvider(gatewayMap[gateway] || 'mtn_momo');
     let result;
 
     try {
-      result = await provider.charge(user.phone, amount);
+      result = await provider.charge(user.phone, amount, contribution.id);
     } catch (chargeErr) {
       result = { success: false, externalRef: null, status: 'FAILED' };
     }
@@ -202,7 +203,7 @@ class ContributionService {
     await this._logTransaction({
       referenceType: 'contribution',
       referenceId: contribution.id,
-      gateway: gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo',
+      gateway: gatewayMap[gateway] || 'mtn_momo',
       externalRef: result.externalRef,
       phone: user.phone,
       amount,
@@ -212,11 +213,11 @@ class ContributionService {
 
     if (!result.success) {
       try {
-        result = await provider.charge(user.phone, amount);
+        result = await provider.charge(user.phone, amount, contribution.id);
         await this._logTransaction({
           referenceType: 'contribution',
           referenceId: contribution.id,
-          gateway: gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo',
+          gateway: gatewayMap[gateway] || 'mtn_momo',
           externalRef: result.externalRef,
           phone: user.phone,
           amount,

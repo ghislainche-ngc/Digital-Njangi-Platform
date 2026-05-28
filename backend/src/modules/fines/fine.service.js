@@ -130,6 +130,18 @@ class FineService {
   }
 
   /**
+   * List all fines for a group.
+   * @returns {object[]}
+   */
+  async listGroupFines(groupId) {
+    return this.db.findAll(
+      'fines',
+      { group_id: groupId },
+      { orderBy: 'created_at', ascending: false }
+    );
+  }
+
+  /**
    * Used by PayoutEngine to block payout if recipient has unpaid fines.
    * @returns {boolean}
    */

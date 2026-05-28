@@ -3,6 +3,13 @@
 const express = require('express');
 const router = express.Router();
 const { handleCampayWebhook } = require('./campay.controller');
+const { createRateLimiter } = require('../../middleware/rateLimit.middleware');
+
+const campayWebhookLimiter = createRateLimiter({
+	windowMs: 60 * 1000,
+	limit: 30,
+	message: 'Campay webhook rate limit exceeded.',
+});
 
 /**
  * @swagger
@@ -54,6 +61,6 @@ const { handleCampayWebhook } = require('./campay.controller');
  *       401: { description: Missing or invalid signature }
  *       500: { description: Internal error (Campay will retry) }
  */
-router.post('/campay', express.json(), handleCampayWebhook);
+router.post('/campay', campayWebhookLimiter, handleCampayWebhook);
 
 module.exports = router;
