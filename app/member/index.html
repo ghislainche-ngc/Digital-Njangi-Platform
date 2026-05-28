@@ -236,17 +236,58 @@
 
             payConfirm.addEventListener('click', async () => {
               payConfirm.disabled = true;
+              if (payCancel) payCancel.disabled = true;
               payMsg.textContent = 'Initiating transaction...';
               const gateway = document.querySelector('#payment-gateway').value;
 
               try {
                 await initiateContributionPayment(activeGroupId, gateway);
-                payMsg.textContent = 'Payment initiated successfully! Check your phone for prompt.';
-                setTimeout(() => {
-                  renderPage();
-                }, 1500);
+                payMsg.textContent = 'Payment initiated! Check your phone for the PIN prompt.';
+                
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                const checkPaymentStatus = async () => {
+                  attempts++;
+                  try {
+                    const contributions = await getMyContributions(activeGroupId);
+                    const confirmedPayment = contributions.some(c => 
+                      c.cycle_id === stats.cycleId && c.status === 'confirmed'
+                    );
+
+                    if (confirmedPayment) {
+                      payMsg.innerHTML = '<span class="text-emerald-500 font-bold">✓ Payment Confirmed! Contribution received.</span>';
+                      setTimeout(() => {
+                        renderPage();
+                      }, 2000);
+                    } else if (attempts >= maxAttempts) {
+                      payMsg.textContent = 'Transaction is still processing on the network. Check back in a few minutes.';
+                      payConfirm.disabled = false;
+                      if (payCancel) payCancel.disabled = false;
+                      setTimeout(() => {
+                        renderPage();
+                      }, 3000);
+                    } else {
+                      payMsg.textContent = `Awaiting PIN confirmation... (Checking status: ${attempts}/${maxAttempts})`;
+                      setTimeout(checkPaymentStatus, 3000);
+                    }
+                  } catch (err) {
+                    if (attempts >= maxAttempts) {
+                      payMsg.textContent = 'Verification timed out. Please refresh page manually.';
+                      payConfirm.disabled = false;
+                      if (payCancel) payCancel.disabled = false;
+                    } else {
+                      setTimeout(checkPaymentStatus, 3000);
+                    }
+                  }
+                };
+
+                // Start polling after a short initial delay of 3 seconds
+                setTimeout(checkPaymentStatus, 3000);
+
               } catch (error) {
                 payConfirm.disabled = false;
+                if (payCancel) payCancel.disabled = false;
                 payMsg.textContent = error.message || 'Payment initiation failed.';
               }
             });
