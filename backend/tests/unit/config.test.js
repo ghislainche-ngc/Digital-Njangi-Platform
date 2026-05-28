@@ -15,6 +15,7 @@ describe('Environment validation (config/env.js)', () => {
     process.env.SUPABASE_URL = 'https://test.supabase.co';
     process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
     process.env.JWT_SECRET = 'test-jwt-secret-at-least-32-chars';
+    process.env.CAMPAY_WEBHOOK_KEY = 'test-campay-webhook-key-32-bytes-min';
   });
 
   afterEach(() => {
@@ -41,6 +42,11 @@ describe('Environment validation (config/env.js)', () => {
   it('throws when JWT_SECRET is missing', () => {
     delete process.env.JWT_SECRET;
     expect(() => require('../../src/config/env')).toThrow('JWT_SECRET');
+  });
+
+  it('throws when CAMPAY_WEBHOOK_KEY is missing', () => {
+    delete process.env.CAMPAY_WEBHOOK_KEY;
+    expect(() => require('../../src/config/env')).toThrow('CAMPAY_WEBHOOK_KEY');
   });
 
   it('defaults PORT to 3000 when not set', () => {

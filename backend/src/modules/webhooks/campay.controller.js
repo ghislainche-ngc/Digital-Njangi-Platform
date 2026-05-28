@@ -1,6 +1,6 @@
 'use strict';
 
-const { verifyCampayWebhook } = require('../../services/payment/campaySignature');
+const { verifyWebhookSignature } = require('../../services/payment/campaySignature');
 const ContributionService = require('../../modules/contributions/contribution.service');
 
 /**
@@ -14,21 +14,19 @@ const ContributionService = require('../../modules/contributions/contribution.se
  *
  * @route POST /webhooks/campay
  */
-const handleCampayWebhook = async (req, res, next) => {
+const handleCampayWebhook = async (req, res) => {
   try {
     const signature = req.get('X-Campay-Signature');
     if (!signature) {
       return res.status(401).json({ error: 'Missing X-Campay-Signature header' });
     }
 
-    // Re-serialise the parsed body with the same key order Campay used.
-    const rawBody = JSON.stringify(req.body);
-    const isValid = verifyCampayWebhook(rawBody, signature);
+    const isValid = verifyWebhookSignature(signature, process.env.CAMPAY_WEBHOOK_KEY);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid webhook signature' });
     }
 
-    const { reference, status, amount, operator, operator_reference } = req.body;
+    const { reference, status, amount } = req.body;
 
     if (!reference || !status) {
       return res.status(400).json({ error: 'Missing reference or status in payload' });
