@@ -342,8 +342,8 @@ describe('getProvider factory', () => {
 describe('Payment factory — campay case', () => {
   it('returns a CampayService when env vars are set', () => {
     const original = { ...process.env };
-    process.env.CAMPAY_APP_USERNAME = 'u';
-    process.env.CAMPAY_APP_PASSWORD = 'p';
+    process.env.APP_USERNAME = 'u';
+    process.env.APP_PASSWORD = 'p';
     try {
       jest.resetModules();
       const { getProvider: freshGetProvider } = require('../../src/services/payment/index');
@@ -355,14 +355,14 @@ describe('Payment factory — campay case', () => {
     }
   });
 
-  it('throws when CAMPAY_APP_USERNAME is unset', () => {
+  it('throws when APP_USERNAME is unset', () => {
     const original = { ...process.env };
-    delete process.env.CAMPAY_APP_USERNAME;
-    delete process.env.CAMPAY_APP_PASSWORD;
+    delete process.env.APP_USERNAME;
+    delete process.env.APP_PASSWORD;
     try {
       jest.resetModules();
       const { getProvider: freshGetProvider } = require('../../src/services/payment/index');
-      expect(() => freshGetProvider('campay')).toThrow(/CAMPAY_APP_USERNAME/);
+      expect(() => freshGetProvider('campay')).toThrow(/APP_USERNAME/);
     } finally {
       process.env = original;
       jest.resetModules();

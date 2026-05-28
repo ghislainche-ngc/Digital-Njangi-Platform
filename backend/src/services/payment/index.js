@@ -17,8 +17,8 @@ const config = {
     baseUrl: process.env.ORANGE_MONEY_BASE_URL,
   },
   campay: {
-    username: process.env.CAMPAY_APP_USERNAME,
-    password: process.env.CAMPAY_APP_PASSWORD,
+    username: process.env.APP_USERNAME,
+    password: process.env.APP_PASSWORD,
     baseUrl: process.env.CAMPAY_BASE_URL || 'https://demo.campay.net/api',
   },
 };
@@ -34,7 +34,7 @@ const getProvider = (gateway) => {
     case 'orange_money': return new OrangeMoneyService(config.orange);
     case 'campay': {
       if (!config.campay.username || !config.campay.password) {
-        throw new Error('CAMPAY_APP_USERNAME and CAMPAY_APP_PASSWORD must be configured');
+        throw new Error('APP_USERNAME and APP_PASSWORD must be configured');
       }
       return new CampayService(config.campay);
     }

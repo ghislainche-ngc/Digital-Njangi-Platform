@@ -21,7 +21,7 @@ const handleCampayWebhook = async (req, res) => {
       return res.status(401).json({ error: 'Missing X-Campay-Signature header' });
     }
 
-    const isValid = verifyWebhookSignature(signature, process.env.CAMPAY_WEBHOOK_KEY);
+    const isValid = verifyWebhookSignature(signature, process.env.APP_WEBHOOK_KEY);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid webhook signature' });
     }

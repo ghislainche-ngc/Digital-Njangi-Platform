@@ -7,9 +7,9 @@
 
 - [ ] Backend deployed to the Contabo VPS with a public HTTPS hostname.
 - [ ] `backend/.env` on the server has:
-  - [ ] `CAMPAY_APP_USERNAME` — from the Campay dashboard
-  - [ ] `CAMPAY_APP_PASSWORD` — from the Campay dashboard
-  - [ ] `CAMPAY_WEBHOOK_KEY` — from the Campay dashboard
+  - [ ] `APP_USERNAME` — from the Campay dashboard
+  - [ ] `APP_PASSWORD` — from the Campay dashboard
+  - [ ] `APP_WEBHOOK_KEY` — from the Campay dashboard
   - [ ] `CAMPAY_BASE_URL` — default `https://demo.campay.net/api` for sandbox
   - [ ] `CAMPAY_NOTIFY_URL` — `https://<contabo-host>/webhooks/campay`
 - [ ] Campay dashboard: app callback URL is set to the same `CAMPAY_NOTIFY_URL`, method = POST.
