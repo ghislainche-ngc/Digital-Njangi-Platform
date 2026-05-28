@@ -5,7 +5,7 @@ const router = express.Router();
 const auth = require('../../middleware/auth.middleware');
 const tenant = require('../../middleware/tenant.middleware');
 const { requireRole } = require('../../middleware/role.middleware');
-const { createGroup, listMyGroups, getGroup, updateSettings, updateGateway, updatePayoutGateway } = require('./group.controller');
+const { createGroup, listMyGroups, getGroup, updateSettings, updateGateway, updatePayoutGateway, renewSubscription } = require('./group.controller');
 
 /**
  * @swagger
@@ -177,5 +177,8 @@ router.patch('/:groupId/gateway', auth, tenant, requireRole('president'), update
  *       500: { description: Server error }
  */
 router.patch('/:groupId/payout-gateway', auth, tenant, requireRole('president'), updatePayoutGateway);
+
+// POST /groups/:groupId/billing/renew — renew subscription (President only)
+router.post('/:groupId/billing/renew', auth, tenant, requireRole('president'), renewSubscription);
 
 module.exports = router;

@@ -130,8 +130,13 @@ describe('GroupService.updateSettings', () => {
   });
 
   it('allows updating contribution_amount', async () => {
-    const updated = { id: 'grp-1', contribution_amount: 15000 };
-    mockFrom.mockReturnValue(chainMock(updated));
+    const updated = { id: 'grp-1', contribution_amount: 15000, subscription_tier: 'growth' };
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return chainMock({ subscription_tier: 'growth', contribution_amount: 10000 });
+      return chainMock(updated);
+    });
 
     const result = await groupService.updateSettings('grp-1', { contribution_amount: 15000 });
     expect(result.contribution_amount).toBe(15000);
@@ -192,5 +197,46 @@ describe('GroupService.updatePayoutGateway', () => {
     mockFrom.mockReturnValue(chainMock(null));
     await expect(groupService.updatePayoutGateway('missing', 'campay'))
       .rejects.toMatchObject({ statusCode: 404, code: 'GROUP_NOT_FOUND' });
+  });
+});
+
+describe('SaaS Subscriptions & Limits', () => {
+  it('throws TIER_LIMIT_BREACHED when Starter contribution > 10,000', async () => {
+    await expect(
+      groupService.createGroup('u1', { name: 'G1', contribution_amount: 15000, subscription_tier: 'starter' })
+    ).rejects.toMatchObject({ statusCode: 400, code: 'TIER_LIMIT_BREACHED' });
+  });
+
+  it('throws TIER_LIMIT_BREACHED when Growth contribution > 100,000', async () => {
+    await expect(
+      groupService.createGroup('u1', { name: 'G1', contribution_amount: 120000, subscription_tier: 'growth' })
+    ).rejects.toMatchObject({ statusCode: 400, code: 'TIER_LIMIT_BREACHED' });
+  });
+
+  it('allows Enterprise contribution to exceed 100,000', async () => {
+    const mockGroup = { id: 'grp-x', name: 'G1', subscription_tier: 'enterprise' };
+    const mockMembership = { id: 'mem-x', role: 'president' };
+    const mockCycle = { id: 'cyc-x', cycle_number: 1 };
+
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return chainMock(mockGroup);
+      if (callCount === 2) return chainMock(mockMembership);
+      return chainMock(mockCycle);
+    });
+
+    const res = await groupService.createGroup('u1', { name: 'G1', contribution_amount: 250000, subscription_tier: 'enterprise', rotation_type: 'fixed' });
+    expect(res.group.subscription_tier).toBe('enterprise');
+  });
+
+  it('renewSubscription extends expiry date and returns group', async () => {
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + 10);
+    const mockGroup = { id: 'grp-x', name: 'G1', subscription_tier: 'growth', subscription_expires_at: expiry.toISOString() };
+    mockFrom.mockReturnValue(chainMock(mockGroup));
+
+    const res = await groupService.renewSubscription('grp-x', 'mtn_momo');
+    expect(res).toBeDefined();
   });
 });

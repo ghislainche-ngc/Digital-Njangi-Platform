@@ -35,6 +35,9 @@ CREATE TABLE njangi_groups (
   payout_threshold_pct NUMERIC(5, 2) DEFAULT 100,
   approval_threshold NUMERIC(12, 2) DEFAULT 0,
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+  subscription_tier TEXT NOT NULL DEFAULT 'starter' CHECK (subscription_tier IN ('starter', 'growth', 'enterprise')),
+  subscription_status TEXT NOT NULL DEFAULT 'active' CHECK (subscription_status IN ('active', 'past_due', 'canceled')),
+  subscription_expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 days'),
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -191,3 +194,17 @@ ALTER TABLE njangi_groups
   ADD COLUMN preferred_payout_gateway text NULL
     CHECK (preferred_payout_gateway IS NULL
            OR preferred_payout_gateway IN ('mtn_momo', 'orange_money', 'campay'));
+
+-- ============================================================
+-- SaaS Subscription & Monetization columns (added 2026-05-29)
+-- ============================================================
+ALTER TABLE njangi_groups
+  ADD COLUMN subscription_tier text NOT NULL DEFAULT 'starter'
+    CHECK (subscription_tier IN ('starter', 'growth', 'enterprise'));
+
+ALTER TABLE njangi_groups
+  ADD COLUMN subscription_status text NOT NULL DEFAULT 'active'
+    CHECK (subscription_status IN ('active', 'past_due', 'canceled'));
+
+ALTER TABLE njangi_groups
+  ADD COLUMN subscription_expires_at timestamptz DEFAULT (now() + interval '30 days');

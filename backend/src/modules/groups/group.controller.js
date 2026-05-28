@@ -101,4 +101,15 @@ const updatePayoutGateway = async (req, res, next) => {
   }
 };
 
-module.exports = { createGroup, listMyGroups, getGroup, updateSettings, updateGateway, updatePayoutGateway };
+const renewSubscription = async (req, res, next) => {
+  try {
+    const { gateway } = req.body;
+    const group = await groupService.renewSubscription(req.params.groupId, gateway);
+    return res.status(200).json(group);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+module.exports = { createGroup, listMyGroups, getGroup, updateSettings, updateGateway, updatePayoutGateway, renewSubscription };

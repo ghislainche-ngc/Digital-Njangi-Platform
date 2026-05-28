@@ -56,7 +56,7 @@
                 <div class="glass-card p-6 animate-fade-up" style="animation-delay: 100ms;">
                   <p class="text-xs uppercase tracking-widest muted font-semibold">Obtain a Space</p>
                   <h2 class="mt-2 font-display text-xl font-bold">Start a new Njangi</h2>
-                  <form id="create-group-form" class="mt-6 space-y-4">
+                  <form id="create-group-form" class="mt-6 space-y-5">
                     <div>
                       <label class="text-xs font-semibold uppercase tracking-wider muted">Group Name</label>
                       <input name="name" required class="glass-input mt-1" placeholder="e.g., Les Amis de Yaoundé" />
@@ -92,6 +92,49 @@
                         <input name="approval_threshold" type="number" min="0" max="100" class="glass-input mt-1" value="0" />
                       </div>
                     </div>
+
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted block mb-2">Select Subscription Plan</label>
+                      <div class="grid gap-3 md:grid-cols-3">
+                        <label class="glass-card p-3 flex flex-col justify-between cursor-pointer border border-subtle hover:border-[var(--accent)] relative">
+                          <input type="radio" name="subscription_tier" value="starter" checked class="absolute right-3 top-3 accent-[var(--accent)]" />
+                          <div>
+                            <span class="block font-bold text-sm">Starter</span>
+                            <span class="block text-[10px] muted mt-1">Free Trial</span>
+                            <ul class="text-[10px] space-y-1 mt-2 list-disc list-inside muted">
+                              <li>Max 5 members</li>
+                              <li>Max 10k FCFA contrib</li>
+                              <li>30-day trial</li>
+                            </ul>
+                          </div>
+                        </label>
+                        <label class="glass-card p-3 flex flex-col justify-between cursor-pointer border border-subtle hover:border-[var(--accent)] relative">
+                          <input type="radio" name="subscription_tier" value="growth" class="absolute right-3 top-3 accent-[var(--accent)]" />
+                          <div>
+                            <span class="block font-bold text-sm text-[var(--accent)]">Growth</span>
+                            <span class="block text-[10px] font-semibold mt-1">5,000 FCFA/mo</span>
+                            <ul class="text-[10px] space-y-1 mt-2 list-disc list-inside muted">
+                              <li>Max 20 members</li>
+                              <li>Max 100k FCFA contrib</li>
+                              <li>WhatsApp Bot</li>
+                            </ul>
+                          </div>
+                        </label>
+                        <label class="glass-card p-3 flex flex-col justify-between cursor-pointer border border-subtle hover:border-[var(--accent)] relative">
+                          <input type="radio" name="subscription_tier" value="enterprise" class="absolute right-3 top-3 accent-[var(--accent)]" />
+                          <div>
+                            <span class="block font-bold text-sm text-purple-400">Enterprise</span>
+                            <span class="block text-[10px] font-semibold mt-1">15,000 FCFA/mo</span>
+                            <ul class="text-[10px] space-y-1 mt-2 list-disc list-inside muted">
+                              <li>Unlimited members</li>
+                              <li>No contrib limit</li>
+                              <li>WhatsApp + VIP</li>
+                            </ul>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
                     <button type="submit" class="btn-primary w-full mt-4">+ Create Njangi Group</button>
                     <p id="group-form-message" class="text-xs mt-2 text-center"></p>
                   </form>

@@ -10,6 +10,7 @@ const createGroupSchema = Joi.object({
   penalty_per_day: Joi.number().min(0).default(0),
   payout_threshold_pct: Joi.number().min(0).max(100).default(100),
   approval_threshold: Joi.number().min(0).default(0),
+  subscription_tier: Joi.string().valid('starter', 'growth', 'enterprise').default('starter'),
 });
 
 const updateGroupSchema = Joi.object({
@@ -20,6 +21,7 @@ const updateGroupSchema = Joi.object({
   penalty_per_day: Joi.number().min(0),
   payout_threshold_pct: Joi.number().min(0).max(100),
   approval_threshold: Joi.number().min(0),
+  subscription_tier: Joi.string().valid('starter', 'growth', 'enterprise'),
 }).min(1);
 
 const updateGatewaySchema = Joi.object({
