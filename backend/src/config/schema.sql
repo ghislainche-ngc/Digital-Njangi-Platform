@@ -183,7 +183,13 @@ ALTER TABLE otp_verifications    ENABLE ROW LEVEL SECURITY;
 -- Collection rail. NOT NULL with a safe default so every existing group
 -- keeps behaving identically until an admin opts them in.
 ALTER TABLE njangi_groups
-  ADD COLUMN preferred_gateway text NOT NULL DEFAULT 'mtn_momo'
+  ADD COLUMN IF NOT EXISTS preferred_gateway text NOT NULL DEFAULT 'mtn_momo';
+
+-- Add check constraint separately or ensure it doesn't conflict
+ALTER TABLE njangi_groups 
+  DROP CONSTRAINT IF EXISTS njangi_groups_preferred_gateway_check;
+ALTER TABLE njangi_groups
+  ADD CONSTRAINT njangi_groups_preferred_gateway_check 
     CHECK (preferred_gateway IN ('mtn_momo', 'orange_money', 'campay'));
 
 -- Payout rail. NULLABLE — NULL means "fall back to phone-prefix routing"
@@ -191,7 +197,12 @@ ALTER TABLE njangi_groups
 -- Campay disbursement; 'mtn_momo' / 'orange_money' force a specific
 -- direct API (only sensible for single-operator groups).
 ALTER TABLE njangi_groups
-  ADD COLUMN preferred_payout_gateway text NULL
+  ADD COLUMN IF NOT EXISTS preferred_payout_gateway text NULL;
+
+ALTER TABLE njangi_groups 
+  DROP CONSTRAINT IF EXISTS njangi_groups_preferred_payout_gateway_check;
+ALTER TABLE njangi_groups
+  ADD CONSTRAINT njangi_groups_preferred_payout_gateway_check 
     CHECK (preferred_payout_gateway IS NULL
            OR preferred_payout_gateway IN ('mtn_momo', 'orange_money', 'campay'));
 
@@ -199,12 +210,22 @@ ALTER TABLE njangi_groups
 -- SaaS Subscription & Monetization columns (added 2026-05-29)
 -- ============================================================
 ALTER TABLE njangi_groups
-  ADD COLUMN subscription_tier text NOT NULL DEFAULT 'starter'
+  ADD COLUMN IF NOT EXISTS subscription_tier text NOT NULL DEFAULT 'starter';
+
+ALTER TABLE njangi_groups 
+  DROP CONSTRAINT IF EXISTS njangi_groups_subscription_tier_check;
+ALTER TABLE njangi_groups
+  ADD CONSTRAINT njangi_groups_subscription_tier_check 
     CHECK (subscription_tier IN ('starter', 'growth', 'enterprise'));
 
 ALTER TABLE njangi_groups
-  ADD COLUMN subscription_status text NOT NULL DEFAULT 'active'
+  ADD COLUMN IF NOT EXISTS subscription_status text NOT NULL DEFAULT 'active';
+
+ALTER TABLE njangi_groups 
+  DROP CONSTRAINT IF EXISTS njangi_groups_subscription_status_check;
+ALTER TABLE njangi_groups
+  ADD CONSTRAINT njangi_groups_subscription_status_check 
     CHECK (subscription_status IN ('active', 'past_due', 'canceled'));
 
 ALTER TABLE njangi_groups
-  ADD COLUMN subscription_expires_at timestamptz DEFAULT (now() + interval '30 days');
+  ADD COLUMN IF NOT EXISTS subscription_expires_at timestamptz DEFAULT (now() + interval '30 days');
