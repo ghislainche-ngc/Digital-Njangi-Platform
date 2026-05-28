@@ -7,6 +7,7 @@ const express = require('express');
 const cors = require('cors');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const { createRateLimiter } = require('./middleware/rateLimit.middleware');
 
 // Route imports — add each module as it is implemented
 const authRoutes = require('./modules/auth/auth.routes');
@@ -17,6 +18,7 @@ const payoutRoutes = require('./modules/payouts/payout.routes');
 const fineRoutes = require('./modules/fines/fine.routes');
 const socialFundRoutes = require('./modules/social-fund/social-fund.routes');
 const reportRoutes = require('./modules/reports/report.routes');
+const webhookRoutes = require('./modules/webhooks/campay.routes');
 
 const errorMiddleware = require('./middleware/error.middleware');
 
@@ -26,6 +28,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 500,
+  message: 'Too many requests. Please try again later.',
+}));
 
 // ─── Swagger / OpenAPI ────────────────────────────────────────────────────
 const swaggerSpec = swaggerJsdoc({
@@ -63,6 +70,7 @@ app.use('/groups', payoutRoutes);
 app.use('/groups', fineRoutes);
 app.use('/groups', socialFundRoutes);
 app.use('/groups', reportRoutes);
+app.use('/webhooks', webhookRoutes);
 
 // ─── Global error handler (must be last) ──────────────────────────────────
 app.use(errorMiddleware);

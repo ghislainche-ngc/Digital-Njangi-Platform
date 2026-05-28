@@ -190,11 +190,12 @@ class ContributionService {
       .update({ status: 'processing' })
       .eq('id', contribution.id);
 
-    const provider = getProvider(gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo');
+    const gatewayMap = { momo_orange: 'orange_money', momo_mtn: 'mtn_momo', campay: 'campay' };
+    const provider = getProvider(gatewayMap[gateway] || 'mtn_momo');
     let result;
 
     try {
-      result = await provider.charge(user.phone, amount);
+      result = await provider.charge(user.phone, amount, contribution.id);
     } catch (chargeErr) {
       result = { success: false, externalRef: null, status: 'FAILED' };
     }
@@ -202,7 +203,7 @@ class ContributionService {
     await this._logTransaction({
       referenceType: 'contribution',
       referenceId: contribution.id,
-      gateway: gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo',
+      gateway: gatewayMap[gateway] || 'mtn_momo',
       externalRef: result.externalRef,
       phone: user.phone,
       amount,
@@ -212,11 +213,11 @@ class ContributionService {
 
     if (!result.success) {
       try {
-        result = await provider.charge(user.phone, amount);
+        result = await provider.charge(user.phone, amount, contribution.id);
         await this._logTransaction({
           referenceType: 'contribution',
           referenceId: contribution.id,
-          gateway: gateway === 'momo_orange' ? 'orange_money' : 'mtn_momo',
+          gateway: gatewayMap[gateway] || 'mtn_momo',
           externalRef: result.externalRef,
           phone: user.phone,
           amount,
@@ -384,6 +385,91 @@ class ContributionService {
       status: txn.status,
       attempts: txn.attempts || 1,
     });
+  }
+
+  /**
+   * Apply a terminal status from a payment provider (webhook or polling) to
+   * the payment_transactions row and the linked contribution.
+   *
+   * This is the single source of truth for transitioning a payment from
+   * PENDING → SUCCESSFUL / FAILED / TIMEOUT.
+   *
+   * @param {string} externalRef   — the provider's transaction reference
+   * @param {string} terminalStatus — 'SUCCESSFUL' | 'FAILED' | 'TIMEOUT'
+   * @param {object} meta          — optional { phone, amount, gateway, rawPayload }
+   * @returns {Promise<{contributionId: string|null, status: string}>}
+   */
+  async applyTerminalStatus(externalRef, terminalStatus, meta = {}) {
+    const validTerminals = ['SUCCESSFUL', 'FAILED', 'TIMEOUT'];
+    if (!validTerminals.includes(terminalStatus)) {
+      const err = new Error(`Invalid terminal status: ${terminalStatus}`);
+      err.statusCode = 400;
+      err.code = 'INVALID_STATUS';
+      throw err;
+    }
+
+    // 1. Find the payment transaction by external_ref
+    const { data: txn, error: txnErr } = await supabase
+      .from('payment_transactions')
+      .select('id, reference_id, reference_type, status')
+      .eq('external_ref', externalRef)
+      .single();
+
+    if (txnErr || !txn) {
+      const err = new Error(`Payment transaction not found for ref: ${externalRef}`);
+      err.statusCode = 404;
+      err.code = 'TXN_NOT_FOUND';
+      throw err;
+    }
+
+    // 2. Idempotency: if already terminal, do nothing
+    if (txn.status === 'SUCCESSFUL' || txn.status === 'FAILED' || txn.status === 'TIMEOUT') {
+      return { contributionId: txn.reference_id, status: txn.status };
+    }
+
+    // 3. Update the payment transaction
+    const { error: updateTxnErr } = await supabase
+      .from('payment_transactions')
+      .update({
+        status: terminalStatus,
+        ...(meta.phone && { phone: meta.phone }),
+        ...(meta.amount && { amount: meta.amount }),
+        ...(meta.gateway && { gateway: meta.gateway }),
+        ...(meta.rawPayload && { raw_payload: meta.rawPayload }),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', txn.id);
+
+    if (updateTxnErr) throw this._dbError('applyTerminalStatus (txn)', updateTxnErr);
+
+    // 4. If linked to a contribution, update that too
+    if (txn.reference_type === 'contribution' && txn.reference_id) {
+      const finalStatus = terminalStatus === 'SUCCESSFUL' ? 'confirmed' : 'failed';
+      const { error: contribErr } = await supabase
+        .from('contributions')
+        .update({
+          status: finalStatus,
+          ...(finalStatus === 'confirmed' && { confirmed_at: new Date().toISOString() }),
+        })
+        .eq('id', txn.reference_id);
+
+      if (contribErr) throw this._dbError('applyTerminalStatus (contribution)', contribErr);
+
+      // 5. Audit log
+      const eventType = terminalStatus === 'SUCCESSFUL'
+        ? AuditEvents.CONTRIBUTION_CONFIRMED
+        : AuditEvents.CONTRIBUTION_FAILED;
+      await auditService.log(null, null, eventType, {
+        contributionId: txn.reference_id,
+        externalRef,
+        terminalStatus,
+        meta,
+      });
+
+      return { contributionId: txn.reference_id, status: finalStatus };
+    }
+
+    return { contributionId: null, status: terminalStatus };
   }
 
   _dbError(operation, error) {

@@ -2,6 +2,19 @@
 
 const cron = require('node-cron');
 const { supabase } = require('../config/supabase');
+const ContributionService = require('../modules/contributions/contribution.service');
+const { AuditService } = require('../services/audit/AuditService');
+const { getNotificationService, templates } = require('../services/notification');
+
+const contributionService = new ContributionService();
+const auditService = new AuditService(supabase);
+const notificationService = getNotificationService('sms');
+
+const contributionGatewayMap = {
+  mtn_momo: 'momo_mtn',
+  orange_money: 'momo_orange',
+  campay: 'campay',
+};
 
 /**
  * Monthly Contribution Scheduler
@@ -35,13 +48,37 @@ cron.schedule('0 7 1 * *', async () => {
 });
 
 async function _processGroupContributions(group) {
-  // TODO (Dev B):
-  // For each active member in group:
-  // 1. Create contribution record (status: pending)
-  // 2. Initiate MoMo deduction via ContributionService
-  // 3. Log result to audit_events
-  // 4. Notify member of deduction attempt
-  void group;
+  const gateway = contributionGatewayMap[group.preferred_gateway] || 'momo_mtn';
+  const activeMembers = (group.memberships || [])
+    .filter((membership) => membership.status !== 'removed' && membership.users?.phone)
+    .map((membership) => ({
+      userId: membership.user_id,
+      ...membership.users,
+    }));
+
+  for (const member of activeMembers) {
+    try {
+      const result = await contributionService.initiateMobilePayment(group.id, member.userId, gateway);
+
+      await auditService.log(group.id, member.userId, 'CONTRIBUTION_DEDUCTION_ATTEMPTED', {
+        status: result.status,
+        contributionId: result.contributionId,
+        gateway,
+        externalRef: result.externalRef,
+      });
+
+      const message = result.status === 'confirmed'
+        ? templates.paymentConfirmed(member.full_name || 'member', result.amount || group.contribution_amount)
+        : templates.paymentFailed(member.full_name || 'member', result.amount || group.contribution_amount);
+
+      await notificationService.sendBulk([member.phone], message, 'sms');
+    } catch (err) {
+      await auditService.log(group.id, member.userId, 'CONTRIBUTION_DEDUCTION_ERROR', {
+        error: err.message,
+        gateway,
+      });
+    }
+  }
 }
 
 module.exports = { _processGroupContributions };

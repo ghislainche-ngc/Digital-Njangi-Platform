@@ -152,3 +152,76 @@ describe('Contribution Validation', () => {
     expect(error).toBeUndefined();
   });
 });
+
+describe('ContributionService.applyTerminalStatus', () => {
+  function buildChain(returnData, returnError = null) {
+    return {
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: returnData, error: returnError }),
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('throws .statusCode=400 for invalid terminal status', async () => {
+    await expect(ContributionService.applyTerminalStatus('ref-1', 'PENDING'))
+      .rejects.toMatchObject({ statusCode: 400, code: 'INVALID_STATUS' });
+  });
+
+  it('throws .statusCode=404 when transaction not found', async () => {
+    mockFrom.mockReturnValue(buildChain(null, { code: 'PGRST116' }));
+    await expect(ContributionService.applyTerminalStatus('ref-1', 'SUCCESSFUL'))
+      .rejects.toMatchObject({ statusCode: 404, code: 'TXN_NOT_FOUND' });
+  });
+
+  it('idempotent: returns existing status when already terminal', async () => {
+    mockFrom.mockReturnValue(buildChain({
+      id: 'txn-1', reference_id: 'contrib-1', reference_type: 'contribution', status: 'SUCCESSFUL',
+    }));
+    const result = await ContributionService.applyTerminalStatus('ref-1', 'SUCCESSFUL');
+    expect(result).toEqual({ contributionId: 'contrib-1', status: 'SUCCESSFUL' });
+    const chain = mockFrom.mock.results[0].value;
+    expect(chain.update).not.toHaveBeenCalled();
+  });
+
+  it('SUCCESSFUL: updates txn to SUCCESSFUL and contribution to confirmed', async () => {
+    mockFrom.mockReturnValue(buildChain({
+      id: 'txn-1', reference_id: 'contrib-1', reference_type: 'contribution', status: 'PENDING',
+    }));
+    const result = await ContributionService.applyTerminalStatus('ref-1', 'SUCCESSFUL', {
+      phone: '237677000001', amount: 5000, gateway: 'campay',
+    });
+    expect(result).toEqual({ contributionId: 'contrib-1', status: 'confirmed' });
+    const chain = mockFrom.mock.results[0].value;
+    expect(chain.update).toHaveBeenCalledTimes(2); // txn + contribution
+  });
+
+  it('FAILED: updates txn to FAILED and contribution to failed', async () => {
+    mockFrom.mockReturnValue(buildChain({
+      id: 'txn-1', reference_id: 'contrib-1', reference_type: 'contribution', status: 'PENDING',
+    }));
+    const result = await ContributionService.applyTerminalStatus('ref-1', 'FAILED');
+    expect(result).toEqual({ contributionId: 'contrib-1', status: 'failed' });
+  });
+
+  it('TIMEOUT: updates txn to TIMEOUT and contribution to failed', async () => {
+    mockFrom.mockReturnValue(buildChain({
+      id: 'txn-1', reference_id: 'contrib-1', reference_type: 'contribution', status: 'PENDING',
+    }));
+    const result = await ContributionService.applyTerminalStatus('ref-1', 'TIMEOUT');
+    expect(result).toEqual({ contributionId: 'contrib-1', status: 'failed' });
+  });
+
+  it('handles non-contribution reference_type gracefully', async () => {
+    mockFrom.mockReturnValue(buildChain({
+      id: 'txn-1', reference_id: null, reference_type: 'payout', status: 'PENDING',
+    }));
+    const result = await ContributionService.applyTerminalStatus('ref-1', 'SUCCESSFUL');
+    expect(result).toEqual({ contributionId: null, status: 'SUCCESSFUL' });
+  });
+});

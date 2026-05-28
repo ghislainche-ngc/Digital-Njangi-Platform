@@ -10,6 +10,7 @@ const REQUIRED_VARS = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_KEY',
   'JWT_SECRET',
+  'APP_WEBHOOK_KEY',
 ];
 
 const missing = REQUIRED_VARS.filter((key) => !process.env[key]);
