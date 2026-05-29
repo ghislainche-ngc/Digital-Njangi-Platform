@@ -47,6 +47,7 @@ const handleCampayWebhook = async (req, res) => {
   } catch (err) {
     // Never let webhook errors leak stack traces.
     // Return 500 so Campay retries (their retry policy is ~3 attempts).
+    // eslint-disable-next-line no-console
     console.error('[CampayWebhook]', err.message);
     return res.status(500).json({ error: 'Internal processing error' });
   }

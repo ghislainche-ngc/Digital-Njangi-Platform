@@ -80,6 +80,8 @@ class GroupService {
       .select()
       .single();
 
+    if (groupError) throw groupError;
+
     const { data: membership, error: memError } = await supabase
       .from('memberships')
       .insert({
