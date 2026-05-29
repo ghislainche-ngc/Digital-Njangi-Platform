@@ -133,7 +133,7 @@ class AuthService {
 
   _signToken(user) {
     return jwt.sign(
-      { sub: user.id, email: user.email },
+      { sub: user.id, email: user.email, is_admin: !!user.is_admin },
       process.env.JWT_SECRET,
       { expiresIn: JWT_EXPIRY }
     );
