@@ -9,7 +9,7 @@ Alpine.store('i18n',  createI18n());
 /* Convenience: $t('login.title') from markup. */
 Alpine.magic('t', () => (path) => Alpine.store('i18n').t(path));
 
-Alpine.start();
+setTimeout(() => Alpine.start(), 0);
 
 /* PWA — register service worker in production builds. */
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
