@@ -12,6 +12,7 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL,
   language TEXT DEFAULT 'en' CHECK (language IN ('en', 'fr')),
   telegram_chat_id TEXT,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -229,3 +230,10 @@ ALTER TABLE njangi_groups
 
 ALTER TABLE njangi_groups
   ADD COLUMN IF NOT EXISTS subscription_expires_at timestamptz DEFAULT (now() + interval '30 days');
+
+-- ============================================================
+-- Platform Admin role column (added 2026-05-29)
+-- ============================================================
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
+

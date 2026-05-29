@@ -4,6 +4,28 @@ const { supabase } = require('../../config/supabase');
 
 class GroupService {
   async listMyGroups(userId) {
+    const { data: userRecord } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single();
+
+    if (userRecord && userRecord.is_admin) {
+      const { data: groups, error: groupsError } = await supabase
+        .from('njangi_groups')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (groupsError) throw groupsError;
+
+      return (groups || []).map((group) => ({
+        id: group.id,
+        role: 'admin',
+        rotation_position: null,
+        ...group,
+      }));
+    }
+
     const { data, error } = await supabase
       .from('memberships')
       .select('group_id, role, rotation_position, status, njangi_groups(*)')

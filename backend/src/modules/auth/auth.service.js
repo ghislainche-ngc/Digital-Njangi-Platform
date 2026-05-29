@@ -63,7 +63,7 @@ class AuthService {
 
     const { data: user } = await supabase
       .from('users')
-      .select('id, email, full_name')
+      .select('id, email, full_name, is_admin')
       .eq('phone', phone)
       .single();
 
@@ -72,8 +72,10 @@ class AuthService {
     return {
       token,
       user: {
-        ...user,
-        role: membership?.role || 'member',
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.is_admin ? 'admin' : (membership?.role || 'member'),
         group_id: membership?.group_id || null,
       },
     };
@@ -82,7 +84,7 @@ class AuthService {
   async login({ email, password }) {
     const { data: user } = await supabase
       .from('users')
-      .select('id, email, full_name, password_hash')
+      .select('id, email, full_name, password_hash, is_admin')
       .eq('email', email)
       .single();
 
@@ -109,7 +111,7 @@ class AuthService {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        role: membership?.role || 'member',
+        role: user.is_admin ? 'admin' : (membership?.role || 'member'),
         group_id: membership?.group_id || null,
       },
     };
