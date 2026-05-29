@@ -3,6 +3,7 @@
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('../../src/middleware/auth.middleware');
 const { requireRole } = require('../../src/middleware/role.middleware');
+const requireAdmin = require('../../src/middleware/admin.middleware');
 
 const SECRET = 'test_secret_at_least_32_chars_long';
 process.env.JWT_SECRET = SECRET;
@@ -72,6 +73,24 @@ describe('requireRole middleware', () => {
     const { req, res, next } = mockReqRes();
     requireRole('president')(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
+  });
+});
+
+describe('requireAdmin middleware', () => {
+  it('returns 403 when user is not an admin', () => {
+    const { req, res, next } = mockReqRes();
+    req.user = { sub: 'user1', is_admin: false };
+    requireAdmin(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'ADMIN_REQUIRED' }));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('calls next() when user is an admin', () => {
+    const { req, res, next } = mockReqRes();
+    req.user = { sub: 'user1', is_admin: true };
+    requireAdmin(req, res, next);
+    expect(next).toHaveBeenCalled();
   });
 });
 
@@ -154,5 +173,74 @@ describe('tenantMiddleware', () => {
     expect(next).toHaveBeenCalled();
     expect(req.group).toEqual(mockGroup);
     expect(req.membership.role).toBe('president');
+  });
+
+  it('bypasses group membership check if user is a Platform Admin', async () => {
+    const mockGroup = { id: 'group-abc', name: 'Test Group' };
+    const mockUserRecord = { is_admin: true };
+
+    let callCount = 0;
+    mockSupabase.from.mockImplementation((table) => {
+      callCount++;
+      if (table === 'users') {
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({ data: mockUserRecord, error: null }),
+        };
+      }
+      if (table === 'njangi_groups') {
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({ data: mockGroup, error: null }),
+        };
+      }
+      return {};
+    });
+
+    const { req, res, next } = mockReqRes();
+    req.params = { groupId: 'group-abc' };
+    req.user = { sub: 'user-admin' };
+
+    await tenantMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.group).toEqual(mockGroup);
+    expect(req.membership.role).toBe('admin');
+  });
+
+  it('returns 404 if Platform Admin requests non-existent group', async () => {
+    const mockUserRecord = { is_admin: true };
+
+    let callCount = 0;
+    mockSupabase.from.mockImplementation((table) => {
+      callCount++;
+      if (table === 'users') {
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({ data: mockUserRecord, error: null }),
+        };
+      }
+      if (table === 'njangi_groups') {
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({ data: null, error: { message: 'not found' } }),
+        };
+      }
+      return {};
+    });
+
+    const { req, res, next } = mockReqRes();
+    req.params = { groupId: 'group-missing' };
+    req.user = { sub: 'user-admin' };
+
+    await tenantMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'GROUP_NOT_FOUND' }));
+    expect(next).not.toHaveBeenCalled();
   });
 });

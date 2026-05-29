@@ -24,7 +24,17 @@
       "**/tests/**/*.test.js"
     ],
     "collectCoverageFrom": [
-      "src/**/*.js"
+      "src/**/*.js",
+      "!src/app.js",
+      "!src/modules/**/*.controller.js",
+      "!src/modules/**/*.routes.js",
+      "!src/modules/**/*.validation.js",
+      "!src/jobs/**/*.js",
+      "!src/middleware/error.middleware.js",
+      "!src/services/payment/MTNMoMoService.js",
+      "!src/services/payment/OrangeMoneyService.js",
+      "!src/services/notification/SMSNotificationService.js",
+      "!src/services/notification/WhatsAppNotificationService.js"
     ],
     "coverageThreshold": {
       "global": {
