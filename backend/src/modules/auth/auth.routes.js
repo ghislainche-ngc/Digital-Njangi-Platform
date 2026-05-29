@@ -125,8 +125,8 @@ router.get('/whatsapp/qr', (req, res) => {
     }
 
     if (status === 'QR_READY' && qr) {
-      const qrUrl = \`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=\${encodeURIComponent(qr)}\`;
-      return res.send(\`
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+      return res.send(`
         <html>
           <head>
             <title>Link WhatsApp</title>
@@ -140,12 +140,12 @@ router.get('/whatsapp/qr', (req, res) => {
             <div class="card">
               <h2>Link WhatsApp Bot</h2>
               <p>Scan this QR code using Link Devices in your phone's WhatsApp settings:</p>
-              <img src="\${qrUrl}" alt="WhatsApp QR Code"/>
+              <img src="${qrUrl}" alt="WhatsApp QR Code"/>
               <p style="color: #999; font-size: 12px;">This links NjangiBridge as a WhatsApp Web client under your number.</p>
             </div>
           </body>
         </html>
-      \`);
+      `);
     }
 
     return res.send(`
