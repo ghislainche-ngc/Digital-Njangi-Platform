@@ -13,9 +13,54 @@
   </head>
   <body x-data x-init="$store.theme.init()" x-cloak class="relative">
     <div id="app-shell"></div>
+
+    <!-- Management Modal -->
+    <dialog id="manage-group-modal" class="glass-card-heavy p-6 max-w-md w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+      <div class="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+        <h3 class="font-display font-bold text-lg" id="modal-group-name">Manage Njangi Group</h3>
+        <button type="button" onclick="document.getElementById('manage-group-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
+      </div>
+      <form id="manage-group-form" class="mt-4 space-y-4">
+        <input type="hidden" name="groupId" id="modal-group-id" />
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Subscription Plan</label>
+          <select name="subscription_tier" id="modal-tier" class="glass-input mt-1">
+            <option value="starter">Starter (Free)</option>
+            <option value="growth">Growth (5,000 FCFA)</option>
+            <option value="enterprise">Enterprise (15,000 FCFA)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Subscription Status</label>
+          <select name="subscription_status" id="modal-sub-status" class="glass-input mt-1">
+            <option value="active">Active</option>
+            <option value="past_due">Past Due</option>
+            <option value="canceled">Canceled</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Expiration Date</label>
+          <input type="date" name="subscription_expires_at" id="modal-expires" class="glass-input mt-1" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Platform Status</label>
+          <select name="status" id="modal-status" class="glass-input mt-1">
+            <option value="active">Active (Normal Operations)</option>
+            <option value="suspended">Suspended (Blocked)</option>
+          </select>
+        </div>
+        <div class="pt-2 flex gap-3">
+          <button type="submit" class="btn-primary flex-1">Save Settings</button>
+          <button type="button" onclick="document.getElementById('manage-group-modal').close()" class="btn-ghost border border-subtle flex-1">Cancel</button>
+        </div>
+        <p id="modal-msg" class="text-xs text-center mt-2"></p>
+      </form>
+    </dialog>
+
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      import { createGroup, groupLabel, resolveGroupContext, setStoredGroupId } from '/src/js/api/njangi.js';
+      import { createGroup } from '/src/js/api/njangi.js';
+      import { fetchAdminGroups, updateGroupSubscription, updateGroupStatus } from '/src/js/api/admin.js';
 
       const escapeHtml = (value) => String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -26,30 +71,46 @@
 
       renderShell({ role: 'admin', title: 'Njangi groups' });
 
+      // Store a local reference to groups to populate the modal
+      let loadedGroups = [];
+
       const renderPage = async () => {
         mountContent(`
-          <div class="glass-card p-6">Loading your groups…</div>
+          <div class="glass-card p-6">Loading Njangi groups…</div>
         `);
 
         try {
-          const { groups, activeGroupId } = await resolveGroupContext();
-          const totalMembers = groups.reduce((sum, group) => sum + Number(group.memberCount || 0), 0);
-          const rows = groups.length
-            ? groups.map((group) => `
-                <tr class="${group.id === activeGroupId ? 'bg-[var(--accent-soft)]/30' : ''}">
-                  <td class="px-5 py-3 font-medium">${escapeHtml(group.name)}</td>
-                  <td>${escapeHtml(group.frequency || 'monthly')}</td>
-                  <td>${Number(group.memberCount || 0)}</td>
-                  <td>${Number(group.contribution_amount || 0).toLocaleString()}</td>
-                  <td><span class="chip chip-${group.id === activeGroupId ? 'paid' : 'info'}">${group.id === activeGroupId ? 'Selected' : group.role || 'member'}</span></td>
-                  <td class="text-right pr-5">
-                    <button type="button" data-use-group="${escapeHtml(group.id)}" class="nav-link text-xs">Use</button>
-                  </td>
-                </tr>
-              `).join('')
+          loadedGroups = await fetchAdminGroups();
+          const totalMembers = loadedGroups.reduce((sum, group) => sum + Number(group.memberCount || 0), 0);
+          const rows = loadedGroups.length
+            ? loadedGroups.map((group) => {
+                const subStatusClass = group.subscription_status === 'active' 
+                  ? 'paid' 
+                  : (group.subscription_status === 'past_due' ? 'due' : 'info');
+
+                const statusClass = group.status === 'active' ? 'paid' : 'failed';
+
+                return `
+                  <tr>
+                    <td class="px-5 py-3 font-medium">${escapeHtml(group.name)}</td>
+                    <td>${escapeHtml(group.frequency || 'monthly')}</td>
+                    <td>${Number(group.memberCount || 0)}</td>
+                    <td>${Number(group.contribution_amount || 0).toLocaleString()} FCFA</td>
+                    <td>
+                      <span class="chip chip-${subStatusClass} uppercase text-[10px] font-bold">${escapeHtml(group.subscription_tier)} / ${escapeHtml(group.subscription_status)}</span>
+                    </td>
+                    <td>
+                      <span class="chip chip-${statusClass} uppercase text-[10px] font-bold">${escapeHtml(group.status)}</span>
+                    </td>
+                    <td class="text-right pr-5">
+                      <button type="button" data-manage-group="${escapeHtml(group.id)}" class="nav-link text-xs">Manage</button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')
             : `
               <tr>
-                <td colspan="6" class="px-5 py-8 text-center muted">You are not in any active groups yet.</td>
+                <td colspan="7" class="px-5 py-8 text-center muted">No groups found in the database.</td>
               </tr>
             `;
 
@@ -58,7 +119,7 @@
               <section class="glass-card p-6">
                 <p class="text-xs uppercase tracking-widest muted">Create group</p>
                 <h2 class="mt-2 font-display text-2xl font-bold">Start a new Njangi</h2>
-                <p class="mt-2 text-sm muted">Create the group, then switch dashboards to the new group id.</p>
+                <p class="mt-2 text-sm muted">Admin utility to quickly spin up groups for testing.</p>
                 <form id="create-group-form" class="mt-6 space-y-4">
                   <div>
                     <label class="text-xs font-semibold uppercase tracking-wider muted">Group name</label>
@@ -111,10 +172,10 @@
               <section class="glass-card p-0 overflow-hidden">
                 <div class="p-5 border-b border-[var(--border-subtle)] flex flex-wrap items-center gap-3 justify-between">
                   <div>
-                    <p class="text-xs uppercase tracking-widest muted">My groups</p>
-                    <h2 class="font-display text-xl font-bold mt-1">${groups.length} group${groups.length === 1 ? '' : 's'}</h2>
+                    <p class="text-xs uppercase tracking-widest muted">Global Monitor</p>
+                    <h2 class="font-display text-xl font-bold mt-1">${loadedGroups.length} Njangi Group${loadedGroups.length === 1 ? '' : 's'}</h2>
                   </div>
-                  <div class="text-sm muted">${totalMembers} active members total</div>
+                  <div class="text-sm muted">${totalMembers} active members across all groups</div>
                 </div>
                 <table class="w-full text-sm">
                   <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
@@ -123,6 +184,7 @@
                       <th>Frequency</th>
                       <th>Members</th>
                       <th>Contribution</th>
+                      <th>Billing (Tier / Status)</th>
                       <th>Status</th>
                       <th class="text-right pr-5">Actions</th>
                     </tr>
@@ -133,13 +195,34 @@
             </div>
           `);
 
-          document.querySelectorAll('[data-use-group]').forEach((button) => {
+          // Event Listeners for Management Modal
+          document.querySelectorAll('[data-manage-group]').forEach((button) => {
             button.addEventListener('click', () => {
-              setStoredGroupId(button.dataset.useGroup);
-              renderPage();
+              const groupId = button.dataset.manageGroup;
+              const group = loadedGroups.find(g => g.id === groupId);
+              if (group) {
+                document.getElementById('modal-group-id').value = group.id;
+                document.getElementById('modal-group-name').textContent = `Manage: ${group.name}`;
+                document.getElementById('modal-tier').value = group.subscription_tier;
+                document.getElementById('modal-sub-status').value = group.subscription_status;
+                document.getElementById('modal-status').value = group.status;
+                
+                // Format date string to YYYY-MM-DD
+                if (group.subscription_expires_at) {
+                  const dateObj = new Date(group.subscription_expires_at);
+                  const formattedDate = dateObj.toISOString().split('T')[0];
+                  document.getElementById('modal-expires').value = formattedDate;
+                } else {
+                  document.getElementById('modal-expires').value = '';
+                }
+
+                document.getElementById('modal-msg').textContent = '';
+                document.getElementById('manage-group-modal').showModal();
+              }
             });
           });
 
+          // Setup New Group creation form handler
           const form = document.querySelector('#create-group-form');
           const message = document.querySelector('#group-form-message');
           form.addEventListener('submit', async (event) => {
@@ -152,11 +235,7 @@
             payload.approval_threshold = Number(payload.approval_threshold || 0);
 
             try {
-              const created = await createGroup(payload);
-              const groupId = created?.group?.id || created?.data?.group?.id;
-              if (groupId) {
-                setStoredGroupId(groupId);
-              }
+              await createGroup(payload);
               message.textContent = 'Group created successfully.';
               form.reset();
               renderPage();
@@ -172,6 +251,42 @@
           `);
         }
       };
+
+      // Modal submit handler
+      const modalForm = document.getElementById('manage-group-form');
+      modalForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const msg = document.getElementById('modal-msg');
+        msg.textContent = 'Saving modifications…';
+
+        const data = Object.fromEntries(new FormData(modalForm).entries());
+        const groupId = data.groupId;
+
+        try {
+          // 1. Update subscription parameters
+          await updateGroupSubscription(groupId, {
+            subscription_tier: data.subscription_tier,
+            subscription_status: data.subscription_status,
+            subscription_expires_at: data.subscription_expires_at 
+              ? new Date(data.subscription_expires_at).toISOString() 
+              : null,
+          });
+
+          // 2. Update status parameter
+          await updateGroupStatus(groupId, data.status);
+
+          msg.style.color = '#10b981';
+          msg.textContent = 'Settings updated successfully.';
+          
+          setTimeout(() => {
+            document.getElementById('manage-group-modal').close();
+            renderPage();
+          }, 1000);
+        } catch (error) {
+          msg.style.color = '#ef4444';
+          msg.textContent = error.message || 'Failed to update settings.';
+        }
+      });
 
       renderPage();
     </script>

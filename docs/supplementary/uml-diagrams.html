@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NAAS — NjangiBridge: UML Design Diagrams</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+  </script>
+  <style>
+    /* ── Base Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      line-height: 1.6;
+    }
+
+    /* ── Cover / Header ── */
+    header {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 50%, #1a1a2e 100%);
+      color: #ffffff;
+      padding: 56px 40px 48px;
+      text-align: center;
+      border-bottom: 4px solid #e94560;
+    }
+    header .badge {
+      display: inline-block;
+      background: #e94560;
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 18px;
+    }
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    header h1 span { color: #e94560; }
+    header p.subtitle {
+      font-size: 1rem;
+      color: #a8b2d8;
+      max-width: 600px;
+      margin: 0 auto 6px;
+    }
+    header p.meta {
+      font-size: 0.82rem;
+      color: #637598;
+      margin-top: 4px;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    /* ── Table of Contents ── */
+    .toc {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-left: 5px solid #0f3460;
+      border-radius: 8px;
+      padding: 32px 36px;
+      margin: 40px 0 36px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .toc h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0f3460;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 18px;
+    }
+    .toc ol {
+      padding-left: 22px;
+      column-count: 2;
+      column-gap: 40px;
+    }
+    .toc ol li { margin-bottom: 7px; }
+    .toc ol li a {
+      color: #2563eb;
+      text-decoration: none;
+      font-size: 0.93rem;
+      font-weight: 500;
+    }
+    .toc ol li a:hover { text-decoration: underline; color: #e94560; }
+    .toc ol li .tag {
+      display: inline-block;
+      font-size: 0.68rem;
+      background: #e0e7ff;
+      color: #3730a3;
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin-left: 6px;
+      font-weight: 600;
+      vertical-align: middle;
+    }
+
+    /* ── Section Cards ── */
+    .section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 36px 40px 32px;
+      margin-bottom: 36px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.055);
+      page-break-inside: avoid;
+    }
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+      margin-bottom: 20px;
+      padding-bottom: 18px;
+      border-bottom: 2px solid #f1f5f9;
+    }
+    .section-number {
+      flex-shrink: 0;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0f3460, #e94560);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .section-title-wrap h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #0f3460;
+      line-height: 1.25;
+    }
+    .section-title-wrap .diagram-type {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #e94560;
+      margin-top: 2px;
+    }
+    .description {
+      font-size: 0.92rem;
+      color: #4b5563;
+      background: #f8fafc;
+      border-left: 4px solid #e94560;
+      padding: 12px 18px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 28px;
+      line-height: 1.65;
+    }
+
+    /* ── Mermaid Wrapper ── */
+    .mermaid-wrapper {
+      background: #fafbff;
+      border: 1px solid #dde3f0;
+      border-radius: 8px;
+      padding: 28px 20px;
+      overflow-x: auto;
+      text-align: center;
+    }
+    .mermaid {
+      display: inline-block;
+      min-width: 320px;
+    }
+
+    /* ── Design Patterns Section ── */
+    .patterns-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 18px;
+      margin-top: 20px;
+    }
+    .pattern-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .pattern-card h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f3460;
+      margin-bottom: 6px;
+    }
+    .pattern-card .pattern-type {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #ffffff;
+      background: #e94560;
+      border-radius: 4px;
+      padding: 2px 8px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+    .pattern-card p {
+      font-size: 0.85rem;
+      color: #64748b;
+      line-height: 1.55;
+    }
+    .pattern-card .classes {
+      font-size: 0.78rem;
+      color: #3730a3;
+      font-style: italic;
+      margin-top: 6px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      background: #0f3460;
+      color: #a8b2d8;
+      text-align: center;
+      padding: 24px 20px;
+      font-size: 0.82rem;
+      margin-top: 20px;
+    }
+    footer strong { color: #e94560; }
+
+    /* ── Print Styles ── */
+    @media print {
+      body { background: #fff; font-size: 11pt; }
+      header { background: #0f3460 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 30px 20px; }
+      .container { max-width: 100%; padding: 0 10px 20px; }
+      .toc, .section { box-shadow: none; border: 1px solid #ccc; }
+      .toc ol { column-count: 1; }
+      .section { page-break-inside: avoid; margin-bottom: 20px; }
+      .mermaid-wrapper { overflow: visible; }
+      footer { background: #0f3460 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      a { color: inherit; text-decoration: none; }
+    }
+
+    @media (max-width: 720px) {
+      header h1 { font-size: 1.6rem; }
+      .toc ol { column-count: 1; }
+      .section { padding: 22px 18px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════ -->
+<header>
+  <div class="badge">UML Design Document</div>
+  <h1>NAAS — <span>NjangiBridge</span><br>UML Design Diagrams</h1>
+  <p class="subtitle">SEN2241 Object-Oriented Analysis, Design and Implementation — Spring 2026</p>
+  <p class="meta">Rotating Savings Group (Njangi) Management Platform &nbsp;|&nbsp; Version 1.0 &nbsp;|&nbsp; 2026-05-14</p>
+</header>
+
+<!-- ══════════════════════════════════════════════
+     TABLE OF CONTENTS
+══════════════════════════════════════════════ -->
+<div class="container">
+  <nav class="toc" id="top">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#use-case">Use Case Diagram <span class="tag">Use Case</span></a></li>
+      <li><a href="#class">Class Diagram <span class="tag">Structural</span></a></li>
+      <li><a href="#object">Object Diagram <span class="tag">Structural</span></a></li>
+      <li><a href="#seq1">Sequence 1: User Registration &amp; Login <span class="tag">Behavioral</span></a></li>
+      <li><a href="#seq2">Sequence 2: Create Group &amp; Invite Members <span class="tag">Behavioral</span></a></li>
+      <li><a href="#seq3">Sequence 3: Monthly Contribution (Automated) <span class="tag">Behavioral</span></a></li>
+      <li><a href="#seq4">Sequence 4: Payout Execution &amp; Eligibility <span class="tag">Behavioral</span></a></li>
+      <li><a href="#seq5">Sequence 5: Fine Application &amp; Waiver <span class="tag">Behavioral</span></a></li>
+      <li><a href="#seq6">Sequence 6: Financial Report &amp; PDF Export <span class="tag">Behavioral</span></a></li>
+      <li><a href="#seq7">Sequence 7: Rotation Strategy Selection <span class="tag">Behavioral</span></a></li>
+      <li><a href="#patterns">Design Patterns Summary <span class="tag">OOP</span></a></li>
+    </ol>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════
+       1. USE CASE DIAGRAM
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="use-case">
+    <div class="section-header">
+      <div class="section-number">1</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Use Case Diagram</div>
+        <h2>System Use Cases — All Actors &amp; Interactions</h2>
+      </div>
+    </div>
+    <p class="description">
+      Captures the functional boundary of the NAAS platform. Six actors interact with the system:
+      <strong>President</strong>, <strong>Treasurer</strong>, <strong>Secretary</strong>, <strong>Member</strong>,
+      <strong>System Scheduler</strong> (cron), and <strong>Payment Gateway</strong> (MTN MoMo / Orange Money).
+      Use cases are grouped into Auth, Group Management, Contribution, Payout, Fines, Communication, and Admin.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+flowchart LR
+  subgraph Actors["Actors"]
+    direction TB
+    A1(["👤 President"])
+    A2(["👤 Treasurer"])
+    A3(["👤 Secretary"])
+    A4(["👤 Member"])
+    A5(["⚙ System Scheduler"])
+    A6(["💳 Payment Gateway\nMTN MoMo / Orange Money"])
+    A7(["🛡 Platform Admin"])
+  end
+
+  subgraph AUTH["Authentication & Profile"]
+    UC1["Register / Login"]
+    UC2["OTP Verification"]
+    UC3["Manage Profile"]
+  end
+
+  subgraph GROUP["Group Management"]
+    UC4["Create Njangi Group"]
+    UC5["Invite Member"]
+    UC6["Accept Invitation"]
+    UC7["Assign Roles"]
+    UC8["Remove Member"]
+    UC9["Configure Group Settings"]
+    UC10["View Rotation Calendar"]
+  end
+
+  subgraph CONTRIB["Contributions"]
+    UC11["Record Contribution (Cash)"]
+    UC12["Record Contribution (MoMo)"]
+    UC13["Auto-Deduct MoMo Contribution"]
+    UC14["Retry Failed Payment"]
+    UC15["View Contribution Ledger"]
+    UC16["View Payment History"]
+  end
+
+  subgraph PAYOUT["Payouts"]
+    UC17["Execute Rotation Payout"]
+    UC18["Nominate Payout Recipient"]
+    UC19["Approve Payout"]
+    UC20["Disburse Funds via MoMo"]
+  end
+
+  subgraph FINES["Fines & Social Fund"]
+    UC21["Apply Fine (Auto / Manual)"]
+    UC22["Waive Fine"]
+    UC23["Manage Social Fund"]
+  end
+
+  subgraph COMM["Communication & Reports"]
+    UC24["Post Announcement"]
+    UC25["Manage Meeting Minutes"]
+    UC26["Generate PDF Report"]
+  end
+
+  subgraph ADMIN["Platform Administration"]
+    UC27["View All Groups"]
+    UC28["Suspend Group"]
+    UC29["View Analytics Dashboard"]
+  end
+
+  A1 --> UC1
+  A2 --> UC1
+  A3 --> UC1
+  A4 --> UC1
+  UC1 -.->|include| UC2
+
+  A1 --> UC4
+  A1 --> UC5
+  A1 --> UC7
+  A1 --> UC8
+  A1 --> UC9
+  A1 --> UC18
+  A1 --> UC19
+  A1 --> UC22
+  A1 --> UC26
+  A1 --> UC10
+
+  A2 --> UC11
+  A2 --> UC12
+  A2 --> UC14
+  A2 --> UC23
+  A2 --> UC26
+  A2 --> UC15
+
+  A3 --> UC24
+  A3 --> UC25
+  A3 --> UC15
+
+  A4 --> UC6
+  A4 --> UC15
+  A4 --> UC16
+  A4 --> UC10
+
+  A5 --> UC13
+  A5 --> UC17
+  A5 --> UC21
+
+  UC13 -.->|uses| A6
+  UC17 -.->|uses| A6
+  UC20 -.->|uses| A6
+
+  A7 --> UC27
+  A7 --> UC28
+  A7 --> UC29
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       2. CLASS DIAGRAM
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="class">
+    <div class="section-header">
+      <div class="section-number">2</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Class Diagram</div>
+        <h2>Domain &amp; Service Layer — Full Class Model</h2>
+      </div>
+    </div>
+    <p class="description">
+      Complete object model for NAAS. Includes domain entities (User, NjangiGroup, Membership, Cycle, Contribution,
+      Payout, Fine, SocialFund, AuditEvent, PaymentTransaction, Invitation), infrastructure services
+      (DBConnect, PaymentProvider hierarchy, NotificationService hierarchy), strategy pattern classes
+      (RotationStrategy, RotationEngine), and engine services (PayoutEngine, PDFService, AuthService).
+      Visibility markers: <code>+</code> public, <code>-</code> private, <code>#</code> protected.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+classDiagram
+  direction TB
+
+  class User {
+    +String id
+    +String email
+    +String phone
+    +String full_name
+    -String password_hash
+    +String language
+    +String telegram_chat_id
+    +DateTime created_at
+    +register() void
+    +login() String
+    +verifyOTP() Boolean
+  }
+
+  class NjangiGroup {
+    +String id
+    +String name
+    +Number contribution_amount
+    +String frequency
+    +String rotation_type
+    +Number penalty_per_day
+    +Number payout_threshold_pct
+    +String status
+    +String created_by
+    +DateTime created_at
+    +create() NjangiGroup
+    +updateSettings() void
+    +suspend() void
+  }
+
+  class Membership {
+    +String id
+    +String user_id
+    +String group_id
+    +String role
+    +Number rotation_position
+    +String status
+    +DateTime joined_at
+    +invite() Invitation
+    +accept() void
+    +assignRole() void
+    +remove() void
+  }
+
+  class Cycle {
+    +String id
+    +String group_id
+    +Number cycle_number
+    +Date start_date
+    +Date end_date
+    +String status
+    +open() void
+    +close() void
+    +advance() void
+  }
+
+  class Contribution {
+    +String id
+    +String group_id
+    +String cycle_id
+    +String member_id
+    +Number amount
+    +String status
+    +String payment_method
+    +DateTime paid_at
+    +initiateMoMo() PaymentTransaction
+    +recordCash() void
+    +retry() PaymentTransaction
+  }
+
+  class Payout {
+    +String id
+    +String group_id
+    +String cycle_id
+    +String recipient_id
+    +Number amount
+    +String status
+    +String delivery_method
+    +nominate() void
+    +approve() void
+    +execute() PaymentTransaction
+    +disburse() void
+  }
+
+  class Fine {
+    +String id
+    +String group_id
+    +String member_id
+    +Number amount
+    +String reason
+    +String status
+    +String waived_by
+    +String waiver_reason
+    +record() void
+    +markPaid() void
+    +waive() void
+  }
+
+  class SocialFund {
+    +String id
+    +String group_id
+    +String type
+    +Number amount
+    +String member_id
+    +String recorded_by
+    +String description
+    +deposit() void
+    +withdraw() void
+    +getBalance() Number
+  }
+
+  class AuditEvent {
+    +String id
+    +String group_id
+    +String user_id
+    +String event_type
+    +Object payload
+    +DateTime created_at
+    +log() void
+  }
+
+  class PaymentTransaction {
+    +String id
+    +String contribution_id
+    +String gateway
+    +String external_ref
+    +String status
+    +Number amount
+    +DateTime created_at
+  }
+
+  class Invitation {
+    +String id
+    +String group_id
+    +String phone
+    +String token
+    +String status
+    +String invited_by
+    +DateTime expires_at
+    +send() void
+    +accept() void
+    +expire() void
+  }
+
+  class DBConnect {
+    -String _url
+    -String _serviceKey
+    -Object _client
+    -Boolean _connected
+    +getInstance() DBConnect
+    +create() Object
+    +findAll() Array
+    +findOne() Object
+    +findById() Object
+    +update() Object
+    +remove() Boolean
+    +count() Number
+    +disconnect() void
+    +reconnect() void
+  }
+
+  class PaymentProvider {
+    <<abstract>>
+    +charge() PaymentTransaction
+    +disburse() PaymentTransaction
+    +getStatus() String
+    +refund() Boolean
+  }
+
+  class MTNMoMoService {
+    +charge() PaymentTransaction
+    +disburse() PaymentTransaction
+    +getStatus() String
+    +refund() Boolean
+  }
+
+  class OrangeMoneyService {
+    +charge() PaymentTransaction
+    +disburse() PaymentTransaction
+    +getStatus() String
+    +refund() Boolean
+  }
+
+  class NotificationService {
+    <<abstract>>
+    +send() void
+    +sendBulk() void
+  }
+
+  class TelegramNotificationService {
+    +send() void
+    +sendBulk() void
+  }
+
+  class SMSNotificationService {
+    +send() void
+    +sendBulk() void
+  }
+
+  class RotationStrategy {
+    <<abstract>>
+    +selectNextRecipient() String
+  }
+
+  class FixedRotationStrategy {
+    +selectNextRecipient() String
+  }
+
+  class RandomDrawStrategy {
+    +selectNextRecipient() String
+  }
+
+  class PresidentDecisionStrategy {
+    +selectNextRecipient() String
+  }
+
+  class RotationEngine {
+    -RotationStrategy strategy
+    +selectNextRecipient() String
+  }
+
+  class PayoutEngine {
+    -ContributionService contributionService
+    -PaymentProvider paymentProvider
+    -NotificationService notificationService
+    -AuditService auditService
+    -FineService fineService
+    +execute() Payout
+    +checkEligibility() Boolean
+  }
+
+  class PDFService {
+    +generateLedgerReport() Buffer
+    +generateReceiptPDF() Buffer
+  }
+
+  class AuthService {
+    +register() User
+    +login() String
+    +verifyOTP() Boolean
+    -_signToken() String
+  }
+
+  User "1" --> "*" Membership : has
+  NjangiGroup "1" --> "*" Membership : contains
+  NjangiGroup "1" --> "*" Cycle : runs
+  NjangiGroup "1" --> "*" Contribution : tracks
+  NjangiGroup "1" --> "*" Payout : manages
+  NjangiGroup "1" --> "*" Fine : applies
+  NjangiGroup "1" --> "*" AuditEvent : records
+  NjangiGroup "1" --> "*" SocialFund : funds
+  Cycle "1" --> "*" Contribution : includes
+  Cycle "1" --> "*" Payout : triggers
+  Membership "1" --> "*" Contribution : makes
+  Contribution "1" --> "0..1" PaymentTransaction : generates
+  Payout "1" --> "0..1" PaymentTransaction : generates
+  NjangiGroup "1" --> "*" Invitation : sends
+
+  PaymentProvider <|-- MTNMoMoService : extends
+  PaymentProvider <|-- OrangeMoneyService : extends
+  NotificationService <|-- TelegramNotificationService : extends
+  NotificationService <|-- SMSNotificationService : extends
+  RotationStrategy <|-- FixedRotationStrategy : extends
+  RotationStrategy <|-- RandomDrawStrategy : extends
+  RotationStrategy <|-- PresidentDecisionStrategy : extends
+
+  RotationEngine o-- RotationStrategy : uses
+  PayoutEngine o-- PaymentProvider : uses
+  PayoutEngine o-- NotificationService : uses
+  PayoutEngine o-- RotationEngine : uses
+  AuthService ..> DBConnect : depends
+  PaymentProvider ..> DBConnect : persists via
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       3. OBJECT DIAGRAM
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="object">
+    <div class="section-header">
+      <div class="section-number">3</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Object Diagram</div>
+        <h2>Concrete System Snapshot — "Bamenda Youth Njangi" Scenario</h2>
+      </div>
+    </div>
+    <p class="description">
+      Illustrates a real-world snapshot at runtime: three users belong to the "Bamenda Youth Njangi" group.
+      Cycle 1 is active. Member <em>user3</em> has paid their contribution for this cycle (50,000 FCFA),
+      and <em>user1</em> (President, position 1) has received the first payout of 150,000 FCFA.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+classDiagram
+  direction LR
+
+  class `user1 : User` {
+    id = "usr-001"
+    email = "alice@example.cm"
+    phone = "+237670000001"
+    full_name = "Alice Fon"
+    language = "en"
+    created_at = 2026-01-10
+  }
+
+  class `user2 : User` {
+    id = "usr-002"
+    email = "bob@example.cm"
+    phone = "+237680000002"
+    full_name = "Bob Nkeng"
+    language = "fr"
+    created_at = 2026-01-10
+  }
+
+  class `user3 : User` {
+    id = "usr-003"
+    email = "carol@example.cm"
+    phone = "+237690000003"
+    full_name = "Carol Mbah"
+    language = "en"
+    created_at = 2026-01-11
+  }
+
+  class `group1 : NjangiGroup` {
+    id = "grp-001"
+    name = "Bamenda Youth Njangi"
+    contribution_amount = 50000
+    frequency = "monthly"
+    rotation_type = "fixed"
+    penalty_per_day = 500
+    payout_threshold_pct = 100
+    status = "active"
+    created_by = "usr-001"
+    created_at = 2026-01-12
+  }
+
+  class `membership1 : Membership` {
+    id = "mem-001"
+    user_id = "usr-001"
+    group_id = "grp-001"
+    role = "president"
+    rotation_position = 1
+    status = "active"
+    joined_at = 2026-01-12
+  }
+
+  class `membership2 : Membership` {
+    id = "mem-002"
+    user_id = "usr-002"
+    group_id = "grp-001"
+    role = "treasurer"
+    rotation_position = 2
+    status = "active"
+    joined_at = 2026-01-13
+  }
+
+  class `membership3 : Membership` {
+    id = "mem-003"
+    user_id = "usr-003"
+    group_id = "grp-001"
+    role = "member"
+    rotation_position = 3
+    status = "active"
+    joined_at = 2026-01-14
+  }
+
+  class `cycle1 : Cycle` {
+    id = "cyc-001"
+    group_id = "grp-001"
+    cycle_number = 1
+    start_date = 2026-02-01
+    end_date = 2026-02-28
+    status = "active"
+  }
+
+  class `contribution1 : Contribution` {
+    id = "con-001"
+    group_id = "grp-001"
+    cycle_id = "cyc-001"
+    member_id = "usr-003"
+    amount = 50000
+    status = "paid"
+    payment_method = "momo"
+    paid_at = 2026-02-05
+  }
+
+  class `payout1 : Payout` {
+    id = "pay-001"
+    group_id = "grp-001"
+    cycle_id = "cyc-001"
+    recipient_id = "usr-001"
+    amount = 150000
+    status = "completed"
+    delivery_method = "momo"
+  }
+
+  `user1 : User` --> `membership1 : Membership` : is linked to
+  `user2 : User` --> `membership2 : Membership` : is linked to
+  `user3 : User` --> `membership3 : Membership` : is linked to
+  `group1 : NjangiGroup` --> `membership1 : Membership` : contains
+  `group1 : NjangiGroup` --> `membership2 : Membership` : contains
+  `group1 : NjangiGroup` --> `membership3 : Membership` : contains
+  `group1 : NjangiGroup` --> `cycle1 : Cycle` : runs
+  `cycle1 : Cycle` --> `contribution1 : Contribution` : has
+  `cycle1 : Cycle` --> `payout1 : Payout` : triggers
+  `membership3 : Membership` --> `contribution1 : Contribution` : made
+  `membership1 : Membership` --> `payout1 : Payout` : receives
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       4. SEQUENCE 1 — User Registration & Login
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="seq1">
+    <div class="section-header">
+      <div class="section-number">4</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Sequence Diagram 1</div>
+        <h2>User Registration &amp; Login with OTP Verification</h2>
+      </div>
+    </div>
+    <p class="description">
+      Traces the full authentication flow: a new user submits their credentials to the Frontend,
+      which proxies to the REST API (<code>POST /auth/register</code>). AuthService hashes the password,
+      persists via DBConnect to Supabase, and triggers an OTP via SMS/Telegram. On OTP verification,
+      AuthService issues a signed JWT returned to the client.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor User
+  participant FE as Frontend
+  participant API as REST API
+  participant Auth as AuthService
+  participant DB as DBConnect
+  participant Supabase as Supabase DB
+  participant Notif as NotificationService
+
+  User->>FE: Enter name, phone, email, password
+  FE->>API: POST /auth/register { full_name, phone, email, password }
+  API->>Auth: register(dto)
+  Auth->>Auth: hash(password) → password_hash
+  Auth->>DB: create("users", { email, phone, full_name, password_hash })
+  DB->>Supabase: INSERT INTO users ...
+  Supabase-->>DB: { id, email, ... }
+  DB-->>Auth: User record
+  Auth->>Auth: generate OTP (6-digit, TTL 10 min)
+  Auth->>DB: create("otp_tokens", { user_id, otp, expires_at })
+  DB->>Supabase: INSERT INTO otp_tokens ...
+  Auth->>Notif: send({ to: phone, message: "Your OTP: XXXXXX" })
+  Notif-->>User: SMS / Telegram message
+  Auth-->>API: { message: "OTP sent", userId }
+  API-->>FE: 201 { message, userId }
+  FE-->>User: "Check your phone for OTP"
+
+  Note over User, Notif: ── OTP Verification Flow ──
+
+  User->>FE: Enter OTP code
+  FE->>API: POST /auth/verify-otp { userId, otp }
+  API->>Auth: verifyOTP(userId, otp)
+  Auth->>DB: findOne("otp_tokens", { user_id, otp })
+  DB->>Supabase: SELECT * FROM otp_tokens WHERE ...
+  Supabase-->>DB: OTP record
+  DB-->>Auth: token record
+
+  alt OTP valid & not expired
+    Auth->>DB: update("users", { id: userId, verified: true })
+    Auth->>Auth: _signToken({ userId, role }) → JWT
+    Auth-->>API: { token: JWT, user: {...} }
+    API-->>FE: 200 { token, user }
+    FE-->>User: Redirect to dashboard
+  else OTP expired or wrong
+    Auth-->>API: Error "Invalid or expired OTP"
+    API-->>FE: 400 { error }
+    FE-->>User: Show error, allow retry
+  end
+
+  Note over User, Notif: ── Subsequent Login Flow ──
+
+  User->>FE: Enter email + password
+  FE->>API: POST /auth/login { email, password }
+  API->>Auth: login(email, password)
+  Auth->>DB: findOne("users", { email })
+  DB->>Supabase: SELECT * FROM users WHERE email = ...
+  Supabase-->>DB: User record
+  DB-->>Auth: user
+  Auth->>Auth: bcrypt.compare(password, password_hash)
+  Auth->>Auth: _signToken({ userId, role }) → JWT
+  Auth-->>API: { token: JWT, user }
+  API-->>FE: 200 { token, user }
+  FE-->>User: Logged in, dashboard rendered
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       5. SEQUENCE 2 — Create Group & Invite Members
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="seq2">
+    <div class="section-header">
+      <div class="section-number">5</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Sequence Diagram 2</div>
+        <h2>Create Njangi Group &amp; Invite Members</h2>
+      </div>
+    </div>
+    <p class="description">
+      A President creates a new group by submitting settings to the API. GroupService persists the group
+      and auto-creates a Membership record (role: president). The President then invites new members by
+      phone number; GroupService generates a tokenised Invitation record and dispatches an SMS/WhatsApp
+      link. Invited users follow the link to accept and are enrolled with the "member" role.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor President
+  participant FE as Frontend
+  participant API as REST API
+  participant GS as GroupService
+  participant DB as DBConnect
+  participant Supabase as Supabase DB
+  participant Notif as NotificationService
+  actor Invitee
+
+  President->>FE: Fill group creation form
+  FE->>API: POST /groups { name, contribution_amount, frequency, rotation_type, ... }
+  API->>GS: createGroup(dto, presidentId)
+  GS->>DB: create("njangi_groups", groupData)
+  DB->>Supabase: INSERT INTO njangi_groups ...
+  Supabase-->>DB: group record
+  DB-->>GS: NjangiGroup
+  GS->>DB: create("memberships", { user_id: presidentId, group_id, role: "president", rotation_position: 1 })
+  DB->>Supabase: INSERT INTO memberships ...
+  Supabase-->>DB: membership record
+  GS-->>API: { group, membership }
+  API-->>FE: 201 { group }
+  FE-->>President: Group dashboard shown
+
+  Note over President, Invitee: ── Invite Member Flow ──
+
+  President->>FE: Enter invitee phone number
+  FE->>API: POST /groups/:id/invite { phone }
+  API->>GS: inviteMember(groupId, phone, presidentId)
+  GS->>DB: findOne("memberships", { group_id, user phone = phone })
+  DB-->>GS: null (not yet member)
+  GS->>GS: generateToken() → UUID token
+  GS->>DB: create("invitations", { group_id, phone, token, invited_by, expires_at: +48h })
+  DB->>Supabase: INSERT INTO invitations ...
+  Supabase-->>DB: invitation record
+  GS->>Notif: send({ to: phone, message: "Join Bamenda Youth Njangi → https://app/invite/{token}" })
+  Notif-->>Invitee: SMS / WhatsApp message with link
+  GS-->>API: { message: "Invitation sent" }
+  API-->>FE: 200 { message }
+  FE-->>President: "Invitation sent to +237..."
+
+  Note over President, Invitee: ── Accept Invitation Flow ──
+
+  Invitee->>FE: Click invitation link, register / login
+  FE->>API: POST /invitations/:token/accept
+  API->>GS: acceptInvitation(token, userId)
+  GS->>DB: findOne("invitations", { token, status: "pending" })
+  DB->>Supabase: SELECT * FROM invitations WHERE token = ...
+  Supabase-->>DB: invitation
+  DB-->>GS: Invitation record
+
+  alt Token valid & not expired
+    GS->>DB: count("memberships", { group_id })
+    DB-->>GS: current member count
+    GS->>DB: create("memberships", { user_id, group_id, role: "member", rotation_position: count+1 })
+    GS->>DB: update("invitations", { id, status: "accepted" })
+    GS-->>API: { membership }
+    API-->>FE: 201 { membership }
+    FE-->>Invitee: Group dashboard shown
+  else Token expired or already used
+    GS-->>API: Error "Invitation expired or already used"
+    API-->>FE: 400 { error }
+    FE-->>Invitee: Error message
+  end
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       6. SEQUENCE 3 — Monthly Contribution (Automated)
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="seq3">
+    <div class="section-header">
+      <div class="section-number">6</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Sequence Diagram 3</div>
+        <h2>Monthly Contribution Collection — Automated MoMo Deduction</h2>
+      </div>
+    </div>
+    <p class="description">
+      The System Scheduler (cron job) triggers ContributionScheduler at the start of each contribution period.
+      ContributionService creates pending Contribution records for all active members, then invokes
+      MTNMoMoService to charge each registered wallet. On success, status is updated to "paid" and a
+      WhatsApp/SMS confirmation is sent. On failure, the system retries up to 3 times, then marks the
+      contribution "failed" and notifies the Treasurer.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant Cron as System Scheduler (Cron)
+  participant CS as ContributionScheduler
+  participant CSvc as ContributionService
+  participant DB as DBConnect
+  participant Supabase as Supabase DB
+  participant PP as MTNMoMoService
+  participant MoMo as MTN MoMo API
+  participant Notif as NotificationService
+  actor Member
+  actor Treasurer
+
+  Cron->>CS: triggerMonthlyCollection(groupId, cycleId)
+  CS->>CSvc: collectForCycle(groupId, cycleId)
+  CSvc->>DB: findAll("memberships", { group_id: groupId, status: "active" })
+  DB->>Supabase: SELECT * FROM memberships WHERE group_id = ...
+  Supabase-->>DB: [ membership list ]
+  DB-->>CSvc: members[]
+
+  loop For each active member
+    CSvc->>DB: create("contributions", { group_id, cycle_id, member_id, amount, status: "pending", payment_method: "momo" })
+    DB->>Supabase: INSERT INTO contributions ...
+    Supabase-->>DB: contribution record
+    CSvc->>PP: charge({ phone: member.phone, amount, externalRef: contribution.id })
+    PP->>MoMo: POST /collection/v1_0/requesttopay { amount, currency, payer.msisdn }
+    MoMo-->>PP: 202 Accepted { referenceId }
+
+    PP->>MoMo: GET /collection/v1_0/requesttopay/{referenceId} (poll)
+
+    alt Payment SUCCESSFUL
+      MoMo-->>PP: { status: "SUCCESSFUL" }
+      PP-->>CSvc: { status: "paid", externalRef }
+      CSvc->>DB: update("contributions", { id, status: "paid", paid_at: now() })
+      CSvc->>DB: create("payment_transactions", { contribution_id, gateway: "MTN", status: "paid", ... })
+      DB->>Supabase: UPDATE contributions ... ; INSERT INTO payment_transactions ...
+      CSvc->>Notif: send({ to: member.phone, message: "Contribution of 50,000 FCFA received for Cycle 1" })
+      Notif-->>Member: WhatsApp / SMS confirmation
+    else Payment FAILED (attempt 1 or 2)
+      MoMo-->>PP: { status: "FAILED" }
+      PP-->>CSvc: { status: "failed" }
+      Note over CSvc, MoMo: Retry logic — max 3 attempts, 1h apart
+      CSvc->>PP: charge(...) retry
+      PP->>MoMo: POST /collection/v1_0/requesttopay (retry)
+    else All retries EXHAUSTED
+      CSvc->>DB: update("contributions", { id, status: "failed" })
+      CSvc->>Notif: send({ to: treasurer.phone, message: "ALERT: Contribution failed for Carol Mbah after 3 attempts" })
+      Notif-->>Treasurer: SMS / Telegram alert
+    end
+  end
+
+  CSvc-->>CS: CollectionSummary { paid: N, failed: M }
+  CS->>DB: update("cycles", { id: cycleId, collection_summary: {...} })
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       7. SEQUENCE 4 — Payout Execution & Eligibility
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="seq4">
+    <div class="section-header">
+      <div class="section-number">7</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Sequence Diagram 4</div>
+        <h2>Payout Execution with Eligibility Checks</h2>
+      </div>
+    </div>
+    <p class="description">
+      Treasurer initiates a payout. PayoutEngine performs a multi-step eligibility checklist before disbursing:
+      (1) pot threshold collected, (2) recipient has no unpaid fines, (3) recipient's MoMo wallet is linked,
+      (4) President has approved. On all-clear, PayoutEngine calls PaymentProvider to disburse, then
+      RotationEngine advances to the next recipient, and all members are notified. Every step is audit-logged.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Treasurer
+  participant API as REST API
+  participant PE as PayoutEngine
+  participant CSvc as ContributionService
+  participant FSvc as FineService
+  participant DB as DBConnect
+  participant Supabase as Supabase DB
+  participant PP as PaymentProvider
+  participant MoMo as MTN MoMo API
+  participant RE as RotationEngine
+  participant RS as RotationStrategy
+  participant Notif as NotificationService
+  participant Audit as AuditService
+
+  Treasurer->>API: POST /payouts/execute { groupId, cycleId }
+  API->>PE: execute(groupId, cycleId, treasurerId)
+  PE->>PE: checkEligibility(groupId, cycleId)
+
+  Note over PE, Supabase: ── Check 1: Pot threshold collected ──
+  PE->>CSvc: getTotalCollected(groupId, cycleId)
+  CSvc->>DB: count/sum contributions WHERE status="paid"
+  DB->>Supabase: SELECT SUM(amount) FROM contributions ...
+  Supabase-->>DB: totalCollected
+  DB-->>CSvc: totalCollected
+  CSvc-->>PE: totalCollected
+
+  alt Total collected < threshold
+    PE-->>API: Error "Pot threshold not met"
+    API-->>Treasurer: 400 { error }
+  end
+
+  Note over PE, Supabase: ── Check 2: Unpaid fines ──
+  PE->>FSvc: getUnpaidFines(recipientId, groupId)
+  FSvc->>DB: findAll("fines", { member_id: recipientId, status: "unpaid" })
+  DB->>Supabase: SELECT * FROM fines WHERE ...
+  Supabase-->>DB: fines[]
+  DB-->>FSvc: fines[]
+  FSvc-->>PE: fines[]
+
+  alt Unpaid fines exist
+    PE-->>API: Error "Recipient has unpaid fines"
+    API-->>Treasurer: 400 { error }
+  end
+
+  Note over PE, Supabase: ── Check 3: Wallet linked ──
+  PE->>DB: findOne("memberships", { user_id: recipientId, group_id })
+  DB->>Supabase: SELECT * FROM memberships ...
+  Supabase-->>DB: membership
+  DB-->>PE: membership
+
+  Note over PE, Supabase: ── Check 4: President approval ──
+  PE->>DB: findOne("payouts", { cycle_id, recipient_id, status: "approved" })
+  DB->>Supabase: SELECT * FROM payouts WHERE ...
+  Supabase-->>DB: payout record
+  DB-->>PE: payout (approved)
+
+  Note over PE, MoMo: ── All checks passed — Execute Disbursal ──
+  PE->>DB: update("payouts", { id, status: "executing" })
+  PE->>PP: disburse({ phone: recipient.phone, amount: payoutAmount })
+  PP->>MoMo: POST /disbursement/v1_0/transfer { amount, currency, payee.msisdn }
+  MoMo-->>PP: 202 Accepted { referenceId }
+  PP->>MoMo: GET /disbursement/v1_0/transfer/{referenceId} (poll)
+  MoMo-->>PP: { status: "SUCCESSFUL" }
+  PP-->>PE: { status: "completed", externalRef }
+  PE->>DB: update("payouts", { id, status: "completed" })
+  PE->>DB: create("payment_transactions", { payout-related tx })
+
+  Note over PE, RS: ── Advance Rotation ──
+  PE->>RE: selectNextRecipient(groupId, cycleId)
+  RE->>RS: selectNextRecipient(members, paidPayouts)
+  RS-->>RE: nextRecipientId
+  RE-->>PE: nextRecipientId
+  PE->>DB: create("payouts", { group_id, next_cycle_id, recipient_id: nextRecipientId, status: "pending" })
+
+  Note over PE, Notif: ── Notify All Members ──
+  PE->>Notif: sendBulk({ groupId, message: "Alice Fon received 150,000 FCFA payout for Cycle 1!" })
+  Notif-->>Treasurer: Confirmation
+  Notif-->> Treasurer: Broadcast to all members
+
+  Note over PE, DB: ── Audit Log ──
+  PE->>Audit: log({ group_id, event_type: "PAYOUT_EXECUTED", payload: { payoutId, recipientId, amount } })
+  Audit->>DB: create("audit_events", auditData)
+  DB->>Supabase: INSERT INTO audit_events ...
+  PE-->>API: { payout, nextRecipient }
+  API-->>Treasurer: 200 { payout }
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       8. SEQUENCE 5 — Fine Application & Waiver
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="seq5">
+    <div class="section-header">
+      <div class="section-number">8</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Sequence Diagram 5</div>
+        <h2>Fine Application (Automated) &amp; Waiver (President)</h2>
+      </div>
+    </div>
+    <p class="description">
+      A nightly PenaltyScheduler cron identifies overdue contributions and creates Fine records at the
+      configured daily rate. Members are notified immediately. Later, the President may waive a fine via
+      the API, providing a reason; the waiver is persisted and audit-logged for full traceability.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant Cron as PenaltyScheduler (Cron)
+  participant FSvc as FineService
+  participant DB as DBConnect
+  participant Supabase as Supabase DB
+  participant Notif as NotificationService
+  actor Member
+  actor President
+  participant API as REST API
+  participant Audit as AuditService
+
+  Cron->>FSvc: applyDailyPenalties()
+  FSvc->>DB: findAll("contributions", { status: "pending", due_date: lt(today) })
+  DB->>Supabase: SELECT * FROM contributions WHERE status='pending' AND due_date < NOW()
+  Supabase-->>DB: overdueContributions[]
+  DB-->>FSvc: overdueContributions[]
+
+  loop For each overdue contribution
+    FSvc->>DB: findOne("fines", { contribution_id, status: "unpaid", created_today: true })
+    DB-->>FSvc: existing fine or null
+
+    alt No fine yet for today
+      FSvc->>DB: findOne("njangi_groups", { id: contribution.group_id })
+      DB-->>FSvc: group { penalty_per_day }
+      FSvc->>DB: create("fines", { group_id, member_id, amount: penalty_per_day, reason: "Late contribution Day N", status: "unpaid" })
+      DB->>Supabase: INSERT INTO fines ...
+      Supabase-->>DB: fine record
+      FSvc->>Notif: send({ to: member.phone, message: "Fine of 500 FCFA applied for late payment." })
+      Notif-->>Member: SMS / Telegram notification
+    else Fine already applied today
+      Note over FSvc: Skip — idempotent
+    end
+  end
+
+  FSvc-->>Cron: { finesCreated: N }
+
+  Note over President, Audit: ── Fine Waiver Flow ──
+
+  President->>API: PATCH /fines/:fineId/waive { reason: "Medical emergency" }
+  API->>FSvc: waiveFine(fineId, presidentId, reason)
+  FSvc->>DB: findById("fines", fineId)
+  DB->>Supabase: SELECT * FROM fines WHERE id = ...
+  Supabase-->>DB: fine record
+  DB-->>FSvc: fine
+
+  alt Fine exists and status is "unpaid"
+    FSvc->>DB: update("fines", { id: fineId, status: "waived", waived_by: presidentId, waiver_reason: reason })
+    DB->>Supabase: UPDATE fines SET status='waived' ...
+    FSvc->>Notif: send({ to: member.phone, message: "Your fine has been waived by the President." })
+    Notif-->>Member: Waiver notification
+    FSvc->>Audit: log({ event_type: "FINE_WAIVED", payload: { fineId, waivedBy: presidentId, reason } })
+    Audit->>DB: create("audit_events", auditData)
+    DB->>Supabase: INSERT INTO audit_events ...
+    FSvc-->>API: { fine: updatedFine }
+    API-->>President: 200 { fine }
+  else Fine not found or already paid/waived
+    FSvc-->>API: Error "Fine cannot be waived"
+    API-->>President: 400 { error }
+  end
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       9. SEQUENCE 6 — Financial Report & PDF Export
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="seq6">
+    <div class="section-header">
+      <div class="section-number">9</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Sequence Diagram 6</div>
+        <h2>View Financial Report &amp; PDF Export</h2>
+      </div>
+    </div>
+    <p class="description">
+      The President requests a contribution ledger report for a given cycle. ReportService fetches all
+      relevant data (contributions, payouts, fines, social fund) from Supabase via DBConnect, assembles
+      a structured ledger, and delegates PDF rendering to PDFService. The generated PDF buffer is uploaded
+      to Supabase Storage, and a short-lived signed download URL is returned to the client.
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor President
+  participant FE as Frontend
+  participant API as REST API
+  participant RS as ReportService
+  participant DB as DBConnect
+  participant Supabase as Supabase DB
+  participant PDF as PDFService
+  participant Storage as Supabase Storage
+
+  President->>FE: Click "Export PDF Report" for Cycle 1
+  FE->>API: GET /groups/:groupId/reports/ledger?cycleId=cyc-001&format=pdf
+  API->>RS: generateLedgerReport(groupId, cycleId, format)
+
+  Note over RS, Supabase: ── Fetch Ledger Data ──
+  RS->>DB: findAll("contributions", { group_id, cycle_id })
+  DB->>Supabase: SELECT * FROM contributions WHERE group_id = ... AND cycle_id = ...
+  Supabase-->>DB: contributions[]
+  DB-->>RS: contributions[]
+
+  RS->>DB: findAll("payouts", { group_id, cycle_id })
+  DB->>Supabase: SELECT * FROM payouts WHERE ...
+  Supabase-->>DB: payouts[]
+  DB-->>RS: payouts[]
+
+  RS->>DB: findAll("fines", { group_id })
+  DB->>Supabase: SELECT * FROM fines WHERE group_id = ...
+  Supabase-->>DB: fines[]
+  DB-->>RS: fines[]
+
+  RS->>DB: findAll("social_fund", { group_id })
+  DB->>Supabase: SELECT * FROM social_fund WHERE ...
+  Supabase-->>DB: socialFundEntries[]
+  DB-->>RS: socialFundEntries[]
+
+  Note over RS, PDF: ── Assemble & Render PDF ──
+  RS->>RS: assembleLedger(contributions, payouts, fines, socialFund)
+  RS->>PDF: generateLedgerReport(ledgerData, { groupName, cycleNumber, generatedAt })
+  PDF->>PDF: Build HTML/table layout
+  PDF->>PDF: puppeteer/pdfmake → Buffer
+  PDF-->>RS: pdfBuffer (Binary)
+
+  Note over RS, Storage: ── Upload to Supabase Storage ──
+  RS->>Storage: upload("reports/grp-001/cycle-1-ledger.pdf", pdfBuffer, { contentType: "application/pdf" })
+  Storage-->>RS: { path: "reports/grp-001/cycle-1-ledger.pdf" }
+  RS->>Storage: createSignedUrl(path, expiresIn: 3600)
+  Storage-->>RS: signedDownloadUrl
+
+  RS->>DB: create("audit_events", { event_type: "REPORT_GENERATED", user_id: presidentId, payload: { reportUrl } })
+  DB->>Supabase: INSERT INTO audit_events ...
+
+  RS-->>API: { downloadUrl: signedDownloadUrl, expiresIn: 3600 }
+  API-->>FE: 200 { downloadUrl }
+  FE-->>President: Download link shown / auto-download triggered
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       10. SEQUENCE 7 — Rotation Strategy Selection
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="seq7">
+    <div class="section-header">
+      <div class="section-number">10</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">Sequence Diagram 7</div>
+        <h2>Rotation Strategy Selection — Strategy Pattern in Action</h2>
+      </div>
+    </div>
+    <p class="description">
+      Demonstrates how RotationEngine delegates recipient selection to one of three concrete strategies
+      based on the group's <code>rotation_type</code> setting. The Strategy pattern decouples the engine
+      from the selection algorithm. Each branch shows a distinct algorithm:
+      <strong>Fixed</strong> (deterministic by position),
+      <strong>Random Draw</strong> (non-deterministic, filters paid),
+      <strong>President Decision</strong> (deferred — waits for explicit nomination).
+    </p>
+    <div class="mermaid-wrapper">
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant PE as PayoutEngine
+  participant RE as RotationEngine
+  participant DB as DBConnect
+  participant Supabase as Supabase DB
+  participant FRS as FixedRotationStrategy
+  participant RDS as RandomDrawStrategy
+  participant PDS as PresidentDecisionStrategy
+  actor President
+  participant API as REST API
+
+  PE->>RE: selectNextRecipient(groupId, cycleId)
+  RE->>DB: findOne("njangi_groups", { id: groupId })
+  DB->>Supabase: SELECT rotation_type FROM njangi_groups WHERE id = ...
+  Supabase-->>DB: { rotation_type: "fixed" | "random" | "president_decides" }
+  DB-->>RE: group { rotation_type }
+
+  RE->>DB: findAll("memberships", { group_id: groupId, status: "active" })
+  DB->>Supabase: SELECT * FROM memberships WHERE group_id = ... ORDER BY rotation_position ASC
+  Supabase-->>DB: members[]
+  DB-->>RE: members[]
+
+  RE->>DB: findAll("payouts", { group_id: groupId, status: "completed" })
+  DB->>Supabase: SELECT recipient_id FROM payouts WHERE group_id = ... AND status = 'completed'
+  Supabase-->>DB: completedPayouts[]
+  DB-->>RE: paidRecipientIds[]
+
+  alt rotation_type == "fixed"
+    RE->>FRS: selectNextRecipient(members, paidRecipientIds)
+    Note over FRS: Filter out already-paid members
+    Note over FRS: Sort remaining by rotation_position ASC
+    Note over FRS: Pick members[0] → lowest unpaid position
+    FRS-->>RE: nextRecipientId (deterministic)
+    RE-->>PE: nextRecipientId
+
+  else rotation_type == "random"
+    RE->>RDS: selectNextRecipient(members, paidRecipientIds)
+    Note over RDS: Filter out already-paid members → eligibleMembers[]
+    Note over RDS: const idx = Math.floor(Math.random() * eligibleMembers.length)
+    Note over RDS: Return eligibleMembers[idx].user_id
+    RDS-->>RE: nextRecipientId (non-deterministic)
+    RE->>DB: create("audit_events", { event_type: "RANDOM_DRAW", payload: { winner: nextRecipientId, pool: eligibleMembers } })
+    RE-->>PE: nextRecipientId
+
+  else rotation_type == "president_decides"
+    RE->>PDS: selectNextRecipient(members, paidRecipientIds)
+    Note over PDS: No algorithm — returns null
+    Note over PDS: Awaits explicit nomination by President
+    PDS-->>RE: null (deferred)
+    RE-->>PE: null
+
+    Note over PE, President: ── President Nomination Flow ──
+    PE->>DB: update("cycles", { id: cycleId, awaiting_nomination: true })
+    PE->>API: emit event "NOMINATION_REQUIRED"
+    API-->>President: Notification: "Please nominate next payout recipient"
+
+    President->>API: POST /groups/:id/payouts/nominate { recipientId, cycleId }
+    API->>PE: nominateRecipient(groupId, cycleId, recipientId, presidentId)
+    PE->>DB: create("payouts", { group_id, cycle_id, recipient_id: recipientId, status: "nominated" })
+    PE->>DB: update("cycles", { id: cycleId, awaiting_nomination: false })
+    PE-->>API: { payout: nominatedPayout }
+    API-->>President: 201 { payout }
+  end
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════
+       11. DESIGN PATTERNS SUMMARY
+  ══════════════════════════════════════════════ -->
+  <section class="section" id="patterns">
+    <div class="section-header">
+      <div class="section-number">11</div>
+      <div class="section-title-wrap">
+        <div class="diagram-type">OOP Design Reference</div>
+        <h2>Design Patterns Summary</h2>
+      </div>
+    </div>
+    <p class="description">
+      NAAS applies eleven recognised Gang-of-Four (GoF) and enterprise design patterns across its domain
+      and service layers. Each pattern solves a specific architectural concern, promoting extensibility,
+      testability, and separation of concerns throughout the system.
+    </p>
+
+    <div class="patterns-grid">
+
+      <div class="pattern-card">
+        <div class="pattern-type">Creational</div>
+        <h4>Singleton</h4>
+        <p>
+          Guarantees a single shared database client instance throughout the application lifetime,
+          preventing redundant connection overhead and race conditions on initialisation.
+        </p>
+        <p class="classes">DBConnect._instance, getInstance()</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Behavioral</div>
+        <h4>Strategy</h4>
+        <p>
+          Encapsulates the three rotation algorithms (Fixed, Random Draw, President Decision) behind a
+          common <code>RotationStrategy</code> interface. RotationEngine accepts any strategy at runtime
+          without changing its own code, making it trivial to add new rotation modes.
+        </p>
+        <p class="classes">RotationStrategy, FixedRotationStrategy, RandomDrawStrategy, PresidentDecisionStrategy, RotationEngine</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Structural</div>
+        <h4>Template Method</h4>
+        <p>
+          Abstract base classes <code>PaymentProvider</code> and <code>NotificationService</code> define
+          the skeleton of algorithms (charge, disburse, send), leaving concrete steps to subclasses
+          (MTNMoMoService, OrangeMoneyService, TelegramNotificationService, SMSNotificationService).
+        </p>
+        <p class="classes">PaymentProvider, NotificationService and their concrete subclasses</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Structural</div>
+        <h4>Facade</h4>
+        <p>
+          <code>PayoutEngine</code> provides a single, simplified interface (<code>execute()</code>)
+          that hides the complexity of orchestrating ContributionService, FineService, PaymentProvider,
+          RotationEngine, NotificationService, and AuditService behind one cohesive call.
+        </p>
+        <p class="classes">PayoutEngine.execute(), PayoutEngine.checkEligibility()</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Behavioral</div>
+        <h4>Observer (Event-Driven)</h4>
+        <p>
+          Domain events (e.g., <code>CONTRIBUTION_PAID</code>, <code>PAYOUT_EXECUTED</code>,
+          <code>FINE_APPLIED</code>) are emitted and consumed by the NotificationService and AuditService,
+          decoupling the source action from its side effects (notifications, logging).
+        </p>
+        <p class="classes">AuditService.log(), NotificationService.send()</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Structural</div>
+        <h4>Repository</h4>
+        <p>
+          <code>DBConnect</code> acts as a generic repository, centralising all Supabase data-access
+          operations (<code>create</code>, <code>findAll</code>, <code>findOne</code>, <code>update</code>,
+          <code>remove</code>) so domain services remain agnostic of the underlying storage engine.
+        </p>
+        <p class="classes">DBConnect.create(), findAll(), findById(), update(), remove()</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Structural</div>
+        <h4>Inheritance / Polymorphism</h4>
+        <p>
+          Abstract hierarchies (<code>PaymentProvider</code>, <code>NotificationService</code>,
+          <code>RotationStrategy</code>) use inheritance to share contracts and polymorphism to allow
+          runtime substitution of concrete implementations without altering calling code.
+        </p>
+        <p class="classes">MTNMoMoService, OrangeMoneyService, TelegramNotificationService, SMSNotificationService</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Creational</div>
+        <h4>Factory Method (implicit)</h4>
+        <p>
+          <code>RotationEngine</code> selects and instantiates the appropriate
+          <code>RotationStrategy</code> subclass based on <code>group.rotation_type</code>,
+          centralising object creation logic and shielding callers from construction details.
+        </p>
+        <p class="classes">RotationEngine.selectNextRecipient() → strategy instantiation</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Behavioral</div>
+        <h4>Chain of Responsibility</h4>
+        <p>
+          Eligibility checking in <code>PayoutEngine.checkEligibility()</code> is structured as a
+          sequential chain of guards (threshold check → unpaid fines → wallet linked → president approval).
+          Each guard either passes control forward or short-circuits with an error.
+        </p>
+        <p class="classes">PayoutEngine.checkEligibility() guard chain</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Behavioral</div>
+        <h4>Command (Token-Based Invitation)</h4>
+        <p>
+          The <code>Invitation</code> entity encapsulates an "accept membership" command as a shareable,
+          time-limited token. The token carries all information needed to execute the action independently
+          of the originating session, enabling async out-of-band flows.
+        </p>
+        <p class="classes">Invitation.send(), Invitation.accept(), Invitation.expire()</p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-type">Structural</div>
+        <h4>Service Layer (Application Services)</h4>
+        <p>
+          Business logic is encapsulated in dedicated service classes (AuthService, GroupService,
+          ContributionService, FineService, ReportService, PayoutEngine) separate from controllers and
+          data-access, following the Service Layer enterprise pattern for clean layered architecture.
+        </p>
+        <p class="classes">AuthService, PDFService, AuthService._signToken()</p>
+      </div>
+
+    </div>
+  </section>
+
+</div><!-- /container -->
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<footer>
+  <strong>NAAS — NjangiBridge</strong> &nbsp;|&nbsp;
+  UML Design Document &nbsp;|&nbsp;
+  SEN2241 Object-Oriented Analysis, Design and Implementation — Spring 2026 &nbsp;|&nbsp;
+  Generated 2026-05-14
+</footer>
+
+</body>
+</html>
