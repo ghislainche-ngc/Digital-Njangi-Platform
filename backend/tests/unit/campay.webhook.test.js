@@ -26,6 +26,11 @@ describe('Campay Webhook Controller', () => {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
     };
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    console.error.mockRestore();
   });
 
   it('returns 401 when X-Campay-Signature header is missing', async () => {
