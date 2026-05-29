@@ -84,8 +84,8 @@
 
     <main class="relative z-10 mx-auto max-w-2xl px-6 py-10">
       <div class="glass-card-heavy p-8 animate-fade-up">
-        <h1 class="font-display text-3xl font-bold" x-text="$t('register.title')"></h1>
-        <p class="mt-2 text-sm text-secondary-app">Create your account first. You can create or join a group after signing in.</p>
+        <h1 class="font-display text-3xl font-bold" x-text="$t('register.user_title')"></h1>
+        <p class="mt-2 text-sm text-secondary-app" x-text="$t('register.user_subtitle')"></p>
 
         <form @submit.prevent="submit" class="mt-6 space-y-5">
           <div>
@@ -126,13 +126,13 @@
             <p class="text-sm text-emerald-500" x-text="success"></p>
           </template>
 
-          <div class="flex items-center justify-between pt-2">
+          <div class="pt-2">
             <button
-              type="submit" class="btn-primary"
+              type="submit" class="btn-primary w-full"
               :disabled="loading"
               :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
             >
-              <span x-show="!loading" x-text="$t('register.submit')"></span>
+              <span x-show="!loading" x-text="$t('register.user_submit')"></span>
               <span x-show="loading" x-text="$t('common.loading')"></span>
             </button>
           </div>
