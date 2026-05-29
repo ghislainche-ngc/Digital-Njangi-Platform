@@ -13,11 +13,193 @@
   </head>
   <body x-data x-init="$store.theme.init()" x-cloak class="relative">
     <div id="app-shell"></div>
-        <script type="module">
+    <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      import { renderFines } from '/src/js/treasurer/fines.js';
+      import { session } from '/src/js/auth/session.js';
+      import {
+        listGroupFines,
+        listMembers,
+        markFinePaid,
+        recordFine,
+        resolveGroupContext,
+        setStoredGroupId,
+        waiveFine,
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'treasurer', title: 'Fines' });
-      renderFines(mountContent);
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading fines…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose a group from the groups page first.</p>
+              </div>
+            `);
+            return;
+          }
+
+          const [finesResponse, membersResponse] = await Promise.all([
+            listGroupFines(activeGroupId),
+            listMembers(activeGroupId),
+          ]);
+
+          const fines = finesResponse.data || finesResponse;
+          const members = membersResponse.data || membersResponse;
+          const memberNames = new Map(members.map((member) => [member.users?.id || member.user_id, member.users?.full_name || member.users?.email || 'Member']));
+          const role = session.user()?.role || 'member';
+          const outstanding = fines.filter((fine) => fine.status === 'unpaid').reduce((sum, fine) => sum + Number(fine.amount || 0), 0);
+          const collected = fines.filter((fine) => fine.status === 'paid').reduce((sum, fine) => sum + Number(fine.amount || 0), 0);
+          const waivers = fines.filter((fine) => fine.status === 'waived').length;
+
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(group.name)}</option>`).join('');
+          const memberOptions = members.length
+            ? members.map((member) => `<option value="${escapeHtml(member.users?.id || member.user_id)}">${escapeHtml(member.users?.full_name || member.users?.email || 'Member')}</option>`).join('')
+            : '<option value="">No members available</option>';
+
+          const rows = fines.length
+            ? fines.map((fine) => {
+                const actions = [`<button type="button" class="nav-link text-xs" data-pay-fine="${escapeHtml(fine.id)}">Mark paid</button>`];
+                if (role === 'president') {
+                  actions.push(`<button type="button" class="nav-link text-xs text-amber-500" data-waive-fine="${escapeHtml(fine.id)}">Waive</button>`);
+                }
+
+                return `
+                  <tr>
+                    <td class="px-5 py-3 font-medium">${escapeHtml(memberNames.get(fine.user_id) || fine.users?.full_name || fine.user_name || 'Member')}</td>
+                    <td>${escapeHtml(fine.reason || '—')}</td>
+                    <td class="font-mono">${Number(fine.amount || 0).toLocaleString()}</td>
+                    <td>${escapeHtml(new Date(fine.created_at || Date.now()).toLocaleDateString())}</td>
+                    <td><span class="chip chip-${fine.status === 'paid' ? 'paid' : fine.status === 'waived' ? 'info' : 'due'}">${escapeHtml(fine.status)}</span></td>
+                    <td class="text-right pr-5">${actions.join(' ')}</td>
+                  </tr>
+                `;
+              }).join('')
+            : `<tr><td colspan="6" class="px-5 py-8 text-center muted">No fines recorded for this group.</td></tr>`;
+
+          mountContent(`
+            <div class="grid gap-4 md:grid-cols-3 mb-6">
+              <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Outstanding</p><p class="mt-2 font-display text-3xl font-bold">${outstanding.toLocaleString()}</p><p class="mt-1 text-xs text-amber-500">${fines.filter((fine) => fine.status === 'unpaid').length} unpaid fines</p></div>
+              <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Collected YTD</p><p class="mt-2 font-display text-3xl font-bold">${collected.toLocaleString()}</p><p class="mt-1 text-xs muted">Paid fines in this group</p></div>
+              <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Waivers</p><p class="mt-2 font-display text-3xl font-bold">${waivers}</p><p class="mt-1 text-xs muted">Logged with reason</p></div>
+            </div>
+
+            <div class="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+              <form id="fine-form" class="glass-card p-5 space-y-4">
+                <div>
+                  <p class="text-xs uppercase tracking-widest muted">Issue fine</p>
+                  <h2 class="mt-1 font-display text-xl font-bold">Record a new penalty</h2>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Group</label>
+                  <select id="group-picker" class="glass-input mt-1">${groupOptions}</select>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Member</label>
+                  <select name="memberId" class="glass-input mt-1">${memberOptions}</select>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Amount</label>
+                  <input name="amount" type="number" min="1" required class="glass-input mt-1" placeholder="2000" />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Reason</label>
+                  <textarea name="reason" required class="glass-input mt-1 min-h-28" placeholder="Late contribution"></textarea>
+                </div>
+                <button type="submit" class="btn-primary w-full">+ Issue fine</button>
+                <p id="fine-form-message" class="text-xs muted"></p>
+              </form>
+
+              <section class="glass-card p-0 overflow-hidden">
+                <div class="p-5 border-b border-[var(--border-subtle)]">
+                  <p class="text-xs uppercase tracking-widest muted">${escapeHtml(activeGroup?.name || 'Selected group')}</p>
+                  <h2 class="mt-1 font-display text-xl font-bold">Fine register</h2>
+                </div>
+                <table class="w-full text-sm">
+                  <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+                    <tr>
+                      <th class="px-5 py-3">Member</th>
+                      <th>Reason</th>
+                      <th>Amount</th>
+                      <th>Issued</th>
+                      <th>Status</th>
+                      <th class="text-right pr-5">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+                </table>
+              </section>
+            </div>
+
+            <p class="mt-4 text-xs muted">PR-36 record fine · PR-37 mark paid · PR-38 waiver logged immutably with reason.</p>
+          `);
+
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          document.querySelectorAll('[data-pay-fine]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              button.disabled = true;
+              try {
+                await markFinePaid(activeGroupId, button.dataset.payFine);
+                renderPage();
+              } catch (error) {
+                button.disabled = false;
+                button.textContent = error.message || 'Mark paid failed';
+              }
+            });
+          });
+
+          document.querySelectorAll('[data-waive-fine]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              const reason = window.prompt('Waiver reason');
+              if (!reason) return;
+              button.disabled = true;
+              try {
+                await waiveFine(activeGroupId, button.dataset.waiveFine, reason);
+                renderPage();
+              } catch (error) {
+                button.disabled = false;
+                button.textContent = error.message || 'Waive failed';
+              }
+            });
+          });
+
+          const form = document.querySelector('#fine-form');
+          const message = document.querySelector('#fine-form-message');
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            message.textContent = 'Issuing fine…';
+
+            const payload = Object.fromEntries(new FormData(form).entries());
+
+            try {
+              await recordFine(activeGroupId, payload.memberId, Number(payload.amount), payload.reason);
+              message.textContent = 'Fine recorded.';
+              form.reset();
+              renderPage();
+            } catch (error) {
+              message.textContent = error.message || 'Failed to record fine.';
+            }
+          });
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load fines.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

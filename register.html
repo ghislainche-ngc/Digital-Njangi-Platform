@@ -15,29 +15,27 @@
     <!-- Define registerPage BEFORE boot.js calls Alpine.start() -->
     <script type="module">
       import { api } from '/src/js/api/client.js';
-      import { session } from '/src/js/auth/session.js';
-      import { redirectByRole } from '/src/js/auth/role-redirect.js';
       window.registerPage = () => ({
-        step: 0,
-        steps: ['Group', 'Rotation', 'President'],
         form: {
-          groupName: '',
-          amount: 10000,
-          frequency: 'monthly',
-          rotation: 'fixed',
-          leader: { name: '', email: '', phone: '' },
+          email: '',
+          phone: '',
+          full_name: '',
+          password: '',
+          language: 'en',
         },
         loading: false,
         error: '',
-        back() { if (this.step > 0) this.step--; },
+        success: '',
         async submit() {
           this.error = '';
-          if (this.step < this.steps.length - 1) { this.step++; return; }
           this.loading = true;
           try {
-            const { token, user } = await api.post('/api/groups/register', this.form);
-            session.set(token, user);
-            redirectByRole(user.role);
+            const response = await api.post('/auth/register', this.form);
+            this.success = response.message || 'Registration successful. Check your phone for the OTP code.';
+            if (response.otpCode) {
+              this.success += ` Dev OTP: ${response.otpCode}`;
+            }
+            this.form.password = '';
           } catch (err) {
             this.error = err.message || 'Registration failed';
           } finally {
@@ -53,9 +51,8 @@
     class="min-h-screen relative"
   >
     <header class="mx-auto max-w-7xl px-6 py-5 flex items-center">
-      <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg">
-        <img src="/logo.png" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1" />
-        <span x-text="$t('brand.name')"></span>
+      <a href="/" class="flex items-center select-none font-display font-black text-2xl tracking-[-0.07em]">
+        <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
       </a>
       <div class="ml-auto flex items-center gap-2">
         <div x-data="{ open: false }" class="relative">
@@ -86,87 +83,38 @@
     </header>
 
     <main class="relative z-10 mx-auto max-w-2xl px-6 py-10">
-      <!-- stepper -->
-      <ol class="flex items-center gap-2 mb-6 text-xs font-medium">
-        <template x-for="(label, i) in steps" :key="i">
-          <li class="flex items-center gap-2">
-            <span
-              class="h-7 w-7 rounded-full grid place-items-center"
-              :class="i <= step ? 'accent-bg text-white' : 'bg-[var(--bg-muted)] muted'"
-              x-text="i + 1"
-            ></span>
-            <span
-              :class="i === step ? 'text-primary-app' : 'muted'"
-              x-text="label"
-            ></span>
-            <span x-show="i < steps.length - 1" class="mx-2 h-px w-6 bg-[var(--border-subtle)]"></span>
-          </li>
-        </template>
-      </ol>
-
       <div class="glass-card-heavy p-8 animate-fade-up">
         <h1 class="font-display text-3xl font-bold" x-text="$t('register.title')"></h1>
-        <p class="mt-2 text-sm text-secondary-app" x-text="$t('register.subtitle')"></p>
+        <p class="mt-2 text-sm text-secondary-app">Create your account first. You can create or join a group after signing in.</p>
 
         <form @submit.prevent="submit" class="mt-6 space-y-5">
-          <!-- Step 1: Group -->
-          <div x-show="step === 0" class="space-y-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wider muted">Full name</label>
+            <input x-model="form.full_name" required type="text" class="glass-input mt-1" placeholder="Aline Mboh" />
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
             <div>
-              <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.group_name')"></label>
-              <input x-model="form.groupName" required type="text" class="glass-input mt-1" placeholder="Les Amis de Yaoundé" />
+              <label class="text-xs font-semibold uppercase tracking-wider muted">Email</label>
+              <input x-model="form.email" required type="email" class="glass-input mt-1" placeholder="you@example.com" />
             </div>
-            <div class="grid md:grid-cols-2 gap-4">
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.contribution_amount')"></label>
-                <input x-model.number="form.amount" required type="number" min="500" class="glass-input mt-1" placeholder="10 000" />
-              </div>
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.frequency')"></label>
-                <select x-model="form.frequency" class="glass-input mt-1">
-                  <option value="monthly"  x-text="$t('register.frequency_monthly')"></option>
-                  <option value="weekly"   x-text="$t('register.frequency_weekly')"></option>
-                  <option value="biweekly" x-text="$t('register.frequency_biweekly')"></option>
-                </select>
-              </div>
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wider muted">Phone</label>
+              <input x-model="form.phone" required type="tel" class="glass-input mt-1" placeholder="+237677000001" />
             </div>
           </div>
 
-          <!-- Step 2: Rotation -->
-          <div x-show="step === 1" class="space-y-3">
-            <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.rotation_type')"></label>
-            <template x-for="opt in [
-              { key: 'fixed',     label: $t('register.rotation_fixed'),     hint: 'Order set at start. Everyone knows their payout date.' },
-              { key: 'random',    label: $t('register.rotation_random'),    hint: 'System randomly picks next recipient each cycle.' },
-              { key: 'president', label: $t('register.rotation_president'), hint: 'President nominates; group is notified.' },
-            ]" :key="opt.key">
-              <label
-                class="glass-card p-4 flex gap-3 cursor-pointer transition"
-                :class="form.rotation === opt.key ? 'ring-2 ring-[var(--accent)]' : ''"
-              >
-                <input type="radio" x-model="form.rotation" :value="opt.key" class="mt-1 accent-[var(--accent)]" />
-                <span>
-                  <span class="block font-semibold" x-text="opt.label"></span>
-                  <span class="block text-xs muted mt-0.5" x-text="opt.hint"></span>
-                </span>
-              </label>
-            </template>
-          </div>
-
-          <!-- Step 3: President details -->
-          <div x-show="step === 2" class="space-y-4">
+          <div class="grid md:grid-cols-2 gap-4">
             <div>
-              <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.leader_name')"></label>
-              <input x-model="form.leader.name" required type="text" class="glass-input mt-1" />
+              <label class="text-xs font-semibold uppercase tracking-wider muted">Password</label>
+              <input x-model="form.password" required type="password" minlength="8" class="glass-input mt-1" placeholder="••••••••" />
             </div>
-            <div class="grid md:grid-cols-2 gap-4">
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.leader_email')"></label>
-                <input x-model="form.leader.email" required type="email" class="glass-input mt-1" placeholder="you@example.com" />
-              </div>
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('register.leader_phone')"></label>
-                <input x-model="form.leader.phone" required type="tel" class="glass-input mt-1" placeholder="+237 6XX XXX XXX" />
-              </div>
+            <div>
+              <label class="text-xs font-semibold uppercase tracking-wider muted">Language</label>
+              <select x-model="form.language" class="glass-input mt-1">
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+              </select>
             </div>
           </div>
 
@@ -174,17 +122,17 @@
             <p class="text-sm text-red-500" x-text="error"></p>
           </template>
 
+          <template x-if="success">
+            <p class="text-sm text-emerald-500" x-text="success"></p>
+          </template>
+
           <div class="flex items-center justify-between pt-2">
-            <button type="button" @click="back" class="btn-ghost" :class="step === 0 ? 'invisible' : ''">
-              ← Back
-            </button>
             <button
               type="submit" class="btn-primary"
               :disabled="loading"
               :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
             >
-              <span x-show="step < steps.length - 1">Continue →</span>
-              <span x-show="step === steps.length - 1 && !loading" x-text="$t('register.submit')"></span>
+              <span x-show="!loading" x-text="$t('register.submit')"></span>
               <span x-show="loading" x-text="$t('common.loading')"></span>
             </button>
           </div>

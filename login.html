@@ -19,18 +19,31 @@
       import { redirectByRole, destinationFor } from '/src/js/auth/role-redirect.js';
       window.loginPage = () => ({
         method: 'password',
-        form: { email: '', password: '', otp: '' },
+        form: { email: '', password: '', phone: '', code: '' },
         loading: false,
         error: '',
-        preview(role) { return destinationFor(role); },
+        preview(role) {
+          session.set('mock-token', {
+            id: 'mock-id',
+            email: `mock-${role}@naas.app`,
+            name: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            full_name: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            role: role,
+            group_id: 'group-demo-123'
+          });
+          redirectByRole(role);
+        },
         async submit() {
           this.error = '';
           this.loading = true;
           try {
-            const endpoint = this.method === 'otp' ? '/api/auth/otp-verify' : '/api/auth/login';
-            const { token, user } = await api.post(endpoint, this.form);
+            const endpoint = this.method === 'otp' ? '/auth/verify-otp' : '/auth/login';
+            const payload = this.method === 'otp'
+              ? { phone: this.form.phone, code: this.form.code }
+              : { email: this.form.email, password: this.form.password };
+            const { token, user } = await api.post(endpoint, payload);
             session.set(token, user);
-            redirectByRole(user.role);
+            redirectByRole(user.role || 'member');
           } catch (err) {
             this.error = err.message || 'Login failed';
           } finally {
@@ -47,9 +60,8 @@
   >
     <!-- minimal top bar -->
     <header class="mx-auto max-w-7xl px-6 py-5 flex items-center">
-      <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg">
-        <img src="/logo.png" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1" />
-        <span x-text="$t('brand.name')"></span>
+      <a href="/" class="flex items-center select-none font-display font-black text-2xl tracking-[-0.07em]">
+        <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
       </a>
       <div class="ml-auto flex items-center gap-2">
         <!-- language -->
@@ -102,11 +114,21 @@
         </div>
 
         <form @submit.prevent="submit" class="mt-6 space-y-4">
-          <div>
+          <div x-show="method === 'password'">
             <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('login.email')"></label>
             <input
-              x-model="form.email" type="email" required autocomplete="email"
+              x-model="form.email" type="email" autocomplete="email"
+              :required="method === 'password'" :disabled="method !== 'password'"
               class="glass-input mt-1" placeholder="you@example.com"
+            />
+          </div>
+
+          <div x-show="method === 'otp'">
+            <label class="text-xs font-semibold uppercase tracking-wider muted">Phone</label>
+            <input
+              x-model="form.phone" type="tel" required autocomplete="tel"
+              :required="method === 'otp'" :disabled="method !== 'otp'"
+              class="glass-input mt-1" placeholder="+237677000001"
             />
           </div>
 
@@ -117,6 +139,7 @@
             </div>
             <input
               x-model="form.password" type="password" autocomplete="current-password"
+              :required="method === 'password'" :disabled="method !== 'password'"
               class="glass-input mt-1" placeholder="••••••••"
             />
           </div>
@@ -124,7 +147,8 @@
           <div x-show="method === 'otp'">
             <label class="text-xs font-semibold uppercase tracking-wider muted">OTP</label>
             <input
-              x-model="form.otp" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+              x-model="form.code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required
+              :required="method === 'otp'" :disabled="method !== 'otp'"
               class="glass-input mt-1 tracking-[0.5em] text-center font-mono" placeholder="••••••"
             />
           </div>
@@ -147,7 +171,7 @@
           <p class="text-xs uppercase tracking-widest muted">Preview a dashboard</p>
           <div class="mt-3 grid grid-cols-5 gap-2">
             <template x-for="role in ['admin','president','treasurer','secretary','member']" :key="role">
-              <a :href="preview(role)" class="nav-link justify-center text-xs capitalize" x-text="role"></a>
+              <button type="button" @click="preview(role)" class="nav-link justify-center text-xs capitalize" x-text="role"></button>
             </template>
           </div>
         </div>

@@ -15,47 +15,149 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        getContributionStats,
+        getMyContributions,
+        groupLabel
+      } from '/src/js/api/njangi.js';
+
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'member', title: 'My payment history' });
-      const rows = [
-        ['Cycle 4', 'Apr 14, 2026', 'MTN MoMo',     '10 000', 'paid', 'Paid'],
-        ['Cycle 3', 'Mar 14, 2026', 'MTN MoMo',     '10 000', 'paid', 'Paid'],
-        ['Cycle 2', 'Feb 14, 2026', 'Cash',         '10 000', 'paid', 'Paid'],
-        ['Cycle 1', 'Jan 14, 2026', 'Orange Money', '10 000', 'paid', 'Paid'],
-      ].map(r => `
-        <tr>
-          <td class="px-5 py-3 font-medium">${r[0]}</td>
-          <td>${r[1]}</td>
-          <td>${r[2]}</td>
-          <td class="font-mono">${r[3]}</td>
-          <td><span class="chip chip-${r[4]}">${r[5]}</span></td>
-          <td class="text-right pr-5"><a href="#" class="nav-link text-xs inline-flex">↓ PDF</a></td>
-        </tr>
-      `).join('');
-      mountContent(`
-        <div class="grid gap-4 md:grid-cols-3 mb-6">
-          <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Paid this year</p><p class="mt-2 font-display text-3xl font-bold">40 000</p><p class="mt-1 text-xs muted">4 of 4 cycles</p></div>
-          <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">On-time rate</p><p class="mt-2 font-display text-3xl font-bold">100%</p><p class="mt-1 text-xs text-emerald-500">perfect</p></div>
-          <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Next due</p><p class="mt-2 font-display text-2xl font-bold">Apr 26</p><p class="mt-1 text-xs muted">10 000 FCFA</p></div>
-        </div>
 
-        <div class="glass-card p-0 overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading payment history…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose a group to see payment history.</p>
+              </div>
+            `);
+            return;
+          }
+
+          const [statsResponse, myContributions] = await Promise.all([
+            getContributionStats(activeGroupId),
+            getMyContributions(activeGroupId)
+          ]);
+
+          const stats = statsResponse.data || statsResponse;
+
+          const totalPaid = myContributions
+            .filter(c => c.status === 'confirmed')
+            .reduce((sum, c) => sum + Number(c.amount), 0);
+
+          const confirmedCount = myContributions.filter(c => c.status === 'confirmed').length;
+          const totalCount = myContributions.length;
+          const onTimeRate = totalCount > 0 ? Math.round((confirmedCount / totalCount) * 100) : 100;
+
+          const hasPaidCurrentCycle = myContributions.some(c => 
+            c.cycle_id === stats.cycleId && c.status === 'confirmed'
+          );
+
+          let dueText = 'Due now';
+          let dueAmount = activeGroup?.contribution_amount || 0;
+          if (hasPaidCurrentCycle) {
+            dueText = 'Paid';
+            dueAmount = 0;
+          }
+
+          const rows = myContributions.length
+            ? myContributions.map(c => {
+                const dateStr = new Date(c.created_at).toLocaleDateString();
+                const cycleText = c.cycles?.cycle_number ? `Cycle ${c.cycles.cycle_number}` : 'Contribution';
+                const chipClass = c.status === 'confirmed' ? 'paid' : c.status === 'failed' ? 'failed' : 'due';
+                
+                const receiptButton = c.status === 'confirmed'
+                  ? `<a href="${apiBase}/groups/${activeGroupId}/contributions/${c.id}/receipt?token=${encodeURIComponent(session.token() || '')}" target="_blank" class="nav-link text-xs inline-flex justify-center">↓ PDF</a>`
+                  : '<span class="muted text-xs">—</span>';
+
+                return `
+                  <tr>
+                    <td class="px-5 py-3 font-medium">${escapeHtml(cycleText)}</td>
+                    <td>${escapeHtml(dateStr)}</td>
+                    <td>${escapeHtml(c.payment_method || 'pending')}</td>
+                    <td class="font-mono">${Number(c.amount).toLocaleString()}</td>
+                    <td><span class="chip chip-${chipClass}">${escapeHtml(c.status)}</span></td>
+                    <td class="text-right pr-5">${receiptButton}</td>
+                  </tr>
+                `;
+              }).join('')
+            : `
               <tr>
-                <th class="px-5 py-3">Cycle</th>
-                <th>Date</th>
-                <th>Method</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th class="text-right pr-5">Receipt</th>
+                <td colspan="6" class="px-5 py-8 text-center muted">No contributions found.</td>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
-          </table>
-        </div>
+            `;
 
-        <p class="mt-4 text-xs muted">PR-33: members view own payment history · PR-19 digital receipts.</p>
-      `);
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-3 mb-6">
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Paid total</p>
+                <p class="mt-2 font-display text-3xl font-bold">${totalPaid.toLocaleString()} FCFA</p>
+                <p class="mt-1 text-xs muted">${confirmedCount} successful cycles</p>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Success Rate</p>
+                <p class="mt-2 font-display text-3xl font-bold">${onTimeRate}%</p>
+                <p class="mt-1 text-xs text-emerald-500">${onTimeRate === 100 ? 'perfect' : 'on track'}</p>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Next due</p>
+                <p class="mt-2 font-display text-2xl font-bold">${dueAmount.toLocaleString()} FCFA</p>
+                <p class="mt-1 text-xs muted">${escapeHtml(dueText)}</p>
+              </div>
+            </div>
+
+            <div class="glass-card p-0 overflow-hidden">
+              <table class="w-full text-sm">
+                <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+                  <tr>
+                    <th class="px-5 py-3">Cycle</th>
+                    <th>Date</th>
+                    <th>Method</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th class="text-right pr-5">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+              </table>
+            </div>
+
+            <p class="mt-4 text-xs muted">PR-33: members view own payment history · PR-19 digital receipts.</p>
+          `);
+
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load payment history.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

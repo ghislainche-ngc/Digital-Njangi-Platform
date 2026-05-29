@@ -13,11 +13,192 @@
   </head>
   <body x-data x-init="$store.theme.init()" x-cloak class="relative">
     <div id="app-shell"></div>
-        <script type="module">
+    <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      import { renderContributions } from '/src/js/treasurer/contributions.js';
+      import {
+        getContributionStats,
+        listContributions,
+        listMembers,
+        recordCashContribution,
+        resolveGroupContext,
+        retryContributionPayment,
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'treasurer', title: 'Contributions' });
-      renderContributions(mountContent);
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading contributions…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Create or choose a group first.</p>
+              </div>
+            `);
+            return;
+          }
+
+          const [statsResponse, contributionsResponse, membersResponse] = await Promise.all([
+            getContributionStats(activeGroupId),
+            listContributions(activeGroupId),
+            listMembers(activeGroupId),
+          ]);
+
+          const stats = statsResponse.data || statsResponse;
+          const contributions = contributionsResponse.data || contributionsResponse;
+          const members = membersResponse.data || membersResponse;
+          const rows = contributions.length
+            ? contributions.map((entry) => {
+                const memberName = entry.users?.full_name || entry.users?.email || 'Unknown member';
+                const chipClass = entry.status === 'confirmed' ? 'paid' : entry.status === 'failed' ? 'failed' : 'due';
+                const retryButton = entry.status === 'failed'
+                  ? `<button type="button" class="nav-link text-xs" data-retry-contribution="${escapeHtml(entry.id)}">Retry</button>`
+                  : '<span class="muted text-xs">—</span>';
+
+                return `
+                  <tr>
+                    <td class="px-5 py-3 font-medium">${escapeHtml(memberName)}</td>
+                    <td>${escapeHtml(entry.payment_method || 'pending')}</td>
+                    <td class="font-mono">${Number(entry.amount || 0).toLocaleString()}</td>
+                    <td>${escapeHtml(new Date(entry.created_at || Date.now()).toLocaleDateString())}</td>
+                    <td><span class="chip chip-${chipClass}">${escapeHtml(entry.status)}</span></td>
+                    <td class="text-right pr-5">${retryButton}</td>
+                  </tr>
+                `;
+              }).join('')
+            : `
+              <tr>
+                <td colspan="6" class="px-5 py-8 text-center muted">No contributions found for this group.</td>
+              </tr>
+            `;
+
+          const memberOptions = members.length
+            ? members.map((member) => `<option value="${escapeHtml(member.users?.id || member.user_id)}">${escapeHtml(member.users?.full_name || member.users?.email || 'Member')}</option>`).join('')
+            : '<option value="">No members available</option>';
+
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="grid gap-4 md:grid-cols-3 mb-6">
+              <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Expected</p><p class="mt-2 font-display text-3xl font-bold">${Number(stats.totalExpected || 0).toLocaleString()}</p><p class="mt-1 text-xs muted">${Number(stats.totalMembers || 0)} active members</p></div>
+              <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Collected</p><p class="mt-2 font-display text-3xl font-bold">${Number(stats.totalCollected || 0).toLocaleString()}</p><p class="mt-1 text-xs text-emerald-500">${Number(stats.collectionRate || 0)}% of target</p></div>
+              <div class="glass-card p-5"><p class="text-xs uppercase tracking-widest muted">Pending / Failed</p><p class="mt-2 font-display text-3xl font-bold">${Number(stats.pending || 0)} / ${Number(stats.failed || 0)}</p><p class="mt-1 text-xs text-amber-500">Current cycle ${stats.cycleNumber || '—'}</p></div>
+            </div>
+
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+              <select id="retry-gateway" class="glass-input w-auto">
+                <option value="momo_mtn">MTN MoMo</option>
+                <option value="momo_orange">Orange Money</option>
+                <option value="campay">Campay</option>
+              </select>
+              <div class="flex-1"></div>
+            </div>
+
+            <div class="grid gap-6 lg:grid-cols-3 mb-6">
+              <form id="cash-payment-form" class="glass-card p-5 lg:col-span-1 space-y-4">
+                <div>
+                  <p class="text-xs uppercase tracking-widest muted">Record cash</p>
+                  <h2 class="mt-1 font-display text-xl font-bold">Add manual payment</h2>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Member</label>
+                  <select name="memberId" class="glass-input mt-1">${memberOptions}</select>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Amount</label>
+                  <input name="amount" type="number" min="1" required class="glass-input mt-1" placeholder="10000" />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Notes</label>
+                  <textarea name="notes" class="glass-input mt-1 min-h-24" placeholder="Meeting cash receipt"></textarea>
+                </div>
+                <button type="submit" class="btn-primary w-full">+ Record cash payment</button>
+                <p id="cash-payment-message" class="text-xs muted"></p>
+              </form>
+
+              <div class="glass-card p-5 lg:col-span-2">
+                <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                  <div>
+                    <p class="text-xs uppercase tracking-widest muted">Cycle data</p>
+                    <h2 class="font-display text-xl font-bold">${escapeHtml(activeGroup?.name || 'Selected group')}</h2>
+                  </div>
+                  <button type="button" id="retry-all-button" class="btn-ghost">↻ Retry failed payments</button>
+                </div>
+                <div class="glass-card p-0 overflow-hidden">
+                  <table class="w-full text-sm">
+                    <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+                      <tr>
+                        <th class="px-5 py-3">Member</th>
+                        <th>Method</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th class="text-right pr-5">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          `);
+
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          document.querySelectorAll('[data-retry-contribution]').forEach((button) => {
+            button.addEventListener('click', async () => {
+              button.disabled = true;
+              try {
+                const gateway = document.querySelector('#retry-gateway').value;
+                await retryContributionPayment(activeGroupId, button.dataset.retryContribution, gateway);
+                renderPage();
+              } catch (error) {
+                button.disabled = false;
+                button.textContent = error.message || 'Retry failed';
+              }
+            });
+          });
+
+          document.querySelector('#retry-all-button').addEventListener('click', () => {
+            document.querySelectorAll('[data-retry-contribution]').forEach((button) => button.click());
+          });
+
+          const form = document.querySelector('#cash-payment-form');
+          const message = document.querySelector('#cash-payment-message');
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            message.textContent = 'Saving payment…';
+
+            const payload = Object.fromEntries(new FormData(form).entries());
+
+            try {
+              await recordCashContribution(activeGroupId, payload.memberId, Number(payload.amount), payload.notes || '');
+              message.textContent = 'Cash payment recorded.';
+              form.reset();
+              renderPage();
+            } catch (error) {
+              message.textContent = error.message || 'Failed to record payment.';
+            }
+          });
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load contributions.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

@@ -24,23 +24,45 @@ function chainMock(finalData = null, finalError = null) {
   return chain;
 }
 
+function mockSupabase(tableMocks = {}) {
+  let callCounts = {};
+  mockFrom.mockImplementation((table) => {
+    callCounts[table] = (callCounts[table] || 0) + 1;
+
+    if (table === 'njangi_groups' && !tableMocks.njangi_groups) {
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + 30);
+      return chainMock({
+        subscription_tier: 'starter',
+        subscription_status: 'active',
+        subscription_expires_at: expiry.toISOString()
+      });
+    }
+
+    const mockCreator = tableMocks[table];
+    if (typeof mockCreator === 'function') {
+      return mockCreator(callCounts[table]);
+    }
+    return mockCreator || chainMock();
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSupabase({});
 });
 
 describe('MemberService.inviteMember', () => {
   it('creates invitation and logs audit event', async () => {
     const invitation = { id: 'inv-1', group_id: 'grp-1', phone: '+237677000002', token: 'abc' };
-
-    let callCount = 0;
-    mockFrom.mockImplementation((table) => {
-      callCount++;
-      if (table === 'invitations' && callCount === 1) return chainMock(null);
-      if (table === 'users') return chainMock(null);
-      if (table === 'memberships' && callCount <= 4) return chainMock(null);
-      if (table === 'invitations') return chainMock(invitation);
-      if (table === 'audit_events') return { insert: jest.fn().mockResolvedValue({ error: null }) };
-      return chainMock();
+    mockSupabase({
+      invitations: (count) => {
+        if (count === 1) return chainMock(null); // existing check
+        return chainMock(invitation); // insertion
+      },
+      memberships: () => chainMock(null), // already member check
+      users: () => chainMock(null),
+      audit_events: () => ({ insert: jest.fn().mockResolvedValue({ error: null }) }),
     });
 
     const result = await memberService.inviteMember('grp-1', '+237677000002', 'user-pres');
@@ -48,7 +70,10 @@ describe('MemberService.inviteMember', () => {
   });
 
   it('throws 409 for duplicate pending invitation', async () => {
-    mockFrom.mockReturnValue(chainMock({ id: 'existing-inv' }));
+    mockSupabase({
+      invitations: () => chainMock({ id: 'existing-inv' }),
+      memberships: () => chainMock(null),
+    });
 
     await expect(
       memberService.inviteMember('grp-1', '+237677000002', 'user-pres')
@@ -62,36 +87,26 @@ describe('MemberService.acceptInvite', () => {
     const invitation = { id: 'inv-1', group_id: 'grp-1', token: 'abc', status: 'pending', expires_at: futureDate, invited_by: 'user-pres' };
     const membership = { id: 'mem-1', role: 'member', rotation_position: 3 };
 
-    let callCount = 0;
-    mockFrom.mockImplementation((table) => {
-      callCount++;
-      if (table === 'invitations' && callCount === 1) return chainMock(invitation);
-      if (table === 'memberships' && callCount <= 3) return chainMock(null); // count
-      if (table === 'memberships') return chainMock(membership);
-      if (table === 'invitations') return { update: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({}) }) };
-      if (table === 'audit_events') return { insert: jest.fn().mockResolvedValue({ error: null }) };
-      return chainMock();
-    });
-
-    // Mock the count result
-    const countResult = { count: 2 };
-    let memberCallCount = 0;
-    mockFrom.mockImplementation((table) => {
-      callCount++;
-      if (table === 'invitations' && callCount <= 2) return chainMock(invitation);
-      if (table === 'memberships') {
-        memberCallCount++;
-        if (memberCallCount === 1) {
+    let membershipsCallCount = 0;
+    mockSupabase({
+      invitations: (count) => {
+        if (count === 1) return chainMock(invitation); // findOne check
+        return { update: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({}) }) }; // mark accepted
+      },
+      memberships: (count) => {
+        membershipsCallCount++;
+        // First two calls:
+        // 1. _enforce count check
+        // 2. acceptInvite count check
+        if (membershipsCallCount <= 2) {
           const c = {};
           c.select = jest.fn().mockReturnValue(c);
-          c.eq = jest.fn().mockReturnValueOnce(c).mockResolvedValueOnce(countResult);
+          c.eq = jest.fn().mockReturnValueOnce(c).mockResolvedValueOnce({ count: 2 });
           return c;
         }
-        return chainMock(membership);
-      }
-      if (table === 'invitations') return { update: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({}) }) };
-      if (table === 'audit_events') return { insert: jest.fn().mockResolvedValue({ error: null }) };
-      return chainMock();
+        return chainMock(membership); // insert
+      },
+      audit_events: () => ({ insert: jest.fn().mockResolvedValue({ error: null }) }),
     });
 
     const result = await memberService.acceptInvite('abc', 'user-new');
@@ -102,12 +117,11 @@ describe('MemberService.acceptInvite', () => {
     const pastDate = new Date(Date.now() - 86400000).toISOString();
     const invitation = { id: 'inv-1', expires_at: pastDate, status: 'pending' };
 
-    let callCount = 0;
-    mockFrom.mockImplementation((table) => {
-      callCount++;
-      if (table === 'invitations' && callCount === 1) return chainMock(invitation);
-      if (table === 'invitations') return { update: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({}) }) };
-      return chainMock();
+    mockSupabase({
+      invitations: (count) => {
+        if (count === 1) return chainMock(invitation);
+        return { update: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({}) }) };
+      }
     });
 
     await expect(
@@ -116,7 +130,9 @@ describe('MemberService.acceptInvite', () => {
   });
 
   it('throws 400 for invalid token', async () => {
-    mockFrom.mockReturnValue(chainMock(null, { message: 'not found' }));
+    mockSupabase({
+      invitations: () => chainMock(null, { message: 'not found' })
+    });
 
     await expect(
       memberService.acceptInvite('bad-token', 'user-new')
@@ -128,13 +144,12 @@ describe('MemberService.removeMember', () => {
   it('president removes member and logs audit event', async () => {
     const removed = { id: 'mem-2', status: 'removed' };
 
-    let callCount = 0;
-    mockFrom.mockImplementation((table) => {
-      callCount++;
-      if (table === 'memberships' && callCount === 1) return chainMock({ role: 'president' });
-      if (table === 'memberships') return chainMock(removed);
-      if (table === 'audit_events') return { insert: jest.fn().mockResolvedValue({ error: null }) };
-      return chainMock();
+    mockSupabase({
+      memberships: (count) => {
+        if (count === 1) return chainMock({ role: 'president' });
+        return chainMock(removed);
+      },
+      audit_events: () => ({ insert: jest.fn().mockResolvedValue({ error: null }) }),
     });
 
     const result = await memberService.removeMember('grp-1', 'user-target', 'user-pres');
@@ -142,7 +157,9 @@ describe('MemberService.removeMember', () => {
   });
 
   it('president cannot remove themselves', async () => {
-    mockFrom.mockReturnValue(chainMock({ role: 'president' }));
+    mockSupabase({
+      memberships: () => chainMock({ role: 'president' }),
+    });
 
     await expect(
       memberService.removeMember('grp-1', 'user-pres', 'user-pres')
@@ -160,15 +177,69 @@ describe('MemberService.assignRole', () => {
   it('assigns new role and logs audit event', async () => {
     const updated = { id: 'mem-1', role: 'treasurer' };
 
-    let callCount = 0;
-    mockFrom.mockImplementation((table) => {
-      callCount++;
-      if (table === 'memberships') return chainMock(updated);
-      if (table === 'audit_events') return { insert: jest.fn().mockResolvedValue({ error: null }) };
-      return chainMock();
+    mockSupabase({
+      memberships: () => chainMock(updated),
+      audit_events: () => ({ insert: jest.fn().mockResolvedValue({ error: null }) }),
     });
 
     const result = await memberService.assignRole('grp-1', 'user-target', 'treasurer', 'user-pres');
     expect(result.role).toBe('treasurer');
+  });
+});
+
+describe('SaaS Member Limits and Subscriptions', () => {
+  it('throws SUBSCRIPTION_EXPIRED when group has expired subscription', async () => {
+    const pastDate = new Date(Date.now() - 86400000).toISOString();
+    mockSupabase({
+      njangi_groups: () => chainMock({
+        subscription_tier: 'starter',
+        subscription_status: 'active',
+        subscription_expires_at: pastDate,
+      })
+    });
+
+    await expect(
+      memberService.inviteMember('grp-1', '+237677000002', 'user-pres')
+    ).rejects.toMatchObject({ statusCode: 402, code: 'SUBSCRIPTION_EXPIRED' });
+  });
+
+  it('throws TIER_LIMIT_REACHED when Starter tier has 5 active members', async () => {
+    mockSupabase({
+      njangi_groups: () => chainMock({
+        subscription_tier: 'starter',
+        subscription_status: 'active',
+        subscription_expires_at: new Date(Date.now() + 86400000).toISOString(),
+      }),
+      memberships: () => {
+        const c = {};
+        c.select = jest.fn().mockReturnValue(c);
+        c.eq = jest.fn().mockReturnValueOnce(c).mockResolvedValueOnce({ count: 5 });
+        return c;
+      }
+    });
+
+    await expect(
+      memberService.inviteMember('grp-1', '+237677000002', 'user-pres')
+    ).rejects.toMatchObject({ statusCode: 403, code: 'TIER_LIMIT_REACHED' });
+  });
+
+  it('throws TIER_LIMIT_REACHED when Growth tier has 20 active members', async () => {
+    mockSupabase({
+      njangi_groups: () => chainMock({
+        subscription_tier: 'growth',
+        subscription_status: 'active',
+        subscription_expires_at: new Date(Date.now() + 86400000).toISOString(),
+      }),
+      memberships: () => {
+        const c = {};
+        c.select = jest.fn().mockReturnValue(c);
+        c.eq = jest.fn().mockReturnValueOnce(c).mockResolvedValueOnce({ count: 20 });
+        return c;
+      }
+    });
+
+    await expect(
+      memberService.inviteMember('grp-1', '+237677000002', 'user-pres')
+    ).rejects.toMatchObject({ statusCode: 403, code: 'TIER_LIMIT_REACHED' });
   });
 });

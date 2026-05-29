@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const { register, verifyOTP, login } = require('./auth.controller');
 const { createRateLimiter } = require('../../middleware/rateLimit.middleware');
+const WhatsAppNotificationService = require('../../services/notification/WhatsAppNotificationService');
 
 const loginLimiter = createRateLimiter({
 	windowMs: 15 * 60 * 1000,
@@ -87,5 +88,89 @@ router.post('/verify-otp', verifyOTP);
  *       401: { description: Invalid credentials }
  */
 router.post('/login', loginLimiter, login);
+
+router.get('/whatsapp/status', (req, res) => {
+  try {
+    const status = WhatsAppNotificationService.getStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/whatsapp/qr', (req, res) => {
+  try {
+    const { status, qr } = WhatsAppNotificationService.getStatus();
+    
+    if (status === 'CONNECTED') {
+      return res.send(`
+        <html>
+          <head>
+            <title>WhatsApp Status</title>
+            <style>
+              body { font-family: sans-serif; background: #0a0a0a; color: #fff; text-align: center; padding: 50px; }
+              .card { background: #1a1a1a; padding: 30px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+              .status { color: #10b981; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>WhatsApp Bot Status</h2>
+              <p class="status">✓ Connected and active</p>
+              <p>Your phone is linked to NjangiBridge as a self-hosted notification bot.</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    if (status === 'QR_READY' && qr) {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+      return res.send(`
+        <html>
+          <head>
+            <title>Link WhatsApp</title>
+            <style>
+              body { font-family: sans-serif; background: #0a0a0a; color: #fff; text-align: center; padding: 50px; }
+              .card { background: #1a1a1a; padding: 30px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+              img { margin: 20px 0; border: 10px solid #fff; border-radius: 8px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>Link WhatsApp Bot</h2>
+              <p>Scan this QR code using Link Devices in your phone's WhatsApp settings:</p>
+              <img src="${qrUrl}" alt="WhatsApp QR Code"/>
+              <p style="color: #999; font-size: 12px;">This links NjangiBridge as a WhatsApp Web client under your number.</p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    return res.send(`
+      <html>
+        <head>
+          <title>WhatsApp Status</title>
+          <style>
+            body { font-family: sans-serif; background: #0a0a0a; color: #fff; text-align: center; padding: 50px; }
+            .card { background: #1a1a1a; padding: 30px; border-radius: 12px; display: inline-block; }
+          </style>
+          <script>
+            setTimeout(() => { window.location.reload(); }, 3000);
+          </script>
+        </head>
+        <body>
+          <div class="card">
+            <h2>WhatsApp Bot status: ${status}</h2>
+            <p>Please wait... (page will refresh automatically)</p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send(`Error: ${err.message}`);
+  }
+});
 
 module.exports = router;

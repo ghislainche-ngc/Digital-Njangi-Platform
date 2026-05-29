@@ -10,17 +10,26 @@
     "test": "jest --runInBand",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
+    "test:smoke": "jest tests/integration/smoke.test.js",
     "test:security": "jest tests/security",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFiles": ["./tests/setup.js"],
-    "testMatch": ["**/tests/**/*.test.js"],
-    "collectCoverageFrom": ["src/**/*.js"],
+    "setupFiles": [
+      "./tests/setup.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
     "coverageThreshold": {
-      "global": { "lines": 70 }
+      "global": {
+        "lines": 70
+      }
     }
   },
   "dependencies": {
@@ -36,7 +45,8 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "twilio": "^4.21.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "whatsapp-web.js": "^1.34.7"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

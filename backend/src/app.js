@@ -19,6 +19,7 @@ const fineRoutes = require('./modules/fines/fine.routes');
 const socialFundRoutes = require('./modules/social-fund/social-fund.routes');
 const reportRoutes = require('./modules/reports/report.routes');
 const webhookRoutes = require('./modules/webhooks/campay.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 
 const errorMiddleware = require('./middleware/error.middleware');
 
@@ -71,6 +72,7 @@ app.use('/groups', fineRoutes);
 app.use('/groups', socialFundRoutes);
 app.use('/groups', reportRoutes);
 app.use('/webhooks', webhookRoutes);
+app.use('/admin', adminRoutes);
 
 // ─── Global error handler (must be last) ──────────────────────────────────
 app.use(errorMiddleware);

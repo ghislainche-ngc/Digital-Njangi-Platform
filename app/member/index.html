@@ -14,46 +14,417 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      renderShell({ role: 'member', title: 'My Njangi' });
-      mountContent(`
-        <div class="grid gap-4 md:grid-cols-3 animate-fade-up">
-          <div class="glass-card p-5 md:col-span-2">
-            <p class="text-xs uppercase tracking-widest muted">Next due</p>
-            <p class="mt-2 font-display text-3xl font-bold">10 000 FCFA</p>
-            <p class="mt-1 text-sm muted">April 26 · MTN MoMo auto-debit</p>
-            <div class="mt-4 flex gap-2">
-              <button class="btn-primary">Pay now</button>
-              <button class="btn-ghost">Review details</button>
-            </div>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs uppercase tracking-widest muted">My payout turn</p>
-            <p class="mt-2 font-display text-2xl font-bold">Position 7</p>
-            <p class="mt-1 text-xs muted">Estimated: July 28</p>
-          </div>
-        </div>
+      import { session } from '/src/js/auth/session.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        getContributionStats,
+        listMembers,
+        getMyContributions,
+        getSocialFundBalance,
+        initiateContributionPayment,
+        groupLabel,
+        createGroup
+      } from '/src/js/api/njangi.js';
 
-        <div class="mt-6 grid gap-4 lg:grid-cols-2">
-          <div class="glass-card p-5">
-            <h2 class="font-display text-xl font-bold mb-3">Recent contributions</h2>
-            <ul class="divide-y divide-[var(--border-subtle)]">
-              <li class="flex items-center justify-between py-3"><div><p class="text-sm font-medium">March 2026</p><p class="text-xs muted">MTN MoMo · 10 000 FCFA</p></div><span class="chip chip-paid">Paid</span></li>
-              <li class="flex items-center justify-between py-3"><div><p class="text-sm font-medium">February 2026</p><p class="text-xs muted">MTN MoMo · 10 000 FCFA</p></div><span class="chip chip-paid">Paid</span></li>
-              <li class="flex items-center justify-between py-3"><div><p class="text-sm font-medium">January 2026</p><p class="text-xs muted">Cash · 10 000 FCFA</p></div><span class="chip chip-paid">Paid</span></li>
-            </ul>
-          </div>
-          <div class="glass-card p-5">
-            <h2 class="font-display text-xl font-bold mb-3">Group ledger</h2>
-            <div class="grid grid-cols-2 gap-3 text-sm">
-              <div class="glass-card p-3"><p class="muted text-xs">Pot balance</p><p class="font-display text-lg font-bold">450 000</p></div>
-              <div class="glass-card p-3"><p class="muted text-xs">Members paid</p><p class="font-display text-lg font-bold">11 / 14</p></div>
-              <div class="glass-card p-3"><p class="muted text-xs">Social fund</p><p class="font-display text-lg font-bold">85 000</p></div>
-              <div class="glass-card p-3"><p class="muted text-xs">Cycle</p><p class="font-display text-lg font-bold">4 of 14</p></div>
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+      renderShell({ role: 'member', title: 'My Njangi' });
+
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading Njangi status…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="max-w-xl mx-auto space-y-6">
+                <!-- Welcome greeting -->
+                <div class="glass-card p-6 animate-fade-up">
+                  <h2 class="font-display text-2xl font-bold text-gradient">Welcome to NjangiBridge!</h2>
+                  <p class="mt-2 text-sm text-secondary-app">
+                    You are not currently in any Njangi groups. To start your own Njangi operation, fill in the form below to create your group workspace. You will automatically become the group's <strong>President</strong> and can invite other members, configure cycle schedules, and manage payout approvals.
+                  </p>
+                </div>
+
+                <!-- Create group form -->
+                <div class="glass-card p-6 animate-fade-up" style="animation-delay: 100ms;">
+                  <p class="text-xs uppercase tracking-widest muted font-semibold">Obtain a Space</p>
+                  <h2 class="mt-2 font-display text-xl font-bold">Start a new Njangi</h2>
+                  <form id="create-group-form" class="mt-6 space-y-5">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Group Name</label>
+                      <input name="name" required class="glass-input mt-1" placeholder="e.g., Les Amis de Yaoundé" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Contribution Amount</label>
+                        <input name="contribution_amount" required type="number" min="1" class="glass-input mt-1" value="10000" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Frequency</label>
+                        <select name="frequency" class="glass-input mt-1">
+                          <option value="monthly">Monthly</option>
+                          <option value="weekly">Weekly</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Rotation Type</label>
+                      <select name="rotation_type" class="glass-input mt-1">
+                        <option value="fixed">Fixed (Sequential order)</option>
+                        <option value="random">Random (Fair draw per cycle)</option>
+                        <option value="president">President decides</option>
+                      </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Penalty/day (FCFA)</label>
+                        <input name="penalty_per_day" type="number" min="0" class="glass-input mt-1" value="0" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-semibold uppercase tracking-wider muted">Approval % Threshold</label>
+                        <input name="approval_threshold" type="number" min="0" max="100" class="glass-input mt-1" value="0" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted block mb-2">Select Subscription Plan</label>
+                      <div class="grid gap-3 md:grid-cols-3">
+                        <label class="glass-card p-3 flex flex-col justify-between cursor-pointer border border-subtle hover:border-[var(--accent)] relative">
+                          <input type="radio" name="subscription_tier" value="starter" checked class="absolute right-3 top-3 accent-[var(--accent)]" />
+                          <div>
+                            <span class="block font-bold text-sm">Starter</span>
+                            <span class="block text-[10px] muted mt-1">Free Trial</span>
+                            <ul class="text-[10px] space-y-1 mt-2 list-disc list-inside muted">
+                              <li>Max 5 members</li>
+                              <li>Max 10k FCFA contrib</li>
+                              <li>30-day trial</li>
+                            </ul>
+                          </div>
+                        </label>
+                        <label class="glass-card p-3 flex flex-col justify-between cursor-pointer border border-subtle hover:border-[var(--accent)] relative">
+                          <input type="radio" name="subscription_tier" value="growth" class="absolute right-3 top-3 accent-[var(--accent)]" />
+                          <div>
+                            <span class="block font-bold text-sm text-[var(--accent)]">Growth</span>
+                            <span class="block text-[10px] font-semibold mt-1">5,000 FCFA/mo</span>
+                            <ul class="text-[10px] space-y-1 mt-2 list-disc list-inside muted">
+                              <li>Max 20 members</li>
+                              <li>Max 100k FCFA contrib</li>
+                              <li>WhatsApp Bot</li>
+                            </ul>
+                          </div>
+                        </label>
+                        <label class="glass-card p-3 flex flex-col justify-between cursor-pointer border border-subtle hover:border-[var(--accent)] relative">
+                          <input type="radio" name="subscription_tier" value="enterprise" class="absolute right-3 top-3 accent-[var(--accent)]" />
+                          <div>
+                            <span class="block font-bold text-sm text-purple-400">Enterprise</span>
+                            <span class="block text-[10px] font-semibold mt-1">15,000 FCFA/mo</span>
+                            <ul class="text-[10px] space-y-1 mt-2 list-disc list-inside muted">
+                              <li>Unlimited members</li>
+                              <li>No contrib limit</li>
+                              <li>WhatsApp + VIP</li>
+                            </ul>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary w-full mt-4">+ Create Njangi Group</button>
+                    <p id="group-form-message" class="text-xs mt-2 text-center"></p>
+                  </form>
+                </div>
+              </div>
+            `);
+
+            // Setup form event listener
+            const form = document.querySelector('#create-group-form');
+            const message = document.querySelector('#group-form-message');
+            form.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              message.className = 'text-xs mt-2 text-center text-amber-500';
+              message.textContent = 'Creating group…';
+
+              const payload = Object.fromEntries(new FormData(form).entries());
+              payload.contribution_amount = Number(payload.contribution_amount);
+              payload.penalty_per_day = Number(payload.penalty_per_day || 0);
+              payload.approval_threshold = Number(payload.approval_threshold || 0);
+
+              try {
+                const created = await createGroup(payload);
+                const groupId = created?.group?.id || created?.data?.group?.id;
+                if (groupId) {
+                  setStoredGroupId(groupId);
+                }
+                message.className = 'text-xs mt-2 text-center text-emerald-500 font-bold';
+                message.textContent = 'Group created successfully! Redirecting...';
+                form.reset();
+                setTimeout(() => {
+                  renderPage();
+                }, 1500);
+              } catch (error) {
+                message.className = 'text-xs mt-2 text-center text-red-500';
+                message.textContent = error.message || 'Failed to create group.';
+              }
+            });
+
+            return;
+          }
+
+          const currentUser = session.user() || {};
+
+          const [statsResponse, members, myContributions, socialFundResponse] = await Promise.all([
+            getContributionStats(activeGroupId),
+            listMembers(activeGroupId),
+            getMyContributions(activeGroupId),
+            getSocialFundBalance(activeGroupId)
+          ]);
+
+          const stats = statsResponse.data || statsResponse;
+          const socialFundBalance = socialFundResponse.balance || 0;
+
+          const myMembership = members.find(m => 
+            m.user_id === currentUser.id || 
+            m.users?.id === currentUser.id ||
+            m.users?.email === currentUser.email
+          );
+
+          const myPos = myMembership?.rotation_position || null;
+          let turnText = '—';
+          let turnSubtext = 'Not in rotation';
+
+          if (myPos !== null && stats.cycleNumber) {
+            if (myPos === stats.cycleNumber) {
+              turnText = `Position ${myPos}`;
+              turnSubtext = 'Active Turn (Payout Cycle)';
+            } else if (myPos < stats.cycleNumber) {
+              turnText = `Position ${myPos}`;
+              turnSubtext = 'Turn passed / Payout received';
+            } else {
+              turnText = `Position ${myPos}`;
+              const cyclesRemaining = myPos - stats.cycleNumber;
+              const dateEst = new Date();
+              if (activeGroup?.frequency === 'weekly') {
+                dateEst.setDate(dateEst.getDate() + (cyclesRemaining * 7));
+              } else {
+                dateEst.setMonth(dateEst.getMonth() + cyclesRemaining);
+              }
+              turnSubtext = `Estimated: ${dateEst.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+            }
+          }
+
+          const hasPaidCurrentCycle = myContributions.some(c => 
+            c.cycle_id === stats.cycleId && c.status === 'confirmed'
+          );
+
+          let nextDueAmount = activeGroup?.contribution_amount || 0;
+          let dueTitle = 'Next due';
+          let dueSub = `Cycle ${stats.cycleNumber || '—'} · MTN/Orange MoMo auto-debit`;
+          let showPayButton = true;
+
+          if (hasPaidCurrentCycle) {
+            nextDueAmount = 0;
+            dueTitle = 'Cycle Contribution';
+            dueSub = `Cycle ${stats.cycleNumber || '—'} contribution paid. Thank you!`;
+            showPayButton = false;
+          }
+
+          const recentList = myContributions.slice(0, 5).map(c => {
+            const dateStr = new Date(c.created_at).toLocaleDateString();
+            const cycleText = c.cycles?.cycle_number ? `Cycle ${c.cycles.cycle_number}` : 'Contribution';
+            const chipClass = c.status === 'confirmed' ? 'paid' : c.status === 'failed' ? 'failed' : 'due';
+            return `
+              <li class="flex items-center justify-between py-3">
+                <div>
+                  <p class="text-sm font-medium">${escapeHtml(cycleText)}</p>
+                  <p class="text-xs muted">${escapeHtml(c.payment_method || 'pending')} · ${Number(c.amount).toLocaleString()} FCFA</p>
+                </div>
+                <span class="chip chip-${chipClass}">${escapeHtml(c.status)}</span>
+              </li>
+            `;
+          }).join('') || `<li class="py-6 text-center muted text-sm">No recent contributions found.</li>`;
+
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
             </div>
-            <a href="/app/member/rotation.html" class="mt-4 inline-block text-sm accent-text font-semibold">View full rotation →</a>
-          </div>
-        </div>
-      `);
+
+            <div class="grid gap-4 md:grid-cols-3 animate-fade-up">
+              <div class="glass-card p-5 md:col-span-2">
+                <p class="text-xs uppercase tracking-widest muted">${escapeHtml(dueTitle)}</p>
+                <p class="mt-2 font-display text-3xl font-bold">${nextDueAmount.toLocaleString()} FCFA</p>
+                <p class="mt-1 text-sm muted">${escapeHtml(dueSub)}</p>
+                
+                ${showPayButton ? `
+                  <div class="mt-4 flex gap-2">
+                    <button id="btn-pay-trigger" class="btn-primary">Pay now</button>
+                    <a href="/app/member/history.html" class="btn-ghost">Review details</a>
+                  </div>
+                ` : `
+                  <div class="mt-4">
+                    <a href="/app/member/history.html" class="btn-ghost">View my history</a>
+                  </div>
+                `}
+
+                <!-- Inline Payment Box -->
+                <div id="payment-box" class="mt-4 hidden space-y-4 p-5 glass-card border border-[var(--border-subtle)]">
+                  <div>
+                    <h4 class="font-display font-bold text-sm">Make Cycle Contribution</h4>
+                    <p class="text-xs muted">Initiate a mobile money payment for ${nextDueAmount.toLocaleString()} FCFA.</p>
+                  </div>
+                  <div class="space-y-3">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Select Gateway</label>
+                      <select id="payment-gateway" class="glass-input mt-1">
+                        <option value="momo_mtn">MTN MoMo</option>
+                        <option value="momo_orange">Orange Money</option>
+                        <option value="campay">Campay</option>
+                      </select>
+                    </div>
+                    <div class="flex gap-2 justify-end">
+                      <button type="button" id="btn-pay-cancel" class="btn-ghost">Cancel</button>
+                      <button type="button" id="btn-pay-confirm" class="btn-primary">Confirm & Pay</button>
+                    </div>
+                    <p id="payment-message" class="text-xs text-amber-500"></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">My payout turn</p>
+                <p class="mt-2 font-display text-2xl font-bold">${escapeHtml(turnText)}</p>
+                <p class="mt-1 text-xs muted">${escapeHtml(turnSubtext)}</p>
+              </div>
+            </div>
+
+            <div class="mt-6 grid gap-4 lg:grid-cols-2">
+              <div class="glass-card p-5">
+                <h2 class="font-display text-xl font-bold mb-3">Recent contributions</h2>
+                <ul class="divide-y divide-[var(--border-subtle)]">
+                  ${recentList}
+                </ul>
+              </div>
+
+              <div class="glass-card p-5">
+                <h2 class="font-display text-xl font-bold mb-3">Group ledger</h2>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                  <div class="glass-card p-3">
+                    <p class="muted text-xs">Pot balance</p>
+                    <p class="font-display text-lg font-bold">${Number(stats.totalCollected || 0).toLocaleString()} FCFA</p>
+                  </div>
+                  <div class="glass-card p-3">
+                    <p class="muted text-xs">Members paid</p>
+                    <p class="font-display text-lg font-bold">${stats.confirmed || 0} / ${stats.totalMembers || 0}</p>
+                  </div>
+                  <div class="glass-card p-3">
+                    <p class="muted text-xs">Social fund</p>
+                    <p class="font-display text-lg font-bold">${socialFundBalance.toLocaleString()} FCFA</p>
+                  </div>
+                  <div class="glass-card p-3">
+                    <p class="muted text-xs">Current Cycle</p>
+                    <p class="font-display text-lg font-bold">${stats.cycleNumber || '—'} of ${stats.totalMembers || '—'}</p>
+                  </div>
+                </div>
+                <a href="/app/member/rotation.html" class="mt-4 inline-block text-sm accent-text font-semibold">View full rotation →</a>
+              </div>
+            </div>
+          `);
+
+          // Event listeners
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          const payTrigger = document.querySelector('#btn-pay-trigger');
+          if (payTrigger) {
+            const paymentBox = document.querySelector('#payment-box');
+            const payCancel = document.querySelector('#btn-pay-cancel');
+            const payConfirm = document.querySelector('#btn-pay-confirm');
+            const payMsg = document.querySelector('#payment-message');
+
+            payTrigger.addEventListener('click', () => {
+              paymentBox.classList.remove('hidden');
+              payMsg.textContent = '';
+            });
+
+            payCancel.addEventListener('click', () => {
+              paymentBox.classList.add('hidden');
+              payMsg.textContent = '';
+            });
+
+            payConfirm.addEventListener('click', async () => {
+              payConfirm.disabled = true;
+              if (payCancel) payCancel.disabled = true;
+              payMsg.textContent = 'Initiating transaction...';
+              const gateway = document.querySelector('#payment-gateway').value;
+
+              try {
+                await initiateContributionPayment(activeGroupId, gateway);
+                payMsg.textContent = 'Payment initiated! Check your phone for the PIN prompt.';
+                
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                const checkPaymentStatus = async () => {
+                  attempts++;
+                  try {
+                    const contributions = await getMyContributions(activeGroupId);
+                    const confirmedPayment = contributions.some(c => 
+                      c.cycle_id === stats.cycleId && c.status === 'confirmed'
+                    );
+
+                    if (confirmedPayment) {
+                      payMsg.innerHTML = '<span class="text-emerald-500 font-bold">✓ Payment Confirmed! Contribution received.</span>';
+                      setTimeout(() => {
+                        renderPage();
+                      }, 2000);
+                    } else if (attempts >= maxAttempts) {
+                      payMsg.textContent = 'Transaction is still processing on the network. Check back in a few minutes.';
+                      payConfirm.disabled = false;
+                      if (payCancel) payCancel.disabled = false;
+                      setTimeout(() => {
+                        renderPage();
+                      }, 3000);
+                    } else {
+                      payMsg.textContent = `Awaiting PIN confirmation... (Checking status: ${attempts}/${maxAttempts})`;
+                      setTimeout(checkPaymentStatus, 3000);
+                    }
+                  } catch (err) {
+                    if (attempts >= maxAttempts) {
+                      payMsg.textContent = 'Verification timed out. Please refresh page manually.';
+                      payConfirm.disabled = false;
+                      if (payCancel) payCancel.disabled = false;
+                    } else {
+                      setTimeout(checkPaymentStatus, 3000);
+                    }
+                  }
+                };
+
+                // Start polling after a short initial delay of 3 seconds
+                setTimeout(checkPaymentStatus, 3000);
+
+              } catch (error) {
+                payConfirm.disabled = false;
+                if (payCancel) payCancel.disabled = false;
+                payMsg.textContent = error.message || 'Payment initiation failed.';
+              }
+            });
+          }
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load member overview.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

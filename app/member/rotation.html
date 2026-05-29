@@ -15,61 +15,172 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        getContributionStats,
+        listMembers,
+        groupLabel
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'member', title: 'Rotation calendar' });
-      const schedule = [
-        { pos: 1,  name: 'Claire Biya',        when: 'Jan 28', status: 'paid' },
-        { pos: 2,  name: 'Fatou Ngo',          when: 'Feb 28', status: 'paid' },
-        { pos: 3,  name: 'Jean-Pierre Mbarga', when: 'Mar 28', status: 'paid' },
-        { pos: 4,  name: 'Marie Tchinda',      when: 'Apr 28', status: 'info', label: 'Next' },
-        { pos: 5,  name: 'Pa Ngwa',            when: 'May 28', status: 'upcoming' },
-        { pos: 6,  name: 'Alice Fotso',        when: 'Jun 28', status: 'upcoming' },
-        { pos: 7,  name: 'You',                when: 'Jul 28', status: 'me' },
-        { pos: 8,  name: '—',                  when: 'Aug 28', status: 'upcoming' },
-        { pos: 9,  name: '—',                  when: 'Sep 28', status: 'upcoming' },
-      ].map(r => {
-        const rowClass = r.status === 'me' ? 'ring-2 ring-[var(--accent)] bg-[var(--accent-soft)]' : '';
-        const numClass = r.status === 'paid' ? 'bg-emerald-500/20 text-emerald-500' : r.status === 'info' ? 'accent-bg text-[var(--text-on-brand)]' : 'bg-[var(--bg-muted)] muted';
-        const nameClass = r.status === 'upcoming' ? 'muted' : '';
-        const chip = r.label ? `<span class="chip chip-info">${r.label}</span>` : r.status === 'paid' ? '<span class="chip chip-paid">Done</span>' : '';
-        return `
-          <li class="flex items-center justify-between p-3 rounded-xl ${rowClass}">
-            <div class="flex items-center gap-3">
-              <div class="h-8 w-8 rounded-full grid place-items-center text-xs font-bold ${numClass}">${r.pos}</div>
-              <span class="font-medium ${nameClass}">${r.name}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs muted">${r.when}</span>
-              ${chip}
-            </div>
-          </li>
-        `;
-      }).join('');
-      mountContent(`
-        <div class="grid gap-6 lg:grid-cols-3">
-          <div class="glass-card p-6 lg:col-span-1">
-            <p class="text-xs uppercase tracking-widest muted">My payout turn</p>
-            <p class="mt-2 font-display text-4xl font-bold">Position 7</p>
-            <p class="mt-1 text-sm muted">Estimated Jul 28, 2026</p>
-            <div class="mt-5 h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden">
-              <div class="h-full accent-bg" style="width: 43%"></div>
-            </div>
-            <p class="mt-2 text-xs muted">Cycle 4 of 14 · 43% complete</p>
 
-            <div class="mt-6 p-3 rounded-xl bg-[var(--bg-muted)]">
-              <p class="text-xs muted">Rotation type</p>
-              <p class="font-semibold text-sm mt-1">Random draw</p>
-              <p class="text-xs muted mt-2">System selects next recipient from unpaid members each cycle.</p>
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading rotation calendar…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose a group first to see the rotation calendar.</p>
+              </div>
+            `);
+            return;
+          }
+
+          const [statsResponse, members] = await Promise.all([
+            getContributionStats(activeGroupId),
+            listMembers(activeGroupId)
+          ]);
+
+          const stats = statsResponse.data || statsResponse;
+          const totalMembers = members.length || 1;
+          const currentCycle = stats.cycleNumber || 1;
+
+          const currentUser = session.user() || {};
+          const myMembership = members.find(m => 
+            m.user_id === currentUser.id || 
+            m.users?.id === currentUser.id ||
+            m.users?.email === currentUser.email
+          );
+
+          const myPos = myMembership?.rotation_position || null;
+
+          // Estimate date helper
+          const getEstimatedDateStr = (pos) => {
+            if (!currentCycle) return '—';
+            const cyclesRemaining = pos - currentCycle;
+            const dateEst = new Date();
+            if (activeGroup?.frequency === 'weekly') {
+              dateEst.setDate(dateEst.getDate() + (cyclesRemaining * 7));
+            } else {
+              dateEst.setMonth(dateEst.getMonth() + cyclesRemaining);
+            }
+            return dateEst.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+          };
+
+          let myTurnText = '—';
+          let myTurnSubtext = 'Not in rotation';
+          if (myPos !== null) {
+            myTurnText = `Position ${myPos}`;
+            myTurnSubtext = `Estimated ${getEstimatedDateStr(myPos)}`;
+          }
+
+          const progressPercent = Math.min(100, Math.round((currentCycle / totalMembers) * 100));
+
+          const scheduleHtml = members.map((member) => {
+            const pos = member.rotation_position;
+            const isMe = member.user_id === currentUser.id || 
+                         member.users?.id === currentUser.id ||
+                         member.users?.email === currentUser.email;
+
+            const name = isMe 
+              ? `You (${member.users?.full_name || 'Member'})` 
+              : (member.users?.full_name || member.users?.email || 'Unnamed Member');
+
+            let itemStatus = 'upcoming';
+            let label = '';
+
+            if (pos < currentCycle) {
+              itemStatus = 'paid';
+              label = 'Done';
+            } else if (pos === currentCycle) {
+              itemStatus = 'info';
+              label = 'Current';
+            } else if (isMe) {
+              itemStatus = 'me';
+            }
+
+            const rowClass = isMe ? 'ring-2 ring-[var(--accent)] bg-[var(--accent-soft)]' : '';
+            
+            let numClass = 'bg-[var(--bg-muted)] muted';
+            if (itemStatus === 'paid') {
+              numClass = 'bg-emerald-500/20 text-emerald-500';
+            } else if (itemStatus === 'info') {
+              numClass = 'accent-bg text-white';
+            }
+
+            const chip = label ? `<span class="chip chip-${itemStatus === 'paid' ? 'paid' : 'info'}">${label}</span>` : '';
+            const whenStr = getEstimatedDateStr(pos);
+
+            return `
+              <li class="flex items-center justify-between p-3 rounded-xl ${rowClass}">
+                <div class="flex items-center gap-3">
+                  <div class="h-8 w-8 rounded-full grid place-items-center text-xs font-bold ${numClass}">${pos}</div>
+                  <span class="font-medium ${itemStatus === 'upcoming' ? 'muted' : ''}">${escapeHtml(name)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs muted">${escapeHtml(whenStr)}</span>
+                  ${chip}
+                </div>
+              </li>
+            `;
+          }).join('') || `<li class="py-8 text-center muted text-sm">No members in rotation.</li>`;
+
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
             </div>
-          </div>
 
-          <div class="lg:col-span-2 glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Full rotation schedule</h2>
-            <ol class="space-y-2">${schedule}</ol>
-          </div>
-        </div>
+            <div class="grid gap-6 lg:grid-cols-3">
+              <div class="glass-card p-6 lg:col-span-1">
+                <p class="text-xs uppercase tracking-widest muted">My payout turn</p>
+                <p class="mt-2 font-display text-4xl font-bold">${escapeHtml(myTurnText)}</p>
+                <p class="mt-1 text-sm muted">${escapeHtml(myTurnSubtext)}</p>
+                <div class="mt-5 h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden">
+                  <div class="h-full accent-bg" style="width: ${progressPercent}%"></div>
+                </div>
+                <p class="mt-2 text-xs muted">Cycle ${currentCycle} of ${totalMembers} · ${progressPercent}% complete</p>
 
-        <p class="mt-6 text-xs muted">PR-23/24/25: rotation order visible to all · PR-32: full payout history.</p>
-      `);
+                <div class="mt-6 p-3 rounded-xl bg-[var(--bg-muted)]">
+                  <p class="text-xs muted">Rotation type</p>
+                  <p class="font-semibold text-sm mt-1">Fixed rotation</p>
+                  <p class="text-xs muted mt-2">Payout is allocated to members sequentially in order of their rotation position.</p>
+                </div>
+              </div>
+
+              <div class="lg:col-span-2 glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Full rotation schedule</h2>
+                <ol class="space-y-2">${scheduleHtml}</ol>
+              </div>
+            </div>
+
+            <p class="mt-6 text-xs muted">PR-23/24/25: rotation order visible to all · PR-32: full payout history.</p>
+          `);
+
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load rotation calendar.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

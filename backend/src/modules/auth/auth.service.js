@@ -63,18 +63,28 @@ class AuthService {
 
     const { data: user } = await supabase
       .from('users')
-      .select('id, email, full_name')
+      .select('id, email, full_name, is_admin')
       .eq('phone', phone)
       .single();
 
     const token = this._signToken(user);
-    return { token, user };
+    const membership = await this._getPrimaryMembership(user.id);
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.is_admin ? 'admin' : (membership?.role || 'member'),
+        group_id: membership?.group_id || null,
+      },
+    };
   }
 
   async login({ email, password }) {
     const { data: user } = await supabase
       .from('users')
-      .select('id, email, full_name, password_hash')
+      .select('id, email, full_name, password_hash, is_admin')
       .eq('email', email)
       .single();
 
@@ -94,7 +104,17 @@ class AuthService {
     }
 
     const token = this._signToken(user);
-    return { token, user: { id: user.id, email: user.email, full_name: user.full_name } };
+    const membership = await this._getPrimaryMembership(user.id);
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.is_admin ? 'admin' : (membership?.role || 'member'),
+        group_id: membership?.group_id || null,
+      },
+    };
   }
 
   async _generateAndStoreOTP(phone) {
@@ -113,10 +133,21 @@ class AuthService {
 
   _signToken(user) {
     return jwt.sign(
-      { sub: user.id, email: user.email },
+      { sub: user.id, email: user.email, is_admin: !!user.is_admin },
       process.env.JWT_SECRET,
       { expiresIn: JWT_EXPIRY }
     );
+  }
+
+  async _getPrimaryMembership(userId) {
+    const { data } = await supabase
+      .from('memberships')
+      .select('group_id, role')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single();
+
+    return data || null;
   }
 }
 

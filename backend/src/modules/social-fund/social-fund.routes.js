@@ -153,4 +153,34 @@ router.post(
   }
 );
 
+/**
+ * @swagger
+ * /groups/{groupId}/social-fund/events:
+ *   get:
+ *     summary: Get the group's social fund transaction logs
+ *     tags: [Social Fund]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: List of social fund events returned }
+ *       401: { description: Not authenticated }
+ *       403: { description: Not a member of this group }
+ *       500: { description: Server error }
+ */
+router.get('/:groupId/social-fund/events', auth, tenant, async (req, res) => {
+  try {
+    const events = await socialFundService.getEvents(req.params.groupId);
+    res.status(200).json(events);
+  } catch (err) {
+    res
+      .status(err.statusCode || 500)
+      .json({ error: err.message, code: 'SOCIAL_FUND_ERROR' });
+  }
+});
+
 module.exports = router;

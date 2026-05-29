@@ -13,11 +13,203 @@
   </head>
   <body x-data x-init="$store.theme.init()" x-cloak class="relative">
     <div id="app-shell"></div>
-        <script type="module">
+    <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      import { renderSocialFund } from '/src/js/treasurer/social-fund.js';
+      import {
+        getSocialFundBalance,
+        listSocialFundEvents,
+        recordSocialFundDeposit,
+        recordSocialFundWithdrawal,
+        resolveGroupContext,
+        setStoredGroupId,
+        groupLabel
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'treasurer', title: 'Social fund' });
-      renderSocialFund(mountContent);
+
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading social fund…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Create or choose a group first.</p>
+              </div>
+            `);
+            return;
+          }
+
+          const [balanceResponse, events] = await Promise.all([
+            getSocialFundBalance(activeGroupId),
+            listSocialFundEvents(activeGroupId)
+          ]);
+
+          const balance = Number(balanceResponse.balance || 0);
+
+          const activityRows = events.length
+            ? events.map((event) => {
+                const dateStr = new Date(event.created_at).toLocaleDateString();
+                const sign = event.type === 'deposit' ? '+' : '−';
+                const chipClass = event.type === 'deposit' ? 'paid' : 'info';
+                return `
+                  <li class="flex items-center justify-between py-3">
+                    <div>
+                      <p class="text-sm font-medium">${escapeHtml(event.reason)}</p>
+                      <p class="text-xs muted">${escapeHtml(dateStr)} · ${escapeHtml(event.type)}</p>
+                    </div>
+                    <span class="chip chip-${chipClass} font-mono">${sign} ${Number(event.amount).toLocaleString()} FCFA</span>
+                  </li>
+                `;
+              }).join('')
+            : `
+              <li class="py-8 text-center muted text-sm">No transaction activity recorded.</li>
+            `;
+
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+            </div>
+
+            <div class="grid gap-6 lg:grid-cols-3">
+              <div class="lg:col-span-2 glass-card p-6">
+                <p class="text-xs uppercase tracking-widest muted">Current balance</p>
+                <p class="mt-2 font-display text-5xl font-bold">${balance.toLocaleString()} FCFA</p>
+                <p class="mt-1 text-sm muted">Emergency fund for births, weddings, bereavement.</p>
+
+                <div class="mt-6 flex gap-3">
+                  <button id="btn-deposit-trigger" class="btn-primary">+ Deposit</button>
+                  <button id="btn-withdraw-trigger" class="btn-ghost">− Withdraw</button>
+                </div>
+
+                <!-- Transaction Form Section (Toggled) -->
+                <div id="tx-form-container" class="mt-6 hidden glass-card p-5 border border-[var(--border-subtle)] space-y-4">
+                  <div>
+                    <h4 id="tx-form-title" class="font-display text-lg font-bold">Record Deposit</h4>
+                    <p class="text-xs muted">Add a manual entry for the group's welfare/social funds.</p>
+                  </div>
+                  <form id="tx-form" class="space-y-4">
+                    <input type="hidden" name="type" id="tx-type" value="deposit" />
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Amount (FCFA)</label>
+                      <input name="amount" type="number" min="1" required class="glass-input mt-1" placeholder="5000" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Reason</label>
+                      <input name="reason" type="text" required class="glass-input mt-1" placeholder="Monthly welfare contribution" />
+                    </div>
+                    <div class="flex gap-2 justify-end pt-2">
+                      <button type="button" id="btn-tx-cancel" class="btn-ghost">Cancel</button>
+                      <button type="submit" class="btn-primary">Submit Transaction</button>
+                    </div>
+                    <p id="tx-message" class="text-xs text-amber-500"></p>
+                  </form>
+                </div>
+
+                <h3 class="font-semibold text-sm mt-8 mb-3">Recent activity</h3>
+                <ul class="divide-y divide-[var(--border-subtle)]">${activityRows}</ul>
+              </div>
+
+              <div class="glass-card p-6">
+                <h3 class="font-display text-lg font-bold mb-3">Contribution rule</h3>
+                <p class="text-sm muted">Each member adds 1 000 FCFA to the social fund at every cycle. Withdrawals require President approval.</p>
+
+                <div class="mt-6">
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Per-cycle amount (FCFA)</label>
+                  <input class="glass-input mt-1" type="number" value="1000" />
+                </div>
+                <div class="mt-4">
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Approval threshold</label>
+                  <input class="glass-input mt-1" type="number" value="10000" />
+                  <p class="mt-1 text-xs muted">Withdrawals above require President sign-off.</p>
+                </div>
+
+                <button id="btn-save-rules" class="btn-primary w-full mt-6">Save rules</button>
+                <p id="rules-message" class="text-xs text-emerald-500 mt-2 text-center"></p>
+              </div>
+            </div>
+          `);
+
+          // Event Listeners
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          const txFormContainer = document.querySelector('#tx-form-container');
+          const txFormTitle = document.querySelector('#tx-form-title');
+          const txTypeInput = document.querySelector('#tx-type');
+          const txForm = document.querySelector('#tx-form');
+          const txMessage = document.querySelector('#tx-message');
+
+          document.querySelector('#btn-deposit-trigger').addEventListener('click', () => {
+            txFormTitle.textContent = 'Record Deposit';
+            txTypeInput.value = 'deposit';
+            txForm.reset();
+            txMessage.textContent = '';
+            txFormContainer.classList.remove('hidden');
+          });
+
+          document.querySelector('#btn-withdraw-trigger').addEventListener('click', () => {
+            txFormTitle.textContent = 'Record Withdrawal';
+            txTypeInput.value = 'withdrawal';
+            txForm.reset();
+            txMessage.textContent = '';
+            txFormContainer.classList.remove('hidden');
+          });
+
+          document.querySelector('#btn-tx-cancel').addEventListener('click', () => {
+            txFormContainer.classList.add('hidden');
+            txForm.reset();
+            txMessage.textContent = '';
+          });
+
+          txForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            txMessage.textContent = 'Processing...';
+            const formData = new FormData(txForm);
+            const amount = Number(formData.get('amount'));
+            const reason = formData.get('reason');
+            const type = formData.get('type');
+
+            try {
+              if (type === 'deposit') {
+                await recordSocialFundDeposit(activeGroupId, amount, reason);
+              } else {
+                await recordSocialFundWithdrawal(activeGroupId, amount, reason);
+              }
+              txMessage.textContent = 'Transaction saved successfully!';
+              setTimeout(() => {
+                renderPage();
+              }, 800);
+            } catch (err) {
+              txMessage.textContent = err.message || 'Failed to record transaction.';
+            }
+          });
+
+          document.querySelector('#btn-save-rules').addEventListener('click', () => {
+            const msg = document.querySelector('#rules-message');
+            msg.textContent = 'Rules saved successfully (local preview).';
+            setTimeout(() => { msg.textContent = ''; }, 3000);
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load social fund.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

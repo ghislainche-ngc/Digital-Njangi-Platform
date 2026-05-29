@@ -3,6 +3,7 @@
    Keeps layout logic in one place so Dev A / Dev B don't repeat it. */
 
 import { session } from '/src/js/auth/session.js';
+import { destinationFor } from '/src/js/auth/role-redirect.js';
 
 // Every officer is also a contributing member of the Njangi — they pay into the
 // pot and sit in the rotation like everyone else. So President / Treasurer /
@@ -78,7 +79,23 @@ function iconSvg(name) {
 }
 
 export function renderShell({ role, title, mount = '#app-shell' } = {}) {
-  const user = session.user() || { name: 'Demo User', role };
+  /* ── Route guard: redirect unauthenticated or wrong-role users ── */
+  if (!session.isAuthenticated()) {
+    window.location.assign('/login.html');
+    return;
+  }
+  const sessionUser = session.user();
+  if (sessionUser && sessionUser.role && sessionUser.role !== role) {
+    // Officers (president/treasurer/secretary) can access member personal pages
+    const memberPersonalPaths = ['/app/member/history.html', '/app/member/rotation.html', '/app/member/ledger.html', '/app/member/profile.html'];
+    const isOfficerOnMemberPage = ['president', 'treasurer', 'secretary'].includes(sessionUser.role) && memberPersonalPaths.some(p => window.location.pathname.endsWith(p));
+    if (!isOfficerOnMemberPage) {
+      window.location.assign(destinationFor(sessionUser.role));
+      return;
+    }
+  }
+
+  const user = sessionUser || { name: 'Demo User', role };
   const items = NAV_BY_ROLE[role] || [];
   const initials = (user.name || 'U').split(' ').map(s => s[0]).slice(0, 2).join('');
   const path = window.location.pathname.replace(/\/+$/, '/');
@@ -100,13 +117,40 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
   }).join('');
 
   document.querySelector(mount).innerHTML = `
-    <div class="flex min-h-screen">
-      <!-- Sidebar -->
-      <aside class="hidden md:flex md:flex-col w-64 glass-card-heavy rounded-none border-r border-subtle p-4 gap-1">
-        <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg px-3 py-3">
-          <img src="/logo.png" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1"/>
-          <span x-text="$t('brand.name')"></span>
-        </a>
+    <div x-data="{ mobileMenuOpen: false }" class="flex h-screen overflow-hidden bg-[var(--bg-app)]">
+      <!-- Mobile Sidebar Drawer -->
+      <div x-show="mobileMenuOpen" class="md:hidden fixed inset-0 z-50 flex" x-cloak>
+        <!-- Backdrop -->
+        <div @click="mobileMenuOpen = false" x-transition:enter="transition-opacity ease-linear duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity ease-linear duration-300" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+        
+        <!-- Drawer content -->
+        <aside x-transition:enter="transition ease-in-out duration-300 transform" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in-out duration-300 transform" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full" class="relative flex flex-col w-64 max-w-xs h-full p-4 gap-1 bg-[var(--glass-bg-heavy)] border-r border-subtle backdrop-blur-lg">
+          <div class="flex items-center justify-between px-3 py-3">
+            <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg">
+              <span class="font-display font-black text-2xl tracking-[-0.07em]">
+                <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
+              </span>
+            </a>
+            <button @click="mobileMenuOpen = false" class="nav-link p-1">✕</button>
+          </div>
+          <div class="px-3 pb-2 text-xs uppercase tracking-widest muted">${role}</div>
+          <nav class="flex flex-col gap-1">${nav}</nav>
+          <div class="mt-auto glass-card p-3 flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">${initials}</div>
+            <div class="min-w-0">
+              <p class="text-sm font-medium truncate">${user.name || 'Demo User'}</p>
+              <p class="text-xs muted truncate">${user.email || 'demo@naas.app'}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Desktop Sidebar -->
+      <aside class="hidden md:flex md:flex-col w-64 glass-card-heavy rounded-none border-r border-subtle p-4 gap-1 h-full overflow-y-auto">
+        <a href="/" class="flex items-center select-none font-display font-black text-2xl tracking-[-0.07em] px-3 py-3">
+          <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
+        </span>
+      </a>
         <div class="mt-2 px-3 pb-2 text-xs uppercase tracking-widest muted">${role}</div>
         <nav class="flex flex-col gap-1">${nav}</nav>
         <div class="mt-auto glass-card p-3 flex items-center gap-3">
@@ -118,10 +162,16 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
         </div>
       </aside>
 
-      <!-- Main -->
-      <div class="flex-1 flex flex-col">
+      <!-- Main Container -->
+      <div class="flex-1 flex flex-col h-full overflow-hidden">
         <header class="glass-nav sticky top-0 z-30">
-          <div class="mx-auto max-w-7xl px-6 py-3 flex items-center gap-4">
+          <div class="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-center gap-4">
+            <!-- Mobile Menu Toggle -->
+            <button @click="mobileMenuOpen = true" class="md:hidden nav-link p-1.5 mr-1" aria-label="Open menu">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <h1 class="font-display text-lg font-bold">${title || ''}</h1>
             <div class="ml-auto flex items-center gap-2">
               <!-- language -->
@@ -150,16 +200,20 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
                   <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
                 </svg>
               </button>
-              <a href="/login.html" onclick="localStorage.removeItem('naas.jwt'); localStorage.removeItem('naas.user');" class="nav-link" x-text="$t('dashboard.logout')"></a>
+              <a href="/login.html" id="logout-link" class="nav-link" x-text="$t('dashboard.logout')"></a>
             </div>
           </div>
         </header>
-        <main class="flex-1 relative z-10 mx-auto w-full max-w-7xl px-6 py-8" id="role-content">
+        <main class="flex-1 overflow-y-auto relative z-10 mx-auto w-full max-w-7xl px-4 md:px-6 py-8" id="role-content">
           <!-- role content injected by page -->
         </main>
       </div>
     </div>
   `;
+
+  document.querySelector('#logout-link')?.addEventListener('click', () => {
+    session.clear();
+  });
 }
 
 export function mountContent(html) {

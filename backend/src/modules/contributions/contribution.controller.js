@@ -63,9 +63,9 @@ const recordCash = async (req, res, next) => {
 const initiateMobilePayment = async (req, res, next) => {
   try {
     const gateway = req.body.gateway;
-    if (!['momo_mtn', 'momo_orange'].includes(gateway)) {
+    if (!['momo_mtn', 'momo_orange', 'campay'].includes(gateway)) {
       return res.status(400).json({
-        error: 'Gateway must be momo_mtn or momo_orange.',
+        error: 'Gateway must be momo_mtn, momo_orange, or campay.',
         code: 'VALIDATION_ERROR',
       });
     }
