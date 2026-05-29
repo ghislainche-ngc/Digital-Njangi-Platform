@@ -106,11 +106,11 @@ class DBConnect {
    * INSERT — Create one or more records in a table.
    * @param {string} table - Target table name
    * @param {object|object[]} data - Record(s) to insert
-   * @param {object} [options] - Optional: { returning: 'minimal' | 'representation' }
+   * @param {object} [_options] - Reserved: { returning: 'minimal' | 'representation' }
    * @returns {Promise<object[]>} The inserted record(s)
    * @throws {Error} On database error
    */
-  async create(table, data, options = {}) {
+  async create(table, data, _options = {}) {
     this._ensureConnected();
     const query = this._client.from(table).insert(data).select();
 

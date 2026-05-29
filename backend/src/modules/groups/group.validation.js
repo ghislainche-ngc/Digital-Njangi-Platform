@@ -22,4 +22,12 @@ const updateGroupSchema = Joi.object({
   approval_threshold: Joi.number().min(0),
 }).min(1);
 
-module.exports = { createGroupSchema, updateGroupSchema };
+const updateGatewaySchema = Joi.object({
+  gateway: Joi.string().valid('mtn_momo', 'orange_money', 'campay').required(),
+});
+
+const updatePayoutGatewaySchema = Joi.object({
+  payout_gateway: Joi.string().valid('mtn_momo', 'orange_money', 'campay').allow(null).required(),
+});
+
+module.exports = { createGroupSchema, updateGroupSchema, updateGatewaySchema, updatePayoutGatewaySchema };

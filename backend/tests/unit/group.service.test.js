@@ -137,3 +137,60 @@ describe('GroupService.updateSettings', () => {
     expect(result.contribution_amount).toBe(15000);
   });
 });
+
+describe('GroupService.updateGateway', () => {
+  it('updates preferred_gateway on njangi_groups and returns the row', async () => {
+    mockFrom.mockReturnValue(chainMock({ id: 'g1', preferred_gateway: 'campay' }));
+
+    const result = await groupService.updateGateway('g1', 'campay');
+
+    const chain = mockFrom.mock.results[0].value;
+    expect(chain.update).toHaveBeenCalledWith({ preferred_gateway: 'campay' });
+    expect(chain.eq).toHaveBeenCalledWith('id', 'g1');
+    expect(result.preferred_gateway).toBe('campay');
+  });
+
+  it('throws .statusCode=400 for an invalid gateway value without hitting DB', async () => {
+    await expect(groupService.updateGateway('g1', 'bogus'))
+      .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('throws .statusCode=404 when the group is not found', async () => {
+    mockFrom.mockReturnValue(chainMock(null));
+    await expect(groupService.updateGateway('missing', 'mtn_momo'))
+      .rejects.toMatchObject({ statusCode: 404, code: 'GROUP_NOT_FOUND' });
+  });
+});
+
+describe('GroupService.updatePayoutGateway', () => {
+  it.each(['mtn_momo', 'orange_money', 'campay'])(
+    'accepts %s and updates the column', async (value) => {
+      mockFrom.mockReturnValue(chainMock({ id: 'g1', preferred_payout_gateway: value }));
+      const result = await groupService.updatePayoutGateway('g1', value);
+      const chain = mockFrom.mock.results[0].value;
+      expect(chain.update).toHaveBeenCalledWith({ preferred_payout_gateway: value });
+      expect(result.preferred_payout_gateway).toBe(value);
+    }
+  );
+
+  it('accepts null to clear the column (revert to phone-prefix routing)', async () => {
+    mockFrom.mockReturnValue(chainMock({ id: 'g1', preferred_payout_gateway: null }));
+    const result = await groupService.updatePayoutGateway('g1', null);
+    const chain = mockFrom.mock.results[0].value;
+    expect(chain.update).toHaveBeenCalledWith({ preferred_payout_gateway: null });
+    expect(result.preferred_payout_gateway).toBeNull();
+  });
+
+  it('throws .statusCode=400 for invalid value without hitting DB', async () => {
+    await expect(groupService.updatePayoutGateway('g1', 'bogus'))
+      .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('throws .statusCode=404 when the group is not found', async () => {
+    mockFrom.mockReturnValue(chainMock(null));
+    await expect(groupService.updatePayoutGateway('missing', 'campay'))
+      .rejects.toMatchObject({ statusCode: 404, code: 'GROUP_NOT_FOUND' });
+  });
+});
