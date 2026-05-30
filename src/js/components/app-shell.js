@@ -96,9 +96,10 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
     }
   }
 
-  const user = sessionUser || { name: 'Demo User', role };
+  const user = sessionUser || { full_name: 'Demo User', role };
+  const displayName = user.full_name || user.name || 'Demo User';
   const items = NAV_BY_ROLE[role] || [];
-  const initials = (user.name || 'U').split(' ').map(s => s[0]).slice(0, 2).join('');
+  const initials = displayName.split(' ').map(s => s[0]).slice(0, 2).join('');
   const path = window.location.pathname.replace(/\/+$/, '/');
 
   const nav = items.map((it, i) => {
@@ -139,7 +140,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
           <div class="mt-auto glass-card p-3 flex items-center gap-3">
             <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">${initials}</div>
             <div class="min-w-0">
-              <p class="text-sm font-medium truncate">${user.name || 'Demo User'}</p>
+              <p class="text-sm font-medium truncate">${displayName}</p>
               <p class="text-xs muted truncate">${user.email || 'demo@naas.app'}</p>
             </div>
           </div>
@@ -157,7 +158,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
         <div class="mt-auto glass-card p-3 flex items-center gap-3">
           <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">${initials}</div>
           <div class="min-w-0">
-            <p class="text-sm font-medium truncate">${user.name || 'Demo User'}</p>
+            <p class="text-sm font-medium truncate">${displayName}</p>
             <p class="text-xs muted truncate">${user.email || 'demo@naas.app'}</p>
           </div>
         </div>
