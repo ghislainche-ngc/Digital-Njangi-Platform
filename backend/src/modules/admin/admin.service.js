@@ -238,6 +238,100 @@ class AdminService {
       };
     });
   }
+
+  /**
+   * List all registered users with their active memberships (group names and roles).
+   */
+  async getPlatformUsers() {
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select('id, email, phone, full_name, language, is_admin, created_at')
+      .order('created_at', { ascending: false });
+
+    if (userError) throw userError;
+
+    // Fetch all active memberships to map groups and roles
+    const { data: memberships, error: memError } = await supabase
+      .from('memberships')
+      .select('user_id, role, njangi_groups(name)')
+      .eq('status', 'active');
+
+    if (memError) throw memError;
+
+    // Group memberships by user_id
+    const userMemberships = {};
+    (memberships || []).forEach(m => {
+      if (!userMemberships[m.user_id]) userMemberships[m.user_id] = [];
+      userMemberships[m.user_id].push({
+        role: m.role,
+        groupName: m.njangi_groups?.name || 'N/A'
+      });
+    });
+
+    return users.map(u => ({
+      ...u,
+      memberships: userMemberships[u.id] || [],
+    }));
+  }
+
+  /**
+   * Update a user's global admin role.
+   */
+  async updateUserRole(targetUserId, { is_admin }, requestedBy) {
+    if (targetUserId === requestedBy && !is_admin) {
+      const err = new Error('You cannot revoke your own administrator privileges.');
+      err.statusCode = 400;
+      err.code = 'SELF_DEMOTION';
+      throw err;
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .update({ is_admin: !!is_admin })
+      .eq('id', targetUserId)
+      .select('id, email, phone, full_name, language, is_admin, created_at')
+      .single();
+
+    if (error) throw error;
+    return user;
+  }
+
+  /**
+   * Permanently delete a user from the platform (subject to safety checks).
+   */
+  async deleteUser(targetUserId, requestedBy) {
+    if (targetUserId === requestedBy) {
+      const err = new Error('You cannot delete your own account.');
+      err.statusCode = 400;
+      err.code = 'SELF_DELETION';
+      throw err;
+    }
+
+    // Check if the user is an active president of any group
+    const { data: memberships, error: memError } = await supabase
+      .from('memberships')
+      .select('group_id')
+      .eq('user_id', targetUserId)
+      .eq('role', 'president')
+      .eq('status', 'active');
+
+    if (memError) throw memError;
+
+    if (memberships && memberships.length > 0) {
+      const err = new Error('User is the active President of a Njangi group. Transfer group presidency before deleting.');
+      err.statusCode = 400;
+      err.code = 'ACTIVE_PRESIDENT_DELETION';
+      throw err;
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', targetUserId);
+
+    if (error) throw error;
+    return { success: true };
+  }
 }
 
 module.exports = new AdminService();

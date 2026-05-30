@@ -271,4 +271,136 @@ describe('AdminService', () => {
       expect(txs[1].userName).toBe('User Y');
     });
   });
+
+  describe('getPlatformUsers', () => {
+    it('returns all users with their active memberships', async () => {
+      mockFrom.mockImplementation((table) => {
+        if (table === 'users') {
+          return {
+            select: jest.fn().mockReturnValue({
+              order: jest.fn().mockResolvedValue({
+                data: [
+                  { id: 'user-1', email: 'u1@test.com', phone: '123', full_name: 'User One', language: 'en', is_admin: false, created_at: '2026-05-30T00:00:00Z' },
+                  { id: 'user-2', email: 'u2@test.com', phone: '456', full_name: 'User Two', language: 'fr', is_admin: true, created_at: '2026-05-30T00:00:00Z' }
+                ],
+                error: null
+              })
+            })
+          };
+        }
+        if (table === 'memberships') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({
+                data: [
+                  { user_id: 'user-1', role: 'member', njangi_groups: { name: 'Group A' } },
+                  { user_id: 'user-1', role: 'secretary', njangi_groups: { name: 'Group B' } }
+                ],
+                error: null
+              })
+            })
+          };
+        }
+        return chainMock();
+      });
+
+      const users = await adminService.getPlatformUsers();
+      expect(users).toHaveLength(2);
+      expect(users[0].id).toBe('user-1');
+      expect(users[0].memberships).toHaveLength(2);
+      expect(users[0].memberships[0].groupName).toBe('Group A');
+      expect(users[1].id).toBe('user-2');
+      expect(users[1].memberships).toHaveLength(0);
+    });
+  });
+
+  describe('updateUserRole', () => {
+    it('promotes/demotes other users successfully', async () => {
+      const updateMock = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: { id: 'user-2', is_admin: true },
+              error: null
+            })
+          })
+        })
+      });
+      mockFrom.mockReturnValue({ update: updateMock });
+
+      const res = await adminService.updateUserRole('user-2', { is_admin: true }, 'admin-user');
+      expect(updateMock).toHaveBeenCalledWith({ is_admin: true });
+      expect(res.is_admin).toBe(true);
+    });
+
+    it('rejects self-demotion', async () => {
+      await expect(
+        adminService.updateUserRole('admin-user', { is_admin: false }, 'admin-user')
+      ).rejects.toThrow('You cannot revoke your own administrator privileges.');
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('deletes user successfully if all checks pass', async () => {
+      mockFrom.mockImplementation((table) => {
+        if (table === 'memberships') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  eq: jest.fn().mockResolvedValue({
+                    data: [], // not a president
+                    error: null
+                  })
+                })
+              })
+            })
+          };
+        }
+        if (table === 'users') {
+          return {
+            delete: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({
+                error: null
+              })
+            })
+          };
+        }
+        return chainMock();
+      });
+
+      const res = await adminService.deleteUser('user-2', 'admin-user');
+      expect(res.success).toBe(true);
+    });
+
+    it('rejects self-deletion', async () => {
+      await expect(
+        adminService.deleteUser('admin-user', 'admin-user')
+      ).rejects.toThrow('You cannot delete your own account.');
+    });
+
+    it('rejects deletion of active group president', async () => {
+      mockFrom.mockImplementation((table) => {
+        if (table === 'memberships') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  eq: jest.fn().mockResolvedValue({
+                    data: [{ group_id: 'group-1' }], // is president of group-1
+                    error: null
+                  })
+                })
+              })
+            })
+          };
+        }
+        return chainMock();
+      });
+
+      await expect(
+        adminService.deleteUser('user-2', 'admin-user')
+      ).rejects.toThrow('User is the active President of a Njangi group. Transfer group presidency before deleting.');
+    });
+  });
 });

@@ -53,10 +53,41 @@ const getGlobalTransactions = async (req, res, next) => {
   }
 };
 
+const getPlatformUsers = async (req, res, next) => {
+  try {
+    const users = await adminService.getPlatformUsers();
+    return res.status(200).json({ data: users });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateUserRole = async (req, res, next) => {
+  try {
+    const { is_admin } = req.body;
+    const user = await adminService.updateUserRole(req.params.userId, { is_admin }, req.user.sub);
+    return res.status(200).json(user);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const deleteUser = async (req, res, next) => {
+  try {
+    const result = await adminService.deleteUser(req.params.userId, req.user.sub);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getPlatformStats,
   getPlatformGroups,
   updateGroupSubscription,
   updateGroupStatus,
   getGlobalTransactions,
+  getPlatformUsers,
+  updateUserRole,
+  deleteUser,
 };

@@ -21,3 +21,16 @@ export async function fetchAdminTransactions() {
   const response = await api.get('/admin/transactions');
   return response.data || [];
 }
+
+export async function fetchAdminUsers() {
+  const response = await api.get('/admin/users');
+  return response.data || [];
+}
+
+export async function updateUserRole(userId, is_admin) {
+  return api.patch(`/admin/users/${userId}/role`, { is_admin });
+}
+
+export async function deleteUser(userId) {
+  return api.delete(`/admin/users/${userId}`);
+}

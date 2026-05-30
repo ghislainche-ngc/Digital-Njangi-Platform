@@ -15,5 +15,8 @@ router.get('/groups', ctrl.getPlatformGroups);
 router.patch('/groups/:groupId/subscription', ctrl.updateGroupSubscription);
 router.patch('/groups/:groupId/status', ctrl.updateGroupStatus);
 router.get('/transactions', ctrl.getGlobalTransactions);
+router.get('/users', ctrl.getPlatformUsers);
+router.patch('/users/:userId/role', ctrl.updateUserRole);
+router.delete('/users/:userId', ctrl.deleteUser);
 
 module.exports = router;

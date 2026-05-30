@@ -15,6 +15,7 @@ export default defineConfig({
         admin:           resolve(__dirname, 'app/admin/index.html'),
         admin_groups:    resolve(__dirname, 'app/admin/groups.html'),
         admin_analytics: resolve(__dirname, 'app/admin/analytics.html'),
+        admin_users:     resolve(__dirname, 'app/admin/users.html'),
 
         president:          resolve(__dirname, 'app/president/index.html'),
         president_members:  resolve(__dirname, 'app/president/members.html'),

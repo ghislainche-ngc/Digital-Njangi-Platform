@@ -150,6 +150,7 @@ export default {
     reports: 'Reports',
     settings: 'Settings',
     groups: 'Groups',
+    users: 'Users',
     analytics: 'Analytics',
     directory: 'Directory',
     announcements: 'Announcements',

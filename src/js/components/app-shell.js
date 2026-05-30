@@ -21,6 +21,7 @@ const NAV_BY_ROLE = {
   admin: [
     { href: '/app/admin/',               label: 'overview',  icon: 'grid' },
     { href: '/app/admin/groups.html',    label: 'groups',    icon: 'users' },
+    { href: '/app/admin/users.html',      label: 'users',     icon: 'users' },
     { href: '/app/admin/analytics.html', label: 'analytics', icon: 'chart' },
   ],
   president: [
