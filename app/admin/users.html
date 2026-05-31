@@ -224,7 +224,14 @@
                     <!-- User info -->
                     <td class="px-5 py-4">
                       <div class="flex items-center gap-3">
-                        <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm select-none" x-text="getInitials(user.full_name)"></div>
+                        <div class="h-9 w-9 rounded-full overflow-hidden bg-[var(--bg-muted)] border border-subtle flex items-center justify-center relative select-none">
+                          <img :src="'https://fcgbqyiwiumzuqnwkzgf.supabase.co/storage/v1/object/public/avatars/' + user.id + '.png'" 
+                               onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" 
+                               class="h-full w-full object-cover" />
+                          <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm select-none" 
+                               style="display: none;"
+                               x-text="getInitials(user.full_name)"></div>
+                        </div>
                         <div>
                           <p class="font-medium text-[var(--text-primary)]" x-text="user.full_name"></p>
                           <span class="text-xs font-mono muted" x-text="user.id.substring(0,8) + '...'"></span>

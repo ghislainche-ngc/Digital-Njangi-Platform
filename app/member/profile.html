@@ -16,6 +16,7 @@
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
       import { session } from '/src/js/auth/session.js';
+      import { api } from '/src/js/api/client.js';
 
       const escapeHtml = (value) => String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -41,7 +42,14 @@
               <section class="glass-card p-6">
                 <h2 class="font-display text-xl font-bold mb-4">Personal info</h2>
                 <div class="flex items-center gap-4 mb-5">
-                  <div class="h-16 w-16 rounded-full accent-bg text-white grid place-items-center text-xl font-bold">${escapeHtml(initials)}</div>
+                  <div class="h-16 w-16 rounded-full overflow-hidden bg-[var(--bg-muted)] border border-subtle flex items-center justify-center relative select-none">
+                    <img src="${user.avatar_url || ('https://fcgbqyiwiumzuqnwkzgf.supabase.co/storage/v1/object/public/avatars/' + user.id + '.png')}" 
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" 
+                         class="h-full w-full object-cover" 
+                         style="${user.avatar_url ? 'display: block;' : 'display: none;'}" />
+                    <div class="h-full w-full accent-bg text-white grid place-items-center text-xl font-bold" 
+                         style="${user.avatar_url ? 'display: none;' : 'display: grid;'}">${escapeHtml(initials)}</div>
+                  </div>
                   <button type="button" class="btn-ghost text-sm" id="btn-photo">Change photo</button>
                 </div>
                 <div class="space-y-4">
@@ -175,7 +183,58 @@
         });
 
         document.querySelector('#btn-photo').addEventListener('click', () => {
-          alert('Photo upload is simulated.');
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = 'image/png, image/jpeg, image/webp';
+          
+          fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.size > 2 * 1024 * 1024) {
+              alert('Image must be less than 2MB.');
+              return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async () => {
+              const base64Data = reader.result;
+              const btn = document.querySelector('#btn-photo');
+              const originalText = btn.textContent;
+              btn.textContent = 'Uploading...';
+              btn.disabled = true;
+
+              try {
+                const result = await api.post('/auth/avatar', { avatar: base64Data });
+                
+                const img = document.querySelector('#profile-form img');
+                if (img) {
+                  img.src = result.avatarUrl;
+                  img.style.display = 'block';
+                  if (img.nextElementSibling) {
+                    img.nextElementSibling.style.display = 'none';
+                  }
+                }
+                
+                const updatedUser = {
+                  ...user,
+                  avatar_url: result.avatarUrl
+                };
+                localStorage.setItem('naas.user', JSON.stringify(updatedUser));
+
+                alert('Profile picture uploaded successfully!');
+              } catch (err) {
+                alert('Upload failed: ' + err.message);
+              } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+              }
+            };
+            
+            reader.readAsDataURL(file);
+          });
+
+          fileInput.click();
         });
 
         document.querySelector('#btn-signout').addEventListener('click', () => {

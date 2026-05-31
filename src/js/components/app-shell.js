@@ -138,7 +138,14 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
           <div class="px-3 pb-2 text-xs uppercase tracking-widest muted">${role}</div>
           <nav class="flex flex-col gap-1">${nav}</nav>
           <div class="mt-auto glass-card p-3 flex items-center gap-3">
-            <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">${initials}</div>
+            <div class="h-9 w-9 rounded-full overflow-hidden bg-[var(--bg-muted)] border border-subtle flex items-center justify-center relative select-none">
+              <img src="${user.avatar_url || ('https://fcgbqyiwiumzuqnwkzgf.supabase.co/storage/v1/object/public/avatars/' + user.id + '.png')}" 
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" 
+                   class="h-full w-full object-cover" 
+                   style="${user.avatar_url ? 'display: block;' : 'display: none;'}" />
+              <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm" 
+                   style="${user.avatar_url ? 'display: none;' : 'display: grid;'}">${initials}</div>
+            </div>
             <div class="min-w-0">
               <p class="text-sm font-medium truncate">${displayName}</p>
               <p class="text-xs muted truncate">${user.email || 'demo@naas.app'}</p>
@@ -156,7 +163,14 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
         <div class="mt-2 px-3 pb-2 text-xs uppercase tracking-widest muted">${role}</div>
         <nav class="flex flex-col gap-1">${nav}</nav>
         <div class="mt-auto glass-card p-3 flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">${initials}</div>
+          <div class="h-9 w-9 rounded-full overflow-hidden bg-[var(--bg-muted)] border border-subtle flex items-center justify-center relative select-none">
+            <img src="${user.avatar_url || ('https://fcgbqyiwiumzuqnwkzgf.supabase.co/storage/v1/object/public/avatars/' + user.id + '.png')}" 
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" 
+                 class="h-full w-full object-cover" 
+                 style="${user.avatar_url ? 'display: block;' : 'display: none;'}" />
+            <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm" 
+                 style="${user.avatar_url ? 'display: none;' : 'display: grid;'}">${initials}</div>
+          </div>
           <div class="min-w-0">
             <p class="text-sm font-medium truncate">${displayName}</p>
             <p class="text-xs muted truncate">${user.email || 'demo@naas.app'}</p>

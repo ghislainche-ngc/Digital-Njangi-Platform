@@ -149,6 +149,59 @@ class AuthService {
 
     return data || null;
   }
+
+  /**
+   * Upload a user's avatar image to Supabase Storage.
+   */
+  async uploadAvatar(userId, base64Image) {
+    if (!base64Image) {
+      const err = new Error('No image data provided.');
+      err.statusCode = 400;
+      err.code = 'MISSING_IMAGE';
+      throw err;
+    }
+
+    const matches = base64Image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      const err = new Error('Invalid image format. Must be a base64 data URI.');
+      err.statusCode = 400;
+      err.code = 'INVALID_IMAGE_FORMAT';
+      throw err;
+    }
+
+    const mimeType = matches[1];
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    if (buffer.length > 2 * 1024 * 1024) {
+      const err = new Error('Image size exceeds 2MB limit.');
+      err.statusCode = 400;
+      err.code = 'FILE_TOO_LARGE';
+      throw err;
+    }
+
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedMimeTypes.includes(mimeType)) {
+      const err = new Error('Invalid image type. Allowed types: png, jpeg, webp.');
+      err.statusCode = 400;
+      err.code = 'INVALID_MIME_TYPE';
+      throw err;
+    }
+
+    const fileName = `${userId}.png`;
+
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, buffer, {
+        contentType: mimeType,
+        upsert: true
+      });
+
+    if (error) throw error;
+
+    const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/avatars/${fileName}`;
+    return { avatarUrl: publicUrl };
+  }
 }
 
 module.exports = new AuthService();

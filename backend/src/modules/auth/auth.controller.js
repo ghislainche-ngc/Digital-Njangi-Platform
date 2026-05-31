@@ -49,4 +49,15 @@ const login = async (req, res, next) => {
   }
 };
 
-module.exports = { register, verifyOTP, login };
+const uploadAvatar = async (req, res, next) => {
+  try {
+    const { avatar } = req.body;
+    const result = await authService.uploadAvatar(req.user.sub, avatar);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+module.exports = { register, verifyOTP, login, uploadAvatar };

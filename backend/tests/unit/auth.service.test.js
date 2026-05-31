@@ -9,13 +9,17 @@ process.env.NODE_ENV = 'test';
 
 jest.mock('../../src/config/supabase', () => {
   const mockFrom = jest.fn();
+  const mockUpload = jest.fn().mockResolvedValue({ error: null });
+  const mockStorageFrom = jest.fn().mockReturnValue({ upload: mockUpload });
+  const mockStorage = { from: mockStorageFrom };
   return {
-    supabase: { from: mockFrom },
+    supabase: { from: mockFrom, storage: mockStorage },
     __mockFrom: mockFrom,
+    __mockUpload: mockUpload,
   };
 });
 
-const { __mockFrom: mockFrom } = require('../../src/config/supabase');
+const { __mockFrom: mockFrom, __mockUpload: mockUpload } = require('../../src/config/supabase');
 const authService = require('../../src/modules/auth/auth.service');
 
 function chainMock(finalData = null, finalError = null) {
@@ -162,5 +166,43 @@ describe('AuthService.verifyOTP', () => {
     await expect(
       authService.verifyOTP({ phone: '+237677000001', code: '999999' })
     ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_OTP' });
+  });
+
+  describe('uploadAvatar', () => {
+    it('uploads base64 image successfully', async () => {
+      mockUpload.mockResolvedValue({ error: null });
+      const base64Image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      
+      const result = await authService.uploadAvatar('user-123', base64Image);
+      expect(result.avatarUrl).toContain('avatars/user-123.png');
+      expect(mockUpload).toHaveBeenCalled();
+    });
+
+    it('throws 400 for missing image data', async () => {
+      await expect(
+        authService.uploadAvatar('user-123', null)
+      ).rejects.toMatchObject({ statusCode: 400, code: 'MISSING_IMAGE' });
+    });
+
+    it('throws 400 for invalid image format data url', async () => {
+      await expect(
+        authService.uploadAvatar('user-123', 'invalid-base64')
+      ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_IMAGE_FORMAT' });
+    });
+
+    it('throws 400 for file too large (>2MB)', async () => {
+      // Create a large mock base64 (e.g. 3MB)
+      const largeBase64 = 'data:image/png;base64,' + 'a'.repeat(3 * 1024 * 1024);
+      await expect(
+        authService.uploadAvatar('user-123', largeBase64)
+      ).rejects.toMatchObject({ statusCode: 400, code: 'FILE_TOO_LARGE' });
+    });
+
+    it('throws 400 for invalid mime type', async () => {
+      const gifBase64 = 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=';
+      await expect(
+        authService.uploadAvatar('user-123', gifBase64)
+      ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_MIME_TYPE' });
+    });
   });
 });
