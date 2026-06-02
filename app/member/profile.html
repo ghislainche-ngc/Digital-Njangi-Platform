@@ -123,7 +123,8 @@
                 <div class="mt-5 p-3 rounded-xl bg-[var(--bg-muted)] text-xs">
                   <p class="font-semibold">Telegram bot</p>
                   <p class="muted mt-1">Tap below to link your Telegram account to NjangiBridge.</p>
-                  <button type="button" class="btn-ghost text-xs mt-3">Open @NjangiBridgeBot</button>
+                  <a href="#" target="_blank" id="btn-telegram" class="btn-ghost text-xs mt-3 inline-block text-center" style="display: none; text-decoration: none;">Open Bot & Link Account</a>
+                  <p id="telegram-status-msg" class="text-xs muted mt-2"></p>
                 </div>
               </section>
 
@@ -236,6 +237,23 @@
 
           fileInput.click();
         });
+
+        // Fetch Telegram Bot dynamic link
+        try {
+          const res = await api.get('/auth/telegram/bot-url');
+          if (res && res.link) {
+            const btn = document.querySelector('#btn-telegram');
+            if (btn) {
+              btn.href = res.link;
+              btn.style.display = 'inline-block';
+            }
+          }
+        } catch (err) {
+          const statusMsg = document.querySelector('#telegram-status-msg');
+          if (statusMsg) {
+            statusMsg.textContent = 'Telegram Bot not configured on server.';
+          }
+        }
 
         document.querySelector('#btn-signout').addEventListener('click', () => {
           session.clear();

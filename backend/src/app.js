@@ -86,6 +86,10 @@ if (require.main === module) {
     // eslint-disable-next-line no-console
     console.log(`API docs:          http://localhost:${PORT}/api-docs`);
   });
+
+  // Start automatic telegram linking bot service
+  const telegramBotService = require('./services/notification/TelegramBotService');
+  telegramBotService.start();
 }
 
 module.exports = app;

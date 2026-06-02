@@ -60,4 +60,24 @@ const uploadAvatar = async (req, res, next) => {
   }
 };
 
-module.exports = { register, verifyOTP, login, uploadAvatar };
+const getTelegramBotUrl = async (req, res, next) => {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return res.status(404).json({ error: 'Telegram bot not configured.' });
+    
+    const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const data = await response.json();
+    
+    if (data.ok && data.result.username) {
+      const username = data.result.username;
+      const link = `https://t.me/${username}?start=${req.user.sub}`;
+      return res.status(200).json({ link });
+    }
+    
+    return res.status(500).json({ error: 'Failed to retrieve bot username.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl };
