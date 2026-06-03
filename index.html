@@ -23,14 +23,12 @@
         mobileNav: false,
         billing: 'monthly', // 'monthly' | 'yearly'
         plans: [
-          { key: 'starter', monthly: 5000,  yearly: 50000,  featured: false, features: 5 },
-          { key: 'growth',  monthly: 12000, yearly: 120000, featured: true,  features: 6 },
-          { key: 'pro',     monthly: 25000, yearly: 250000, featured: false, features: 6 },
-          { key: 'ent',     monthly: null,  yearly: null,   featured: false, features: 5 },
+          { key: 'starter',    monthly: 0,     yearly: 0,      featured: false, features: 5 },
+          { key: 'growth',     monthly: 5000,  yearly: 50000,  featured: true,  features: 6 },
+          { key: 'enterprise', monthly: 15000, yearly: 150000, featured: false, features: 6 },
         ],
         fmt(n) { return new Intl.NumberFormat('fr-FR').format(n); },
         price(plan) {
-          if (plan.monthly === null) return null;
           return this.billing === 'monthly' ? plan.monthly : Math.round(plan.yearly / 12);
         },
         yearlyTotal(plan) { return plan.yearly; },
@@ -438,10 +436,10 @@
               </ul>
 
               <a
-                :href="plan.key === 'ent' ? 'mailto:sales@naas.app' : '/register.html?plan=' + plan.key"
+                :href="'/register.html?plan=' + plan.key"
                 class="mt-6 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition"
                 :class="plan.featured ? 'btn-primary' : 'btn-ghost'"
-                x-text="plan.key === 'ent' ? $t('pricing.cta_contact') : $t('pricing.cta_start')"
+                x-text="$t('pricing.cta_start')"
               ></a>
             </div>
           </template>

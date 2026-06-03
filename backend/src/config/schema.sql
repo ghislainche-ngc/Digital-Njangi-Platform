@@ -30,7 +30,7 @@ CREATE TABLE njangi_groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   contribution_amount NUMERIC(12, 2) NOT NULL,
-  frequency TEXT DEFAULT 'monthly' CHECK (frequency IN ('weekly', 'monthly')),
+  frequency TEXT DEFAULT 'monthly' CHECK (frequency IN ('weekly', 'biweekly', 'monthly')),
   rotation_type TEXT NOT NULL CHECK (rotation_type IN ('fixed', 'random', 'president')),
   penalty_per_day NUMERIC(10, 2) DEFAULT 0,
   payout_threshold_pct NUMERIC(5, 2) DEFAULT 100,

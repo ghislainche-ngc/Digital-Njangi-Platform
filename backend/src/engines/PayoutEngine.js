@@ -265,6 +265,8 @@ class PayoutEngine {
       const nextStart = this._addDays(currentCycle.end_date || new Date(), 1);
       const nextEnd = group.frequency === 'weekly'
         ? this._addDays(nextStart, 7)
+        : group.frequency === 'biweekly'
+        ? this._addDays(nextStart, 14)
         : this._addMonths(nextStart, 1);
 
       await supabase.from('cycles').insert({

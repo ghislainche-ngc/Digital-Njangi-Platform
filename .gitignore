@@ -34,3 +34,9 @@ coverage/
 # AI assistant local guidance files (kept local, not pushed to remote)
 CLAUDE.md
 AGENTS.md
+
+# Local exam and report files
+Final_Exams_OOADI.pdf
+NAAS_Project_Report Final.pdf
+*.docx
+~$*.docx
