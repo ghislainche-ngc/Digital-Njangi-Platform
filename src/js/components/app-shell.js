@@ -98,7 +98,8 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
 
   const user = sessionUser || { full_name: 'Demo User', role };
   const displayName = user.full_name || user.name || 'Demo User';
-  const items = NAV_BY_ROLE[role] || [];
+  const activeRole = user.role || role;
+  const items = NAV_BY_ROLE[activeRole] || [];
   const initials = displayName.split(' ').map(s => s[0]).slice(0, 2).join('');
   const path = window.location.pathname.replace(/\/+$/, '/');
 
@@ -135,7 +136,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
             </a>
             <button @click="mobileMenuOpen = false" class="nav-link p-1">✕</button>
           </div>
-          <div class="px-3 pb-2 text-xs uppercase tracking-widest muted">${role}</div>
+          <div class="px-3 pb-2 text-xs uppercase tracking-widest muted">${activeRole}</div>
           <nav class="flex flex-col gap-1">${nav}</nav>
           <div class="mt-auto glass-card p-3 flex items-center gap-3">
             <div class="h-9 w-9 rounded-full overflow-hidden bg-[var(--bg-muted)] border border-subtle flex items-center justify-center relative select-none">
@@ -160,7 +161,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
           <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
         </span>
       </a>
-        <div class="mt-2 px-3 pb-2 text-xs uppercase tracking-widest muted">${role}</div>
+        <div class="mt-2 px-3 pb-2 text-xs uppercase tracking-widest muted">${activeRole}</div>
         <nav class="flex flex-col gap-1">${nav}</nav>
         <div class="mt-auto glass-card p-3 flex items-center gap-3">
           <div class="h-9 w-9 rounded-full overflow-hidden bg-[var(--bg-muted)] border border-subtle flex items-center justify-center relative select-none">

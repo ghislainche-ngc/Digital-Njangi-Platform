@@ -192,3 +192,15 @@ export async function updateSettings(groupId, payload) {
 export async function renewSubscription(groupId, gateway) {
   return api.post(`/groups/${groupId}/billing/renew`, { gateway });
 }
+
+export async function inviteMember(groupId, phone) {
+  return api.post(`/groups/${groupId}/invitations`, { phone });
+}
+
+export async function updateMemberRole(groupId, userId, role) {
+  return api.patch(`/groups/${groupId}/members/${userId}/role`, { role });
+}
+
+export async function removeMember(groupId, userId) {
+  return api.delete(`/groups/${groupId}/members/${userId}`);
+}

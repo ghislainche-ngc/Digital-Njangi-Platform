@@ -50,12 +50,13 @@
             return;
           }
 
-          const [statsResponse, myContributions] = await Promise.all([
+          const [statsResponse, myContributionsResponse] = await Promise.all([
             getContributionStats(activeGroupId),
             getMyContributions(activeGroupId)
           ]);
 
           const stats = statsResponse.data || statsResponse;
+          const myContributions = myContributionsResponse.data || myContributionsResponse || [];
 
           const totalPaid = myContributions
             .filter(c => c.status === 'confirmed')

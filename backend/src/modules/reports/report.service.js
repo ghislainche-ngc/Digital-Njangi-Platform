@@ -44,7 +44,7 @@ class ReportService {
       const contributionRows = await this.db.findAll(
         'contributions',
         { cycle_id: cycle.id },
-        { columns: 'amount,status,created_at,users(full_name)' }
+        { columns: 'amount,status,created_at,users!contributions_user_id_fkey(full_name)' }
       );
 
       const contributions = (contributionRows || []).map((row) => {
@@ -63,7 +63,7 @@ class ReportService {
       const payoutRow = await this.db.findOne(
         'payouts',
         { cycle_id: cycle.id },
-        'amount,status,executed_at,users(full_name)'
+        'amount,status,executed_at,users!payouts_recipient_id_fkey(full_name)'
       );
 
       let payout = null;
