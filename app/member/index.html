@@ -24,7 +24,8 @@
         getSocialFundBalance,
         initiateContributionPayment,
         groupLabel,
-        createGroup
+        createGroup,
+        listAnnouncements
       } from '/src/js/api/njangi.js';
 
       const escapeHtml = (value) => String(value ?? '')
@@ -33,6 +34,21 @@
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
+
+      function timeAgo(dateString) {
+        const date = new Date(dateString);
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days} days ago`;
+        const weeks = Math.floor(days / 7);
+        if (weeks < 4) return `${weeks} weeks ago`;
+        return date.toLocaleDateString();
+      }
 
       renderShell({ role: 'member', title: 'My Njangi' });
 
@@ -178,11 +194,12 @@
 
           const currentUser = session.user() || {};
 
-          const [statsResponse, members, myContributionsResponse, socialFundResponse] = await Promise.all([
+          const [statsResponse, members, myContributionsResponse, socialFundResponse, announcementsResponse] = await Promise.all([
             getContributionStats(activeGroupId),
             listMembers(activeGroupId),
             getMyContributions(activeGroupId),
-            getSocialFundBalance(activeGroupId)
+            getSocialFundBalance(activeGroupId),
+            listAnnouncements(activeGroupId)
           ]);
 
           const stats = statsResponse.data || statsResponse;
@@ -190,6 +207,9 @@
 
           const rawContributions = myContributionsResponse?.data ?? myContributionsResponse;
           const myContributions = Array.isArray(rawContributions) ? rawContributions : [];
+
+          const rawAnnouncements = announcementsResponse?.data ?? announcementsResponse;
+          const announcementsList = Array.isArray(rawAnnouncements) ? rawAnnouncements : [];
 
           const myMembership = members.find(m => 
             m.user_id === currentUser.id || 
@@ -254,6 +274,17 @@
 
           const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
 
+          const announcementsPreviewHtml = announcementsList.slice(0, 3).map(a => {
+            const relativeTime = timeAgo(a.created_at || a.date);
+            return `
+              <div class="p-3 rounded-xl bg-[var(--bg-muted)] border border-[var(--border-subtle)]">
+                <p class="text-sm font-semibold">${escapeHtml(a.title)}</p>
+                <p class="text-xs text-[var(--text-muted)] mt-1 whitespace-pre-wrap">${escapeHtml(a.body)}</p>
+                <p class="text-[10px] muted mt-2">${escapeHtml(relativeTime)}</p>
+              </div>
+            `;
+          }).join('') || '<p class="py-4 text-center muted text-sm">No announcements yet.</p>';
+
           mountContent(`
             <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
               <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
@@ -307,7 +338,7 @@
               </div>
             </div>
 
-            <div class="mt-6 grid gap-4 lg:grid-cols-2">
+            <div class="mt-6 grid gap-4 lg:grid-cols-3">
               <div class="glass-card p-5">
                 <h2 class="font-display text-xl font-bold mb-3">Recent contributions</h2>
                 <ul class="divide-y divide-[var(--border-subtle)]">
@@ -336,6 +367,13 @@
                   </div>
                 </div>
                 <a href="/app/member/rotation.html" class="mt-4 inline-block text-sm accent-text font-semibold">View full rotation →</a>
+              </div>
+
+              <div class="glass-card p-5">
+                <h2 class="font-display text-xl font-bold mb-3">Latest Announcements</h2>
+                <div class="space-y-3">
+                  ${announcementsPreviewHtml}
+                </div>
               </div>
             </div>
           `);

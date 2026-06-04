@@ -252,4 +252,23 @@ CREATE TABLE IF NOT EXISTS announcements (
 
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 
+-- ============================================================
+-- Group Meeting Minutes table (added 2026-06-04)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS meeting_minutes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID REFERENCES njangi_groups(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  date DATE NOT NULL,
+  attendees INTEGER NOT NULL DEFAULT 0,
+  pages INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+  description TEXT NOT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE meeting_minutes ENABLE ROW LEVEL SECURITY;
+
+
 

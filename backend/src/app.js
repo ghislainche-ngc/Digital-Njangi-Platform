@@ -21,6 +21,7 @@ const reportRoutes = require('./modules/reports/report.routes');
 const webhookRoutes = require('./modules/webhooks/campay.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const announcementsRoutes = require('./modules/announcements/announcements.routes');
+const minutesRoutes = require('./modules/minutes/minutes.routes');
 
 const errorMiddleware = require('./middleware/error.middleware');
 
@@ -74,6 +75,7 @@ app.use('/groups', fineRoutes);
 app.use('/groups', socialFundRoutes);
 app.use('/groups', reportRoutes);
 app.use('/groups', announcementsRoutes);
+app.use('/groups', minutesRoutes);
 app.use('/webhooks', webhookRoutes);
 app.use('/admin', adminRoutes);
 

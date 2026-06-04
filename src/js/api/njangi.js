@@ -224,3 +224,19 @@ export async function createAnnouncement(groupId, payload) {
 export async function deleteAnnouncement(groupId, announcementId) {
   return api.delete(`/groups/${groupId}/announcements/${announcementId}`);
 }
+
+export async function listMinutes(groupId) {
+  return api.get(`/groups/${groupId}/minutes`);
+}
+
+export async function createMinutes(groupId, payload) {
+  return api.post(`/groups/${groupId}/minutes`, payload);
+}
+
+export async function updateMinutesStatus(groupId, minutesId, status) {
+  return api.patch(`/groups/${groupId}/minutes/${minutesId}/status`, { status });
+}
+
+export async function deleteMinutes(groupId, minutesId) {
+  return api.delete(`/groups/${groupId}/minutes/${minutesId}`);
+}

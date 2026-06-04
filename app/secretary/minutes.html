@@ -15,7 +15,15 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      import { resolveGroupContext, setStoredGroupId, groupLabel } from '/src/js/api/njangi.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        groupLabel,
+        listMinutes,
+        createMinutes,
+        updateMinutesStatus,
+        deleteMinutes
+      } from '/src/js/api/njangi.js';
 
       const escapeHtml = (value) => String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -29,23 +37,9 @@
       let activeGroupId = '';
       let minutesList = [];
 
-      function getMinutes(groupId) {
-        const key = `njangi.minutes.${groupId}`;
-        const data = localStorage.getItem(key);
-        if (data) return JSON.parse(data);
-        const defaults = [
-          { id: '1', title: 'April 2026 monthly meeting', date: '2026-04-28', attendees: 13, pages: 2, status: 'draft', description: 'Discussed dynamic Campay payment gateway setup, fine waivers, and new member onboarding protocols.' },
-          { id: '2', title: 'March 2026 monthly meeting', date: '2026-03-28', attendees: 14, pages: 3, status: 'published', description: 'Reviewed Q1 financials, approved the budget for the annual cultural festival, and finalized loan interest rates.' },
-          { id: '3', title: 'February 2026 monthly meeting', date: '2026-02-28', attendees: 12, pages: 2, status: 'published', description: 'Addressed late contributions penalties, set the emergency social fund relief payout levels, and discussed next venue rotation.' },
-          { id: '4', title: 'January 2026 kickoff meeting', date: '2026-01-15', attendees: 14, pages: 4, status: 'published', description: 'Elected officers, established constitution revisions, finalized rotation draw order, and collected initial base deposits.' }
-        ];
-        localStorage.setItem(key, JSON.stringify(defaults));
-        return defaults;
-      }
-
-      function saveMinutes(groupId, list) {
-        const key = `njangi.minutes.${groupId}`;
-        localStorage.setItem(key, JSON.stringify(list));
+      function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
       }
 
       const renderGrid = (list) => {
@@ -63,7 +57,7 @@
                 <button class="btn-status-toggle chip chip-${m.status === 'draft' ? 'due' : 'paid'} cursor-pointer" title="Click to toggle status">${escapeHtml(m.status)}</button>
               </div>
               <p class="font-semibold">${escapeHtml(m.title)}</p>
-              <p class="text-xs muted mt-1">${escapeHtml(m.date)} · ${escapeHtml(m.attendees)} attendees · ${escapeHtml(m.pages)} pages</p>
+              <p class="text-xs muted mt-1">${escapeHtml(formatDate(m.date))} · ${escapeHtml(m.attendees)} attendees · ${escapeHtml(m.pages)} pages</p>
               <div class="mt-4 flex gap-2">
                 <button class="btn-open btn-ghost flex-1 text-xs">Open</button>
                 <button class="btn-pdf btn-ghost text-xs">↓ PDF</button>
@@ -91,7 +85,7 @@
             const id = card.dataset.id;
             const item = minutesList.find(m => m.id === id);
             if (item) {
-              const content = `Meeting Minutes\n====================\nTitle: ${item.title}\nDate: ${item.date}\nAttendees: ${item.attendees}\nPages: ${item.pages}\nStatus: ${item.status}\n\nNotes:\n${item.description || ''}`;
+              const content = `Meeting Minutes\n====================\nTitle: ${item.title}\nDate: ${formatDate(item.date)}\nAttendees: ${item.attendees}\nPages: ${item.pages}\nStatus: ${item.status}\n\nNotes:\n${item.description || ''}`;
               const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
               const url = URL.createObjectURL(blob);
               const link = document.createElement('a');
@@ -106,27 +100,34 @@
 
         // Wire delete buttons
         grid.querySelectorAll('.btn-delete').forEach(btn => {
-          btn.addEventListener('click', (e) => {
+          btn.addEventListener('click', async (e) => {
             const card = e.target.closest('[data-id]');
             const id = card.dataset.id;
             if (confirm('Are you sure you want to delete these minutes?')) {
-              minutesList = minutesList.filter(m => m.id !== id);
-              saveMinutes(activeGroupId, minutesList);
-              renderGrid(minutesList);
+              try {
+                await deleteMinutes(activeGroupId, id);
+                renderPage();
+              } catch (err) {
+                alert(err.message || 'Failed to delete meeting minutes.');
+              }
             }
           });
         });
 
         // Wire status toggle buttons
         grid.querySelectorAll('.btn-status-toggle').forEach(btn => {
-          btn.addEventListener('click', (e) => {
+          btn.addEventListener('click', async (e) => {
             const card = e.target.closest('[data-id]');
             const id = card.dataset.id;
             const item = minutesList.find(m => m.id === id);
             if (item) {
-              item.status = item.status === 'draft' ? 'published' : 'draft';
-              saveMinutes(activeGroupId, minutesList);
-              renderGrid(minutesList);
+              const nextStatus = item.status === 'draft' ? 'published' : 'draft';
+              try {
+                await updateMinutesStatus(activeGroupId, id, nextStatus);
+                renderPage();
+              } catch (err) {
+                alert(err.message || 'Failed to update status.');
+              }
             }
           });
         });
@@ -139,7 +140,7 @@
         const modalBody = document.querySelector('#details-modal-body');
 
         modalTitle.textContent = item.title;
-        modalMeta.textContent = `${item.date} · ${item.attendees} attendees · ${item.pages} pages · Status: ${item.status}`;
+        modalMeta.textContent = `${formatDate(item.date)} · ${item.attendees} attendees · ${item.pages} pages · Status: ${item.status}`;
         modalBody.textContent = item.description || 'No detailed minutes description provided.';
         modal.classList.remove('hidden');
       };
@@ -160,7 +161,8 @@
             return;
           }
 
-          minutesList = getMinutes(activeGroupId);
+          const response = await listMinutes(activeGroupId);
+          minutesList = Array.isArray(response) ? response : (response?.data || []);
 
           // Group picker options
           const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
@@ -258,36 +260,34 @@
           btnNewMinutes.addEventListener('click', () => {
             createModal.classList.remove('hidden');
             createForm.reset();
-            // Pre-fill date with today's date in YYYY-MM-DD
             createForm.querySelector('[type="date"]').value = new Date().toISOString().split('T')[0];
           });
           btnCreateCancel.addEventListener('click', () => {
             createModal.classList.add('hidden');
           });
-          createForm.addEventListener('submit', (e) => {
+          createForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
             const formData = new FormData(createForm);
-            
-            // Format date nicely (e.g. May 15, 2026)
-            const rawDate = formData.get('date');
-            const dateObj = new Date(rawDate);
-            const options = { year: 'numeric', month: 'short', day: 'numeric' };
-            const formattedDate = dateObj.toLocaleDateString('en-US', options);
-
-            const newItem = {
-              id: Date.now().toString(),
-              title: formData.get('title').trim(),
-              date: formattedDate,
-              attendees: parseInt(formData.get('attendees')),
-              pages: parseInt(formData.get('pages')),
-              status: formData.get('status'),
-              description: formData.get('description').trim()
-            };
-
-            minutesList.unshift(newItem);
-            saveMinutes(activeGroupId, minutesList);
-            createModal.classList.add('hidden');
-            renderGrid(minutesList);
+            try {
+              await createMinutes(activeGroupId, {
+                title: formData.get('title').trim(),
+                date: formData.get('date'),
+                attendees: parseInt(formData.get('attendees')),
+                pages: parseInt(formData.get('pages')),
+                status: formData.get('status'),
+                description: formData.get('description').trim()
+              });
+              createModal.classList.add('hidden');
+              renderPage();
+            } catch (err) {
+              alert(err.message || 'Failed to create meeting minutes.');
+              btn.disabled = false;
+              btn.textContent = 'Create';
+            }
           });
 
           // Details Modal Close
