@@ -212,3 +212,15 @@ export async function updateMemberRole(groupId, userId, role) {
 export async function removeMember(groupId, userId) {
   return api.delete(`/groups/${groupId}/members/${userId}`);
 }
+
+export async function listAnnouncements(groupId) {
+  return api.get(`/groups/${groupId}/announcements`);
+}
+
+export async function createAnnouncement(groupId, payload) {
+  return api.post(`/groups/${groupId}/announcements`, payload);
+}
+
+export async function deleteAnnouncement(groupId, announcementId) {
+  return api.delete(`/groups/${groupId}/announcements/${announcementId}`);
+}

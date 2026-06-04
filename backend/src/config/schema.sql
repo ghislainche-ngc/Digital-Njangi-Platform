@@ -237,3 +237,19 @@ ALTER TABLE njangi_groups
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
 
+-- ============================================================
+-- Group Announcements table (added 2026-06-04)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS announcements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID REFERENCES njangi_groups(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+
+

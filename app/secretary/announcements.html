@@ -15,7 +15,14 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      import { resolveGroupContext, setStoredGroupId, groupLabel } from '/src/js/api/njangi.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        groupLabel,
+        listAnnouncements,
+        createAnnouncement,
+        deleteAnnouncement
+      } from '/src/js/api/njangi.js';
 
       const escapeHtml = (value) => String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -28,25 +35,6 @@
 
       let activeGroupId = '';
       let announcements = [];
-
-      function getAnnouncements(groupId) {
-        const key = `njangi.announcements.${groupId}`;
-        const data = localStorage.getItem(key);
-        if (data) return JSON.parse(data);
-        const defaults = [
-          { id: '1', title: 'April contribution reminder', body: 'Friendly reminder: contributions are due Apr 26 by 18:00 before the late fee kicks in.', when: '2 hours ago', channel: 'Telegram · 14 recipients', date: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
-          { id: '2', title: 'March meeting minutes posted', body: 'Minutes from the March 28 meeting are now available in the Minutes tab.', when: '5 days ago', channel: 'Telegram', date: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString() },
-          { id: '3', title: 'New member welcome — Alice', body: 'Please welcome Alice Fotso, joining our Njangi this cycle.', when: '2 weeks ago', channel: 'Telegram + SMS', date: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString() },
-          { id: '4', title: 'Meeting venue change', body: 'April meeting moves to Salle des Fêtes Ndjouke, 18:00 sharp.', when: '3 weeks ago', channel: 'Telegram + SMS', date: new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString() }
-        ];
-        localStorage.setItem(key, JSON.stringify(defaults));
-        return defaults;
-      }
-
-      function saveAnnouncements(groupId, list) {
-        const key = `njangi.announcements.${groupId}`;
-        localStorage.setItem(key, JSON.stringify(list));
-      }
 
       function timeAgo(dateString) {
         const date = new Date(dateString);
@@ -68,7 +56,7 @@
         if (!container) return;
 
         container.innerHTML = announcements.map(a => {
-          const relativeTime = a.date ? timeAgo(a.date) : a.when;
+          const relativeTime = timeAgo(a.created_at);
           return `
             <div class="glass-card p-5 relative" data-id="${escapeHtml(a.id)}">
               <button class="btn-delete absolute top-4 right-4 text-xs text-red-500 nav-link p-1">Delete</button>
@@ -84,13 +72,16 @@
 
         // Wire delete buttons
         container.querySelectorAll('.btn-delete').forEach(btn => {
-          btn.addEventListener('click', (e) => {
+          btn.addEventListener('click', async (e) => {
             const card = e.target.closest('[data-id]');
             const id = card.dataset.id;
             if (confirm('Are you sure you want to delete this announcement?')) {
-              announcements = announcements.filter(a => a.id !== id);
-              saveAnnouncements(activeGroupId, announcements);
-              renderFeed();
+              try {
+                await deleteAnnouncement(activeGroupId, id);
+                renderPage();
+              } catch (err) {
+                alert(err.message || 'Failed to delete announcement.');
+              }
             }
           });
         });
@@ -112,7 +103,8 @@
             return;
           }
 
-          announcements = getAnnouncements(activeGroupId);
+          const list = await listAnnouncements(activeGroupId);
+          announcements = Array.isArray(list) ? list : (list?.data || []);
 
           // Group picker options
           const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
@@ -161,25 +153,30 @@
           });
 
           // Handle form submit
-          document.querySelector('#announcement-form').addEventListener('submit', (e) => {
+          document.querySelector('#announcement-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Publishing...';
+
             const formData = new FormData(e.target);
             const title = formData.get('title').trim();
             const body = formData.get('body').trim();
             const channels = formData.getAll('channel');
-            
-            const newAnn = {
-              id: Date.now().toString(),
-              title,
-              body,
-              date: new Date().toISOString(),
-              channel: channels.join(' + ') || 'In-app only'
-            };
 
-            announcements.unshift(newAnn);
-            saveAnnouncements(activeGroupId, announcements);
-            e.target.reset();
-            renderFeed();
+            try {
+              await createAnnouncement(activeGroupId, {
+                title,
+                body,
+                channels
+              });
+              e.target.reset();
+              renderPage();
+            } catch (err) {
+              alert(err.message || 'Failed to publish announcement.');
+              btn.disabled = false;
+              btn.textContent = 'Publish';
+            }
           });
 
         } catch (error) {

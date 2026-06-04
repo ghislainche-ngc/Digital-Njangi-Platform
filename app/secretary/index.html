@@ -22,7 +22,8 @@
         groupLabel,
         listContributions,
         getContributionStats,
-        inviteMember
+        inviteMember,
+        listAnnouncements
       } from '/src/js/api/njangi.js';
 
       const escapeHtml = (value) => String(value ?? '')
@@ -33,21 +34,6 @@
         .replaceAll("'", '&#39;');
 
       renderShell({ role: 'secretary', title: 'Secretariat' });
-
-      // Local storage helpers
-      function getAnnouncements(groupId) {
-        const key = `njangi.announcements.${groupId}`;
-        const data = localStorage.getItem(key);
-        if (data) return JSON.parse(data);
-        const defaults = [
-          { id: '1', title: 'April contribution reminder', body: 'Friendly reminder: contributions are due Apr 26 by 18:00 before the late fee kicks in.', when: '2 hours ago', channel: 'Telegram · 14 recipients', date: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
-          { id: '2', title: 'March meeting minutes posted', body: 'Minutes from the March 28 meeting are now available in the Minutes tab.', when: '5 days ago', channel: 'Telegram', date: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString() },
-          { id: '3', title: 'New member welcome — Alice', body: 'Please welcome Alice Fotso, joining our Njangi this cycle.', when: '2 weeks ago', channel: 'Telegram + SMS', date: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString() },
-          { id: '4', title: 'Meeting venue change', body: 'April meeting moves to Salle des Fêtes Ndjouke, 18:00 sharp.', when: '3 weeks ago', channel: 'Telegram + SMS', date: new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString() }
-        ];
-        localStorage.setItem(key, JSON.stringify(defaults));
-        return defaults;
-      }
 
       function getNextMeeting(groupId) {
         const key = `njangi.next_meeting.${groupId}`;
@@ -94,10 +80,11 @@
           }
 
           const currentUser = session.user() || {};
-          const [membersResponse, statsResponse, contributionsResponse] = await Promise.all([
+          const [membersResponse, statsResponse, contributionsResponse, announcementsResponse] = await Promise.all([
             listMembers(activeGroupId),
             getContributionStats(activeGroupId),
-            listContributions(activeGroupId)
+            listContributions(activeGroupId),
+            listAnnouncements(activeGroupId)
           ]);
 
           const rawMembers = membersResponse?.data ?? membersResponse;
@@ -105,6 +92,8 @@
           const stats = statsResponse?.data ?? statsResponse ?? {};
           const rawContributions = contributionsResponse?.data ?? contributionsResponse;
           const contributions = Array.isArray(rawContributions) ? rawContributions : [];
+          const rawAnnouncements = announcementsResponse?.data ?? announcementsResponse;
+          const announcementsList = Array.isArray(rawAnnouncements) ? rawAnnouncements : [];
 
           // Group picker options
           const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
@@ -122,8 +111,7 @@
           );
           const personalStatusText = hasPaidCurrent ? 'Paid' : 'Unpaid';
 
-          // Load announcements and next meeting from localStorage
-          const announcementsList = getAnnouncements(activeGroupId);
+          // Load next meeting from localStorage
           const nextMeeting = getNextMeeting(activeGroupId);
 
           // Renders the Directory Preview list (first 3 members)
@@ -143,7 +131,7 @@
 
           // Renders the Announcements Preview list (last 2 announcements)
           const announcementsPreviewHtml = announcementsList.slice(0, 2).map(a => {
-            const relativeTime = a.date ? timeAgo(a.date) : a.when;
+            const relativeTime = timeAgo(a.created_at || a.date);
             return `
               <div class="p-3 rounded-xl bg-[var(--bg-muted)]">
                 <p class="text-sm font-medium">${escapeHtml(a.title)}</p>
