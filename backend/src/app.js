@@ -24,6 +24,7 @@ const adminRoutes = require('./modules/admin/admin.routes');
 const errorMiddleware = require('./middleware/error.middleware');
 
 const app = express();
+app.set('trust proxy', true);
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 app.use(cors());
