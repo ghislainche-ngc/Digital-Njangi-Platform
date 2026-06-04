@@ -14,57 +14,156 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        getContributionStats,
+        listMembers,
+        getSocialFundBalance,
+        listContributions,
+        getMyContributions,
+        groupLabel
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'treasurer', title: 'Financial overview' });
-      mountContent(`
-        <div class="glass-card p-4 mb-4 flex flex-wrap items-center gap-3 animate-fade-up">
-          <span class="chip chip-info">You</span>
-          <p class="text-sm"><span class="muted">Your cycle 4 contribution:</span> <span class="font-semibold">Paid · MTN MoMo · Apr 14</span></p>
-          <span class="text-sm muted hidden sm:inline">·</span>
-          <p class="text-sm"><span class="muted">Your rotation position:</span> <span class="font-semibold">3 · May 28</span></p>
-          <a href="/app/member/history.html" class="ml-auto nav-link text-xs">My Njangi →</a>
-        </div>
 
-        <div class="grid gap-4 md:grid-cols-3 animate-fade-up">
-          <div class="glass-card p-5">
-            <p class="text-xs uppercase tracking-widest muted">Collected this cycle</p>
-            <p class="mt-2 font-display text-3xl font-bold">110 000 FCFA</p>
-            <p class="mt-1 text-xs text-emerald-500">11 of 14 members</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs uppercase tracking-widest muted">Outstanding</p>
-            <p class="mt-2 font-display text-3xl font-bold">30 000 FCFA</p>
-            <p class="mt-1 text-xs text-amber-500">3 members due</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs uppercase tracking-widest muted">Social fund</p>
-            <p class="mt-2 font-display text-3xl font-bold">85 000 FCFA</p>
-            <p class="mt-1 text-xs muted">Available</p>
-          </div>
-        </div>
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading group details...</div>`);
 
-        <div class="mt-6 glass-card p-5">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="font-display text-xl font-bold">Pending actions</h2>
-          </div>
-          <div class="grid gap-3 md:grid-cols-3">
-            <button class="glass-card p-4 text-left hover:ring-2 hover:ring-[var(--accent)] transition">
-              <span class="chip chip-due mb-2">3 due</span>
-              <p class="font-semibold">Retry failed MoMo</p>
-              <p class="text-xs muted mt-1">3 members have temporary MoMo failures.</p>
-            </button>
-            <button class="glass-card p-4 text-left hover:ring-2 hover:ring-[var(--accent)] transition">
-              <span class="chip chip-info mb-2">1 new</span>
-              <p class="font-semibold">Record cash payment</p>
-              <p class="text-xs muted mt-1">Pa Ngwa paid cash at last meeting.</p>
-            </button>
-            <button class="glass-card p-4 text-left hover:ring-2 hover:ring-[var(--accent)] transition">
-              <span class="chip chip-paid mb-2">ready</span>
-              <p class="font-semibold">Trigger payout</p>
-              <p class="text-xs muted mt-1">Marie T. · awaiting approval.</p>
-            </button>
-          </div>
-        </div>
-      `);
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose or create a group first.</p>
+              </div>
+            `);
+            return;
+          }
+
+          const currentUser = session.user() || {};
+
+          const [statsResponse, membersResponse, socialFundResponse, myContributionsResponse] = await Promise.all([
+            getContributionStats(activeGroupId),
+            listMembers(activeGroupId),
+            getSocialFundBalance(activeGroupId),
+            getMyContributions(activeGroupId)
+          ]);
+
+          const stats = statsResponse?.data ?? statsResponse ?? {};
+          const rawMembers = membersResponse?.data ?? membersResponse;
+          const members = Array.isArray(rawMembers) ? rawMembers : [];
+          const socialFund = socialFundResponse?.data ?? socialFundResponse ?? {};
+          const socialFundBalance = socialFund.balance ?? 0;
+          
+          const rawContributions = myContributionsResponse?.data ?? myContributionsResponse;
+          const myContributions = Array.isArray(rawContributions) ? rawContributions : [];
+
+          const activeCycleNumber = stats.cycleNumber || 1;
+
+          // Personal status card details
+          const myMembership = members.find(m => 
+            m.user_id === currentUser.id || 
+            m.users?.id === currentUser.id ||
+            m.users?.email === currentUser.email
+          );
+          const myPos = myMembership?.rotation_position || '—';
+          
+          const hasPaidCurrent = myContributions.some(c => 
+            c.cycle_id === stats.cycleId && c.status === 'confirmed'
+          );
+          const personalStatusText = hasPaidCurrent ? 'Paid' : 'Unpaid';
+
+          // Group picker options
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          // Calculations for Treasurer overview
+          const collected = stats.totalCollected || 0;
+          const confirmedCount = stats.confirmed || 0;
+          const totalMembersCount = stats.totalMembers || 0;
+          const dueCount = Math.max(0, totalMembersCount - confirmedCount);
+          const outstanding = dueCount * (activeGroup?.contribution_amount || 0);
+
+          mountContent(`
+            <div class="glass-card p-4 mb-4 flex flex-wrap items-center gap-3 animate-fade-up">
+              <span class="chip chip-info">You</span>
+              <p class="text-sm"><span class="muted">Your cycle ${activeCycleNumber} contribution:</span> <span class="font-semibold">${personalStatusText}</span></p>
+              <span class="text-sm muted hidden sm:inline">·</span>
+              <p class="text-sm"><span class="muted">Your rotation position:</span> <span class="font-semibold">${myPos}</span></p>
+              <a href="/app/member/history.html" class="ml-auto nav-link text-xs">My Njangi →</a>
+            </div>
+
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3 animate-fade-up">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-3 animate-fade-up">
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Collected this cycle</p>
+                <p class="mt-2 font-display text-3xl font-bold">${Number(collected).toLocaleString()} FCFA</p>
+                <p class="mt-1 text-xs text-emerald-500">${confirmedCount} of ${totalMembersCount} members paid</p>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Outstanding</p>
+                <p class="mt-2 font-display text-3xl font-bold">${Number(outstanding).toLocaleString()} FCFA</p>
+                <p class="mt-1 text-xs text-amber-500">${dueCount} members due</p>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Social fund</p>
+                <p class="mt-2 font-display text-3xl font-bold">${Number(socialFundBalance).toLocaleString()} FCFA</p>
+                <p class="mt-1 text-xs muted">Available balance</p>
+              </div>
+            </div>
+
+            <div class="mt-6 glass-card p-5 animate-fade-up">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="font-display text-xl font-bold">Quick Treasurer Actions</h2>
+              </div>
+              <div class="grid gap-3 md:grid-cols-3">
+                <a href="/app/treasurer/contributions.html" class="glass-card p-4 text-left hover:ring-2 hover:ring-[var(--accent)] transition block">
+                  <span class="chip chip-due mb-2">${dueCount} due</span>
+                  <p class="font-semibold">Record cash payment</p>
+                  <p class="text-xs muted mt-1">Directly log member contributions received offline or in cash.</p>
+                </a>
+                <a href="/app/treasurer/payouts.html" class="glass-card p-4 text-left hover:ring-2 hover:ring-[var(--accent)] transition block">
+                  <span class="chip chip-info mb-2">Payouts</span>
+                  <p class="font-semibold">Trigger Payouts</p>
+                  <p class="text-xs muted mt-1">Initiate and execute cycle disbursements to rotating winners.</p>
+                </a>
+                <a href="/app/treasurer/fines.html" class="glass-card p-4 text-left hover:ring-2 hover:ring-[var(--accent)] transition block">
+                  <span class="chip chip-paid mb-2">Fines</span>
+                  <p class="font-semibold">Manage Fines</p>
+                  <p class="text-xs muted mt-1">Apply penalties for late arrivals, missed meetings, or policy infractions.</p>
+                </a>
+              </div>
+            </div>
+          `);
+
+          // Event listener
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+        } catch (error) {
+          mountContent(`
+            <div class="glass-card p-6">
+              <p class="text-red-500">Error loading dashboard: ${error.message || error}</p>
+            </div>
+          `);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>
