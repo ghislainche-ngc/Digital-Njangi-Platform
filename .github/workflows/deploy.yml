@@ -18,7 +18,8 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /home/ghislain/Digital-Njangi-Platform
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
             npm install
             npm run build
             cd backend
