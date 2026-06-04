@@ -210,16 +210,6 @@
             Want to lead your community? <a href="#" class="text-black dark:text-white font-semibold underline ml-1 hover:opacity-80 transition">Start a Chapter</a>
           </div>
         </div>
-
-        <!-- Role quick-preview (mock mode) -->
-        <div class="mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-          <p class="text-xs uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Preview a dashboard</p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <template x-for="role in ['admin','president','treasurer','secretary','member']" :key="role">
-              <button type="button" @click="preview(role)" class="text-xs bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 py-1.5 px-3 rounded-lg transition capitalize" x-text="role"></button>
-            </template>
-          </div>
-        </div>
       </div>
 
       <!-- Footer info on left -->
