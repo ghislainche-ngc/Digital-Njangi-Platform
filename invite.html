@@ -59,6 +59,13 @@
           }
         },
 
+        logout() {
+          localStorage.removeItem('naas.jwt');
+          localStorage.removeItem('naas.user');
+          this.isLoggedIn = false;
+          window.location.reload();
+        },
+
         getLoginUrl() {
           return `/login.html?token=${encodeURIComponent(this.token)}`;
         },
@@ -127,7 +134,7 @@
 
           <div class="mt-8 space-y-4">
             <!-- If logged in -->
-            <div x-show="isLoggedIn">
+            <div x-show="isLoggedIn" class="space-y-4">
               <button
                 @click="accept()"
                 :disabled="accepting"
@@ -137,6 +144,12 @@
                 <span x-show="!accepting">Accept & Enter Workspace</span>
                 <span x-show="accepting">Joining Njangi...</span>
               </button>
+
+              <div class="text-center pt-2">
+                <button @click="logout()" class="text-xs accent-text hover:underline">
+                  Not you? Sign out / Switch accounts
+                </button>
+              </div>
               
               <!-- If acceptance fails -->
               <template x-if="error">

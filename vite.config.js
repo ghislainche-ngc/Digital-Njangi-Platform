@@ -11,6 +11,7 @@ export default defineConfig({
         landing:  resolve(__dirname, 'index.html'),
         login:    resolve(__dirname, 'login.html'),
         register: resolve(__dirname, 'register.html'),
+        invite:   resolve(__dirname, 'invite.html'),
 
         admin:           resolve(__dirname, 'app/admin/index.html'),
         admin_groups:    resolve(__dirname, 'app/admin/groups.html'),
