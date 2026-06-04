@@ -4,7 +4,7 @@ const { supabase } = require('../../config/supabase');
 
 class TelegramBotService {
   constructor() {
-    this.token = process.env.TELEGRAM_BOT_TOKEN;
+    this.token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
     this.offset = 0;
     this.isRunning = false;
   }

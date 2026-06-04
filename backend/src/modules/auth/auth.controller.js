@@ -62,7 +62,7 @@ const uploadAvatar = async (req, res, next) => {
 
 const getTelegramBotUrl = async (req, res, next) => {
   try {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
     if (!token) return res.status(404).json({ error: 'Telegram bot not configured.' });
     
     const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
