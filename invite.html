@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <title>Accept Invitation — NjangiBridge</title>
+    <link rel="stylesheet" href="/src/css/app.css" />
+    <script type="module">
+      import { api } from '/src/js/api/client.js';
+
+      window.invitePage = () => ({
+        token: '',
+        loading: true,
+        accepting: false,
+        error: '',
+        invitation: null,
+        isLoggedIn: false,
+
+        async init() {
+          const params = new URLSearchParams(window.location.search);
+          this.token = params.get('token');
+          if (!this.token) {
+            this.error = 'No invitation token provided. Please use a valid link.';
+            this.loading = false;
+            return;
+          }
+
+          // Check if user is logged in
+          const jwt = localStorage.getItem('naas.jwt');
+          this.isLoggedIn = !!jwt;
+
+          try {
+            this.invitation = await api.get(`/groups/invitations/${this.token}`);
+          } catch (err) {
+            this.error = err.message || 'Failed to load invitation. The link may have expired or is invalid.';
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async accept() {
+          if (!this.isLoggedIn) return;
+          this.accepting = true;
+          this.error = '';
+          try {
+            const membership = await api.post(`/groups/invitations/${this.token}/accept`);
+            // Forward to member dashboard
+            window.location.href = `/app/member/index.html?groupId=${membership.group_id}`;
+          } catch (err) {
+            this.error = err.message || 'Failed to accept invitation.';
+            this.accepting = false;
+          }
+        },
+
+        getLoginUrl() {
+          return `/login.html?token=${encodeURIComponent(this.token)}`;
+        },
+
+        getRegisterUrl() {
+          const phoneParam = this.invitation ? `&phone=${encodeURIComponent(this.invitation.phone)}` : '';
+          return `/register.html?token=${encodeURIComponent(this.token)}${phoneParam}`;
+        }
+      });
+    </script>
+    <script type="module" src="/src/js/boot.js"></script>
+  </head>
+  <body x-data="invitePage()" x-init="$store.theme.init(); init()" x-cloak class="min-h-screen relative">
+    <header class="mx-auto max-w-7xl px-6 py-5 flex items-center">
+      <a href="/" class="flex items-center select-none font-display font-black text-2xl tracking-[-0.07em]">
+        <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
+      </a>
+    </header>
+
+    <main class="relative z-10 mx-auto max-w-md px-6 py-12">
+      <div class="glass-card-heavy p-8 animate-fade-up">
+        
+        <!-- Loading State -->
+        <div x-show="loading" class="text-center py-8 space-y-3">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-[var(--accent)] border-r-2"></div>
+          <p class="muted text-sm">Verifying invitation...</p>
+        </div>
+
+        <!-- Error State -->
+        <div x-show="!loading && error && !invitation" class="text-center py-6">
+          <div class="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <h2 class="font-display font-bold text-lg text-white">Invitation Error</h2>
+          <p class="mt-2 text-sm muted" x-text="error"></p>
+          <a href="/" class="btn-ghost mt-6 w-full inline-block">Go to Home</a>
+        </div>
+
+        <!-- Invitation Details -->
+        <div x-show="!loading && invitation">
+          <div class="w-16 h-16 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+            </svg>
+          </div>
+
+          <h1 class="text-center font-display text-2xl font-bold text-gradient">You're Invited!</h1>
+          <p class="text-center text-sm muted mt-2">
+            You have been invited to join the Njangi group
+          </p>
+          <p class="text-center font-display font-extrabold text-xl text-white mt-3" x-text="invitation.njangi_groups?.name || 'Solidarity Njangi'"></p>
+
+          <!-- Invitation Meta -->
+          <div class="mt-6 p-4 rounded-xl bg-[var(--bg-muted)] border border-[var(--border-subtle)] space-y-2 text-xs">
+            <div class="flex justify-between">
+              <span class="muted">Invited Phone:</span>
+              <span class="font-mono text-white" x-text="invitation.phone"></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="muted">Status:</span>
+              <span class="text-emerald-500 font-bold uppercase" x-text="invitation.status"></span>
+            </div>
+          </div>
+
+          <div class="mt-8 space-y-4">
+            <!-- If logged in -->
+            <div x-show="isLoggedIn">
+              <button
+                @click="accept()"
+                :disabled="accepting"
+                class="btn-primary w-full"
+                :class="accepting ? 'opacity-60 cursor-not-allowed' : ''"
+              >
+                <span x-show="!accepting">Accept & Enter Workspace</span>
+                <span x-show="accepting">Joining Njangi...</span>
+              </button>
+              
+              <!-- If acceptance fails -->
+              <template x-if="error">
+                <p class="text-xs text-red-500 mt-2 text-center" x-text="error"></p>
+              </template>
+            </div>
+
+            <!-- If NOT logged in -->
+            <div x-show="!isLoggedIn" class="space-y-3">
+              <p class="text-xs text-center muted mb-4">
+                To accept this invitation, sign up for a new account or log in to your existing one.
+              </p>
+              <a :href="getRegisterUrl()" class="btn-primary w-full block text-center">Create Account to Join</a>
+              <a :href="getLoginUrl()" class="btn-ghost w-full block text-center">Log In to Join</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </body>
+</html>

@@ -43,6 +43,21 @@
               : { email: this.form.email, password: this.form.password };
             const { token, user } = await api.post(endpoint, payload);
             session.set(token, user);
+
+            // Auto-accept invitation if token exists in query parameter
+            const inviteToken = new URLSearchParams(window.location.search).get('token');
+            if (inviteToken) {
+              try {
+                const membership = await api.post(`/groups/invitations/${inviteToken}/accept`);
+                if (membership && membership.group_id) {
+                  window.location.href = `/app/member/index.html?groupId=${membership.group_id}`;
+                  return;
+                }
+              } catch (inviteErr) {
+                console.warn('Auto-accept invitation failed:', inviteErr.message);
+              }
+            }
+
             redirectByRole(user.role || 'member');
           } catch (err) {
             this.error = err.message || 'Login failed';
@@ -178,7 +193,7 @@
 
         <p class="mt-6 text-sm text-center muted">
           <span x-text="$t('login.new_user')"></span>
-          <a href="/register.html" class="accent-text font-semibold ml-1" x-text="$t('login.create_account')"></a>
+          <a :href="new URLSearchParams(window.location.search).get('token') ? `/register.html?token=${new URLSearchParams(window.location.search).get('token')}` : '/register.html'" class="accent-text font-semibold ml-1" x-text="$t('login.create_account')"></a>
         </p>
       </div>
     </main>

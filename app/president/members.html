@@ -117,6 +117,23 @@
                   </div>
                   <p id="invite-message" class="text-xs text-amber-500"></p>
                 </form>
+
+                <!-- Success container (initially hidden) -->
+                <div id="invite-success" class="hidden space-y-4 pt-2">
+                  <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400">
+                    ✓ Invitation created successfully! Share the onboard link below with the member.
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Share Link</label>
+                    <div class="flex gap-2 mt-1">
+                      <input id="invite-link-input" type="text" readonly class="glass-input text-xs font-mono select-all bg-[var(--bg-muted)]" />
+                      <button id="btn-copy-link" class="btn-primary text-xs px-3">Copy</button>
+                    </div>
+                  </div>
+                  <div class="flex justify-end pt-2">
+                    <button id="btn-invite-done" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Close</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -151,14 +168,25 @@
           const inviteForm = document.querySelector('#invite-form');
           const inviteMsg = document.querySelector('#invite-message');
 
-          btnInvite.addEventListener('click', () => {
-            inviteModal.classList.remove('hidden');
+          const resetInviteModal = () => {
+            inviteForm.classList.remove('hidden');
+            document.querySelector('#invite-success').classList.add('hidden');
             inviteForm.reset();
             inviteMsg.textContent = '';
+          };
+
+          btnInvite.addEventListener('click', () => {
+            inviteModal.classList.remove('hidden');
+            resetInviteModal();
           });
 
           btnInviteCancel.addEventListener('click', () => {
             inviteModal.classList.add('hidden');
+          });
+
+          document.querySelector('#btn-invite-done').addEventListener('click', () => {
+            inviteModal.classList.add('hidden');
+            renderPage();
           });
 
           inviteForm.addEventListener('submit', async (e) => {
@@ -168,12 +196,32 @@
             const phone = formData.get('phone').trim();
 
             try {
-              await inviteMember(activeGroupId, phone);
-              inviteMsg.textContent = 'Invitation sent successfully!';
-              setTimeout(() => {
-                inviteModal.classList.add('hidden');
-                renderPage();
-              }, 1200);
+              const invitation = await inviteMember(activeGroupId, phone);
+              
+              // Hide form, show success with copyable link
+              inviteForm.classList.add('hidden');
+              const successContainer = document.querySelector('#invite-success');
+              const linkInput = document.querySelector('#invite-link-input');
+              const copyBtn = document.querySelector('#btn-copy-link');
+              
+              const link = `${window.location.origin}/invite.html?token=${invitation.token}`;
+              linkInput.value = link;
+              copyBtn.textContent = 'Copy';
+              
+              // Setup copy listener
+              copyBtn.replaceWith(copyBtn.cloneNode(true)); // remove old listeners
+              const newCopyBtn = document.querySelector('#btn-copy-link');
+              newCopyBtn.addEventListener('click', async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  newCopyBtn.textContent = 'Copied!';
+                  setTimeout(() => { newCopyBtn.textContent = 'Copy'; }, 2000);
+                } catch (copyErr) {
+                  linkInput.select();
+                }
+              });
+
+              successContainer.classList.remove('hidden');
             } catch (err) {
               inviteMsg.textContent = err.message || 'Failed to send invitation.';
             }

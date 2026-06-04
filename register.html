@@ -18,7 +18,7 @@
       window.registerPage = () => ({
         form: {
           email: '',
-          phone: '',
+          phone: new URLSearchParams(window.location.search).get('phone') || '',
           full_name: '',
           password: '',
           language: 'en',
@@ -140,7 +140,7 @@
 
         <p class="mt-6 text-sm text-center muted">
           <span x-text="$t('register.have_account')"></span>
-          <a href="/login.html" class="accent-text font-semibold ml-1" x-text="$t('register.sign_in')"></a>
+          <a :href="new URLSearchParams(window.location.search).get('token') ? `/login.html?token=${new URLSearchParams(window.location.search).get('token')}` : '/login.html'" class="accent-text font-semibold ml-1" x-text="$t('register.sign_in')"></a>
         </p>
       </div>
     </main>
