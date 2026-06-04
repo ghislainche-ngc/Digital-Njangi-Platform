@@ -178,7 +178,7 @@
 
           const currentUser = session.user() || {};
 
-          const [statsResponse, members, myContributions, socialFundResponse] = await Promise.all([
+          const [statsResponse, members, myContributionsResponse, socialFundResponse] = await Promise.all([
             getContributionStats(activeGroupId),
             listMembers(activeGroupId),
             getMyContributions(activeGroupId),
@@ -187,6 +187,9 @@
 
           const stats = statsResponse.data || statsResponse;
           const socialFundBalance = socialFundResponse.balance || 0;
+
+          const rawContributions = myContributionsResponse?.data ?? myContributionsResponse;
+          const myContributions = Array.isArray(rawContributions) ? rawContributions : [];
 
           const myMembership = members.find(m => 
             m.user_id === currentUser.id || 
@@ -376,7 +379,9 @@
                 const checkPaymentStatus = async () => {
                   attempts++;
                   try {
-                    const contributions = await getMyContributions(activeGroupId);
+                    const contributionsRes = await getMyContributions(activeGroupId);
+                    const rawConts = contributionsRes?.data ?? contributionsRes;
+                    const contributions = Array.isArray(rawConts) ? rawConts : [];
                     const confirmedPayment = contributions.some(c => 
                       c.cycle_id === stats.cycleId && c.status === 'confirmed'
                     );
