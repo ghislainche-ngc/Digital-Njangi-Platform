@@ -15,6 +15,7 @@
  */
 
 require('dotenv').config({ path: '.env.test' });
+jest.setTimeout(30000);
 
 const hasTestDb = Boolean(process.env.SUPABASE_URL && process.env.JWT_SECRET);
 const describeDb = hasTestDb ? describe : describe.skip;

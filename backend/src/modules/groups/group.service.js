@@ -147,7 +147,7 @@ class GroupService {
   }
 
   async updateSettings(groupId, data) {
-    if (data.rotation_type) {
+    if (data.rotation_type || data.contribution_amount !== undefined) {
       const { data: activeCycle } = await supabase
         .from('cycles')
         .select('id')
@@ -156,9 +156,10 @@ class GroupService {
         .single();
 
       if (activeCycle) {
-        const err = new Error('Cannot change rotation type while a cycle is active.');
+        const fieldName = data.rotation_type ? 'rotation type' : 'contribution amount';
+        const err = new Error(`Cannot change ${fieldName} while a cycle is active.`);
         err.statusCode = 400;
-        err.code = 'ROTATION_LOCKED';
+        err.code = data.rotation_type ? 'ROTATION_LOCKED' : 'CONTRIBUTION_AMOUNT_LOCKED';
         throw err;
       }
     }

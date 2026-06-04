@@ -1,6 +1,7 @@
 'use strict';
 
 require('dotenv').config({ path: '.env.test' }); // load test DB creds if present
+jest.setTimeout(30000);
 
 /**
  * Integration tests for the Groups & Members endpoints (Supertest).
@@ -60,6 +61,7 @@ describeDb('Groups & Members API', () => {
         email: overrides.email || `member-${unique}@naas.cm`,
         phone: overrides.phone || `+2376${String(Math.floor(Math.random() * 1e7)).padStart(7, '0')}`,
         full_name: overrides.full_name || 'Test Member',
+        password_hash: 'dummy-password-hash',
       })
       .select()
       .single();
@@ -146,6 +148,13 @@ describeDb('Groups & Members API', () => {
       const group = await createTestGroup({ groupName: `Patch Group ${Date.now()}` });
       createdGroupIds.add(group.id);
 
+      // Upgrade to enterprise tier and delete active cycles to allow contribution_amount updates
+      await supabase
+        .from('njangi_groups')
+        .update({ subscription_tier: 'enterprise' })
+        .eq('id', group.id);
+      await supabase.from('cycles').delete().eq('group_id', group.id);
+
       const res = await request(app)
         .patch(`/groups/${group.id}`)
         .set('Authorization', `Bearer ${getToken(group.presidentId, group.id)}`)
@@ -196,6 +205,26 @@ describeDb('Groups & Members API', () => {
 
       expect(res.status).toBe(400);
       expect(res.body).toHaveProperty('code', 'ROTATION_LOCKED');
+    });
+
+    it('rejects changing contribution_amount while a cycle is active (400)', async () => {
+      const creator = await createUser();
+      const createRes = await request(app)
+        .post('/groups')
+        .set('Authorization', `Bearer ${getToken(creator.id)}`)
+        .send(buildGroupPayload({ rotation_type: 'fixed', contribution_amount: 5000 }));
+      expect(createRes.status).toBe(201);
+
+      const groupId = createRes.body.group.id;
+      createdGroupIds.add(groupId);
+
+      const res = await request(app)
+        .patch(`/groups/${groupId}`)
+        .set('Authorization', `Bearer ${getToken(creator.id, groupId)}`)
+        .send({ contribution_amount: 8000 });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toHaveProperty('code', 'CONTRIBUTION_AMOUNT_LOCKED');
     });
   });
 

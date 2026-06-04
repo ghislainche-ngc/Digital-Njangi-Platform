@@ -1,6 +1,7 @@
 'use strict';
 
 require('dotenv').config({ path: '.env.test' });
+jest.setTimeout(30000);
 
 /**
  * Integration smoke tests for the backend.

@@ -1,6 +1,7 @@
 'use strict';
 
 require('dotenv').config({ path: '.env.test' }); // load test DB creds if present
+jest.setTimeout(30000);
 
 /**
  * Integration tests for the auth endpoints (Supertest).

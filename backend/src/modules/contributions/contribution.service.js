@@ -214,20 +214,20 @@ class ContributionService {
     if (!result.success) {
       try {
         result = await provider.charge(user.phone, amount, contribution.id);
-        await this._logTransaction({
-          referenceType: 'contribution',
-          referenceId: contribution.id,
-          gateway: gatewayMap[gateway] || 'mtn_momo',
-          externalRef: result.externalRef,
-          phone: user.phone,
-          amount,
-          direction: 'debit',
-          status: result.success ? 'success' : 'failed',
-          attempts: 2,
-        });
       } catch {
         result = { success: false, externalRef: null, status: 'FAILED' };
       }
+      await this._logTransaction({
+        referenceType: 'contribution',
+        referenceId: contribution.id,
+        gateway: gatewayMap[gateway] || 'mtn_momo',
+        externalRef: result.externalRef,
+        phone: user.phone,
+        amount,
+        direction: 'debit',
+        status: result.success ? 'success' : 'failed',
+        attempts: 2,
+      });
     }
 
     const finalStatus = result.success ? 'confirmed' : 'failed';

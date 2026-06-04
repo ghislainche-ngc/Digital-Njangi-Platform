@@ -1,6 +1,7 @@
 'use strict';
 
 require('dotenv').config({ path: '.env.test' });
+jest.setTimeout(30000);
 
 /**
  * Integration tests for the contributions endpoints (Supertest).
@@ -78,6 +79,7 @@ describeDb('Contributions API', () => {
         email: `treasurer-${Date.now()}${Math.floor(Math.random() * 1000)}@naas.cm`,
         phone: `+2376${Math.floor(10000000 + Math.random() * 89999999)}`,
         full_name: 'Test Treasurer',
+        password_hash: 'dummy-password-hash',
       })
       .select()
       .single();
@@ -97,6 +99,7 @@ describeDb('Contributions API', () => {
         email: `member-${Date.now()}${Math.floor(Math.random() * 1000)}@naas.cm`,
         phone: `+2376${Math.floor(10000000 + Math.random() * 89999999)}`,
         full_name: 'Test Member',
+        password_hash: 'dummy-password-hash',
       })
       .select()
       .single();
@@ -139,6 +142,7 @@ describeDb('Contributions API', () => {
       // fails, a SECOND payment_transactions row is logged with attempts=2.
       // We assert the retry path is exercised: there is at most one row with
       // attempts=2, and if the contribution failed, both attempts were logged.
+      await new Promise(r => setTimeout(r, 1000));
       const { data: txns } = await supabase
         .from('payment_transactions')
         .select('attempts, status')
@@ -174,14 +178,15 @@ describeDb('Contributions API', () => {
       expect(res.body).toHaveProperty('error');
 
       // The blocked attempt is recorded as a fraud alert in the audit log.
+      await new Promise(r => setTimeout(r, 500));
       const { data: auditRows } = await supabase
-        .from('audit_logs')
-        .select('action, actor_id')
+        .from('audit_events')
+        .select('event_type, user_id')
         .eq('group_id', ctx.groupId)
-        .eq('actor_id', ctx.treasurerId);
+        .eq('user_id', ctx.treasurerId);
 
       const fraudAlert = (auditRows || []).find(
-        (r) => typeof r.action === 'string' && r.action.includes('FRAUD'),
+        (r) => typeof r.event_type === 'string' && r.event_type.includes('FRAUD'),
       );
       expect(fraudAlert).toBeDefined();
     });

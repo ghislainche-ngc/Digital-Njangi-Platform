@@ -19,6 +19,7 @@ async function createTestGroup(overrides = {}) {
     email: overrides.email || `president-${Date.now()}@naas.cm`,
     phone: overrides.phone || `+2376${Math.floor(10000000 + Math.random() * 89999999)}`,
     full_name: overrides.name || 'Test President',
+    password_hash: 'dummy-password-hash',
   }).select().single();
 
   // Create group

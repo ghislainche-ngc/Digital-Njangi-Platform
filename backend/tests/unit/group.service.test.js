@@ -129,13 +129,23 @@ describe('GroupService.updateSettings', () => {
     ).rejects.toMatchObject({ statusCode: 400, code: 'ROTATION_LOCKED' });
   });
 
-  it('allows updating contribution_amount', async () => {
+  it('blocks contribution amount change when cycle is active', async () => {
+    const activeCycle = { id: 'cyc-1' };
+    mockFrom.mockReturnValue(chainMock(activeCycle));
+
+    await expect(
+      groupService.updateSettings('grp-1', { contribution_amount: 15000 })
+    ).rejects.toMatchObject({ statusCode: 400, code: 'CONTRIBUTION_AMOUNT_LOCKED' });
+  });
+
+  it('allows updating contribution_amount when no cycle is active', async () => {
     const updated = { id: 'grp-1', contribution_amount: 15000, subscription_tier: 'growth' };
     let callCount = 0;
     mockFrom.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return chainMock({ subscription_tier: 'growth', contribution_amount: 10000 });
-      return chainMock(updated);
+      if (callCount === 1) return chainMock(null); // active cycle check returns empty
+      if (callCount === 2) return chainMock({ subscription_tier: 'growth', contribution_amount: 10000 }); // current settings check
+      return chainMock(updated); // perform update
     });
 
     const result = await groupService.updateSettings('grp-1', { contribution_amount: 15000 });
