@@ -15,52 +15,179 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { resolveGroupContext, setStoredGroupId, groupLabel } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'secretary', title: 'Announcements' });
-      const feed = [
-        { title: 'April contribution reminder',   body: 'Friendly reminder: contributions are due Apr 26 by 18:00 before the late fee kicks in.', when: '2h ago', channel: 'Telegram · 14 recipients' },
-        { title: 'March meeting minutes posted',  body: 'Minutes from the March 28 meeting are now available in the Minutes tab.',               when: '5 days ago', channel: 'Telegram' },
-        { title: 'New member welcome — Alice',    body: 'Please welcome Alice Fotso, joining our Njangi this cycle.',                              when: '2 weeks ago', channel: 'Telegram + SMS' },
-        { title: 'Meeting venue change',          body: 'April meeting moves to Salle des Fêtes Ndjouke, 18:00 sharp.',                             when: '3 weeks ago', channel: 'Telegram + SMS' },
-      ].map(a => `
-        <div class="glass-card p-5">
-          <div class="flex items-start justify-between gap-3 mb-2">
-            <p class="font-semibold">${a.title}</p>
-            <span class="chip chip-info text-xs shrink-0">${a.when}</span>
-          </div>
-          <p class="text-sm muted">${a.body}</p>
-          <p class="text-xs muted mt-3">via ${a.channel}</p>
-        </div>
-      `).join('');
-      mountContent(`
-        <div class="grid gap-6 lg:grid-cols-3">
-          <div class="lg:col-span-2 space-y-4">${feed}</div>
 
-          <div class="glass-card p-6 h-fit sticky top-24">
-            <h2 class="font-display text-xl font-bold mb-4">New announcement</h2>
-            <div class="space-y-4">
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted">Title</label>
-                <input class="glass-input mt-1" placeholder="e.g. Venue change" />
+      let activeGroupId = '';
+      let announcements = [];
+
+      function getAnnouncements(groupId) {
+        const key = `njangi.announcements.${groupId}`;
+        const data = localStorage.getItem(key);
+        if (data) return JSON.parse(data);
+        const defaults = [
+          { id: '1', title: 'April contribution reminder', body: 'Friendly reminder: contributions are due Apr 26 by 18:00 before the late fee kicks in.', when: '2 hours ago', channel: 'Telegram · 14 recipients', date: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
+          { id: '2', title: 'March meeting minutes posted', body: 'Minutes from the March 28 meeting are now available in the Minutes tab.', when: '5 days ago', channel: 'Telegram', date: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString() },
+          { id: '3', title: 'New member welcome — Alice', body: 'Please welcome Alice Fotso, joining our Njangi this cycle.', when: '2 weeks ago', channel: 'Telegram + SMS', date: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString() },
+          { id: '4', title: 'Meeting venue change', body: 'April meeting moves to Salle des Fêtes Ndjouke, 18:00 sharp.', when: '3 weeks ago', channel: 'Telegram + SMS', date: new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString() }
+        ];
+        localStorage.setItem(key, JSON.stringify(defaults));
+        return defaults;
+      }
+
+      function saveAnnouncements(groupId, list) {
+        const key = `njangi.announcements.${groupId}`;
+        localStorage.setItem(key, JSON.stringify(list));
+      }
+
+      function timeAgo(dateString) {
+        const date = new Date(dateString);
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days} days ago`;
+        const weeks = Math.floor(days / 7);
+        if (weeks < 4) return `${weeks} weeks ago`;
+        return date.toLocaleDateString();
+      }
+
+      const renderFeed = () => {
+        const container = document.querySelector('#feed-container');
+        if (!container) return;
+
+        container.innerHTML = announcements.map(a => {
+          const relativeTime = a.date ? timeAgo(a.date) : a.when;
+          return `
+            <div class="glass-card p-5 relative" data-id="${escapeHtml(a.id)}">
+              <button class="btn-delete absolute top-4 right-4 text-xs text-red-500 nav-link p-1">Delete</button>
+              <div class="flex items-start justify-between gap-3 mb-2 pr-12">
+                <p class="font-semibold">${escapeHtml(a.title)}</p>
+                <span class="chip chip-info text-xs shrink-0">${escapeHtml(relativeTime)}</span>
               </div>
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted">Message</label>
-                <textarea class="glass-input mt-1 min-h-[120px]" placeholder="Keep it short — Telegram/SMS friendly."></textarea>
-              </div>
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted">Channels</label>
-                <div class="mt-2 space-y-2">
-                  <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked class="accent-[var(--accent)]"/> Telegram</label>
-                  <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="accent-[var(--accent)]"/> SMS fallback</label>
-                  <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="accent-[var(--accent)]"/> In-app only</label>
-                </div>
-              </div>
-              <button class="btn-primary w-full">Publish</button>
+              <p class="text-sm muted">${escapeHtml(a.body)}</p>
+              <p class="text-xs muted mt-3">via ${escapeHtml(a.channel)}</p>
             </div>
-          </div>
-        </div>
+          `;
+        }).join('') || '<div class="glass-card p-5 text-center muted">No announcements posted yet.</div>';
 
-        <p class="mt-4 text-xs muted">PR-10: Secretary posts announcements.</p>
-      `);
+        // Wire delete buttons
+        container.querySelectorAll('.btn-delete').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const card = e.target.closest('[data-id]');
+            const id = card.dataset.id;
+            if (confirm('Are you sure you want to delete this announcement?')) {
+              announcements = announcements.filter(a => a.id !== id);
+              saveAnnouncements(activeGroupId, announcements);
+              renderFeed();
+            }
+          });
+        });
+      };
+
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading announcements…</div>`);
+
+        try {
+          const { groups, activeGroupId: id } = await resolveGroupContext();
+          activeGroupId = id;
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose or create a group first.</p>
+              </div>
+            `);
+            return;
+          }
+
+          announcements = getAnnouncements(activeGroupId);
+
+          // Group picker options
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+            </div>
+
+            <div class="grid gap-6 lg:grid-cols-3">
+              <div id="feed-container" class="lg:col-span-2 space-y-4"></div>
+
+              <div class="glass-card p-6 h-fit sticky top-24">
+                <h2 class="font-display text-xl font-bold mb-4">New announcement</h2>
+                <form id="announcement-form" class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Title</label>
+                    <input name="title" required class="glass-input mt-1" placeholder="e.g. Venue change" />
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Message</label>
+                    <textarea name="body" required class="glass-input mt-1 min-h-[120px]" placeholder="Keep it short — Telegram/SMS friendly."></textarea>
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Channels</label>
+                    <div class="mt-2 space-y-2">
+                      <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="channel" value="Telegram" checked class="accent-[var(--accent)]"/> Telegram</label>
+                      <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="channel" value="SMS" class="accent-[var(--accent)]"/> SMS fallback</label>
+                      <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="channel" value="In-App" class="accent-[var(--accent)]"/> In-app only</label>
+                    </div>
+                  </div>
+                  <button type="submit" class="btn-primary w-full">Publish</button>
+                </form>
+              </div>
+            </div>
+
+            <p class="mt-4 text-xs muted">PR-10: Secretary posts announcements.</p>
+          `);
+
+          renderFeed();
+
+          // Group picker change
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          // Handle form submit
+          document.querySelector('#announcement-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const title = formData.get('title').trim();
+            const body = formData.get('body').trim();
+            const channels = formData.getAll('channel');
+            
+            const newAnn = {
+              id: Date.now().toString(),
+              title,
+              body,
+              date: new Date().toISOString(),
+              channel: channels.join(' + ') || 'In-app only'
+            };
+
+            announcements.unshift(newAnn);
+            saveAnnouncements(activeGroupId, announcements);
+            e.target.reset();
+            renderFeed();
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load announcements.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

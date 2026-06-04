@@ -15,44 +15,300 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        listMembers,
+        inviteMember,
+        updateMemberRole,
+        removeMember,
+        groupLabel
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'secretary', title: 'Member directory' });
-      const cards = [
-        { name: 'Marie Tchinda',      role: 'President',  phone: '+237 6XX XXX 001', email: 'marie@example.cm',   initials: 'MT' },
-        { name: 'Jean-Pierre Mbarga', role: 'Treasurer',  phone: '+237 6XX XXX 002', email: 'jp@example.cm',      initials: 'JP' },
-        { name: 'Claire Biya',        role: 'Secretary',  phone: '+237 6XX XXX 003', email: 'claire@example.cm',  initials: 'CB' },
-        { name: 'Fatou Ngo',          role: 'Member',     phone: '+237 6XX XXX 004', email: 'fatou@example.cm',   initials: 'FN' },
-        { name: 'Pa Ngwa',            role: 'Member',     phone: '+237 6XX XXX 005', email: 'pangwa@example.cm',  initials: 'PN' },
-        { name: 'Alice Fotso',        role: 'Member',     phone: '+237 6XX XXX 006', email: 'alice@example.cm',   initials: 'AF' },
-      ].map(m => `
-        <div class="glass-card p-5">
-          <div class="flex items-center gap-3">
-            <div class="h-12 w-12 rounded-full accent-bg text-[var(--text-on-brand)] grid place-items-center font-bold">${m.initials}</div>
-            <div class="flex-1 min-w-0">
-              <p class="font-semibold truncate">${m.name}</p>
-              <p class="text-xs muted">${m.role}</p>
+
+      let members = [];
+      let currentUser = {};
+      let activeGroupId = '';
+
+      const renderGrid = (list) => {
+        const grid = document.querySelector('#members-grid');
+        if (!grid) return;
+
+        grid.innerHTML = list.map(m => {
+          const userId = m.users?.id || m.user_id;
+          const name = m.users?.full_name || m.users?.email || 'Member';
+          const phone = m.users?.phone || m.phone || '—';
+          const email = m.users?.email || '—';
+          const role = m.role || 'member';
+          const status = m.status || 'active';
+          const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+
+          const isSelf = userId === currentUser.id;
+          const disabledAttr = isSelf ? 'disabled' : '';
+
+          return `
+            <div class="glass-card p-5 flex flex-col justify-between" data-user-id="${escapeHtml(userId)}">
+              <div>
+                <div class="flex items-center gap-3">
+                  <div class="h-12 w-12 rounded-full accent-bg text-white grid place-items-center font-bold text-sm">${escapeHtml(initials)}</div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold truncate">${escapeHtml(name)} ${isSelf ? '(You)' : ''}</p>
+                    <div class="flex items-center gap-1 mt-1">
+                      <select class="glass-input w-auto py-0.5 px-1.5 text-[10px] role-select" ${disabledAttr}>
+                        <option value="president" ${role === 'president' ? 'selected' : ''}>President</option>
+                        <option value="treasurer" ${role === 'treasurer' ? 'selected' : ''}>Treasurer</option>
+                        <option value="secretary" ${role === 'secretary' ? 'selected' : ''}>Secretary</option>
+                        <option value="member" ${role === 'member' ? 'selected' : ''}>Member</option>
+                      </select>
+                      <span class="chip chip-${status === 'active' ? 'paid' : 'failed'} text-[10px] py-0.5 px-1.5">${escapeHtml(status)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-4 space-y-1 text-sm">
+                  <p class="flex items-center gap-2"><span class="muted text-xs uppercase w-12">tel</span> <span class="font-mono text-xs">${escapeHtml(phone)}</span></p>
+                  <p class="flex items-center gap-2"><span class="muted text-xs uppercase w-12">mail</span> <span class="truncate text-xs">${escapeHtml(email)}</span></p>
+                </div>
+              </div>
+              <div class="mt-4 pt-3 border-t border-[var(--border-subtle)] flex gap-2">
+                <button class="btn-ghost flex-1 text-xs btn-remove text-red-500" ${disabledAttr}>Remove</button>
+              </div>
             </div>
-          </div>
-          <div class="mt-4 space-y-1 text-sm">
-            <p class="flex items-center gap-2"><span class="muted text-xs uppercase w-12">tel</span> <span class="font-mono text-xs">${m.phone}</span></p>
-            <p class="flex items-center gap-2"><span class="muted text-xs uppercase w-12">mail</span> <span class="truncate text-xs">${m.email}</span></p>
-          </div>
-          <div class="mt-4 flex gap-2">
-            <button class="btn-ghost flex-1 text-xs">Edit</button>
-            <button class="btn-ghost flex-1 text-xs">Message</button>
-          </div>
-        </div>
-      `).join('');
-      mountContent(`
-        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
-          <input type="search" placeholder="Search members…" class="glass-input flex-1 min-w-[220px]" />
-          <button class="btn-ghost">↓ Export CSV</button>
-          <button class="btn-primary">+ Add member</button>
-        </div>
+          `;
+        }).join('') || '<div class="col-span-full py-8 text-center muted">No members found matching query.</div>';
 
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${cards}</div>
+        // Wire role change select
+        grid.querySelectorAll('.role-select').forEach(select => {
+          select.addEventListener('change', async (e) => {
+            const card = e.target.closest('[data-user-id]');
+            const userId = card.dataset.userId;
+            const newRole = e.target.value;
+            try {
+              await updateMemberRole(activeGroupId, userId, newRole);
+              alert(`Role updated to ${newRole} successfully.`);
+              renderPage();
+            } catch (err) {
+              alert(err.message || 'Failed to update role.');
+              renderPage();
+            }
+          });
+        });
 
-        <p class="mt-6 text-xs muted">PR-10: Secretary maintains directory, updates contact details.</p>
-      `);
+        // Wire member remove button
+        grid.querySelectorAll('.btn-remove').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const card = e.target.closest('[data-user-id]');
+            const userId = card.dataset.userId;
+            const name = card.querySelector('.font-semibold').textContent.replace('(You)', '').trim();
+
+            if (!confirm(`Are you sure you want to remove ${name} from this Njangi?`)) {
+              return;
+            }
+
+            try {
+              await removeMember(activeGroupId, userId);
+              alert(`${name} removed successfully.`);
+              renderPage();
+            } catch (err) {
+              alert(err.message || 'Failed to remove member.');
+            }
+          });
+        });
+      };
+
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading directory roster…</div>`);
+
+        try {
+          const { groups, activeGroupId: id, activeGroup } = await resolveGroupContext();
+          activeGroupId = id;
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose or create a group first.</p>
+              </div>
+            `);
+            return;
+          }
+
+          currentUser = session.user() || {};
+          const membersResponse = await listMembers(activeGroupId);
+          const rawMembers = membersResponse?.data ?? membersResponse;
+          members = Array.isArray(rawMembers) ? rawMembers : [];
+
+          // Group picker options
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+              <input id="search-input" type="search" placeholder="Search members…" class="glass-input flex-1 min-w-[220px]" />
+              <button id="btn-export" class="btn-ghost">↓ Export CSV</button>
+              <button id="btn-add-member" class="btn-primary">+ Add member</button>
+            </div>
+
+            <div id="members-grid" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3"></div>
+
+            <p class="mt-6 text-xs muted">PR-10: Secretary maintains directory, updates contact details.</p>
+
+            <!-- Invite Modal -->
+            <div id="invite-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+              <div class="glass-card max-w-md w-full p-6 space-y-4 animate-fade-up">
+                <h3 class="font-display text-lg font-bold">Invite New Member</h3>
+                <p class="text-xs muted">Enter the member's registered phone number to send an invitation token.</p>
+                <form id="invite-form" class="space-y-3">
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Phone Number</label>
+                    <input type="text" name="phone" placeholder="+237677000002" required class="glass-input mt-1" />
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="btn-invite-cancel" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs py-2 px-4">Send Invite</button>
+                  </div>
+                  <p id="invite-message" class="text-xs text-amber-500"></p>
+                </form>
+
+                <!-- Success container -->
+                <div id="invite-success" class="hidden space-y-4 pt-2">
+                  <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400">
+                    ✓ Invitation created successfully! Share the onboard link below with the member.
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Share Link</label>
+                    <div class="flex gap-2 mt-1">
+                      <input id="invite-link-input" type="text" readonly class="glass-input text-xs font-mono select-all bg-[var(--bg-muted)]" />
+                      <button id="btn-copy-link" class="btn-primary text-xs px-3">Copy</button>
+                    </div>
+                  </div>
+                  <div class="flex justify-end pt-2">
+                    <button id="btn-invite-done" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Close</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `);
+
+          renderGrid(members);
+
+          // Wire events
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          // Search live filtering
+          const searchInput = document.querySelector('#search-input');
+          searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const filtered = members.filter(m => {
+              const name = (m.users?.full_name || m.users?.email || '').toLowerCase();
+              const phone = (m.users?.phone || m.phone || '').toLowerCase();
+              const email = (m.users?.email || '').toLowerCase();
+              const role = (m.role || '').toLowerCase();
+              return name.includes(query) || phone.includes(query) || email.includes(query) || role.includes(query);
+            });
+            renderGrid(filtered);
+          });
+
+          // CSV export
+          document.querySelector('#btn-export').addEventListener('click', () => {
+            const headers = ['Name', 'Role', 'Phone', 'Email', 'Status'];
+            const rowsCsv = members.map(m => [
+              m.users?.full_name || m.users?.email || 'Member',
+              m.role || 'member',
+              m.users?.phone || m.phone || '',
+              m.users?.email || '',
+              m.status || 'active'
+            ]);
+            const content = [headers, ...rowsCsv].map(row => row.map(val => `"${val.replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `njangi_members_${activeGroupId}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          });
+
+          // Invite modal logic
+          const inviteModal = document.querySelector('#invite-modal');
+          const btnAddMember = document.querySelector('#btn-add-member');
+          const btnInviteCancel = document.querySelector('#btn-invite-cancel');
+          const inviteForm = document.querySelector('#invite-form');
+          const inviteMsg = document.querySelector('#invite-message');
+
+          const resetInviteModal = () => {
+            inviteForm.classList.remove('hidden');
+            document.querySelector('#invite-success').classList.add('hidden');
+            inviteForm.reset();
+            inviteMsg.textContent = '';
+          };
+
+          btnAddMember.addEventListener('click', () => {
+            inviteModal.classList.remove('hidden');
+            resetInviteModal();
+          });
+
+          btnInviteCancel.addEventListener('click', () => {
+            inviteModal.classList.add('hidden');
+          });
+
+          document.querySelector('#btn-invite-done').addEventListener('click', () => {
+            inviteModal.classList.add('hidden');
+            renderPage();
+          });
+
+          inviteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            inviteMsg.textContent = 'Sending invitation...';
+            const formData = new FormData(inviteForm);
+            const phone = formData.get('phone').trim();
+
+            try {
+              const invitation = await inviteMember(activeGroupId, phone);
+              inviteForm.classList.add('hidden');
+              const successContainer = document.querySelector('#invite-success');
+              const linkInput = document.querySelector('#invite-link-input');
+              const copyBtn = document.querySelector('#btn-copy-link');
+
+              const link = `${window.location.origin}/invite.html?token=${invitation.token}`;
+              linkInput.value = link;
+              copyBtn.textContent = 'Copy';
+
+              copyBtn.replaceWith(copyBtn.cloneNode(true));
+              const newCopyBtn = document.querySelector('#btn-copy-link');
+              newCopyBtn.addEventListener('click', async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  newCopyBtn.textContent = 'Copied!';
+                  setTimeout(() => { newCopyBtn.textContent = 'Copy'; }, 2000);
+                } catch (copyErr) {
+                  linkInput.select();
+                }
+              });
+
+              successContainer.classList.remove('hidden');
+            } catch (err) {
+              inviteMsg.textContent = err.message || 'Failed to send invitation.';
+            }
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load directory roster.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>
