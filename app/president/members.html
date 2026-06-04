@@ -50,7 +50,9 @@
             return;
           }
 
-          const members = await listMembers(activeGroupId);
+          const membersResponse = await listMembers(activeGroupId);
+          const rawMembers = membersResponse?.data ?? membersResponse;
+          const members = Array.isArray(rawMembers) ? rawMembers : [];
           const currentUser = session.user() || {};
 
           // Group picker options

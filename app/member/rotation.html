@@ -48,12 +48,14 @@
             return;
           }
 
-          const [statsResponse, members] = await Promise.all([
+          const [statsResponse, membersResponse] = await Promise.all([
             getContributionStats(activeGroupId),
             listMembers(activeGroupId)
           ]);
 
-          const stats = statsResponse.data || statsResponse;
+          const stats = statsResponse?.data ?? statsResponse ?? {};
+          const rawMembers = membersResponse?.data ?? membersResponse;
+          const members = Array.isArray(rawMembers) ? rawMembers : [];
           const totalMembers = members.length || 1;
           const currentCycle = stats.cycleNumber || 1;
 

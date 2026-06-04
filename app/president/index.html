@@ -54,17 +54,19 @@
 
           const currentUser = session.user() || {};
 
-          // Fetch dashboard data
-          const [statsResponse, members, currentPayoutResponse, contributionsResponse] = await Promise.all([
+          const [statsResponse, membersResponse, currentPayoutResponse, contributionsResponse] = await Promise.all([
             getContributionStats(activeGroupId),
             listMembers(activeGroupId),
             getCurrentPayout(activeGroupId),
             listContributions(activeGroupId)
           ]);
 
-          const stats = statsResponse.data || statsResponse;
-          const currentPayoutData = currentPayoutResponse.data || currentPayoutResponse;
-          const contributions = contributionsResponse.data || contributionsResponse;
+          const stats = statsResponse?.data ?? statsResponse ?? {};
+          const rawMembers = membersResponse?.data ?? membersResponse;
+          const members = Array.isArray(rawMembers) ? rawMembers : [];
+          const currentPayoutData = currentPayoutResponse?.data ?? currentPayoutResponse ?? {};
+          const rawContributions = contributionsResponse?.data ?? contributionsResponse;
+          const contributions = Array.isArray(rawContributions) ? rawContributions : [];
 
           const currentPayout = currentPayoutData.payout || null;
           const eligibility = currentPayoutData.eligibility || { eligible: false, reason: 'No active cycle' };

@@ -81,17 +81,20 @@
             return;
           }
 
-          const [ledgerData, summary, socialFundResponse] = await Promise.all([
+          const [ledgerResponse, summaryResponse, socialFundResponse] = await Promise.all([
             getGroupLedger(activeGroupId),
             getGroupSummary(activeGroupId),
             getSocialFundBalance(activeGroupId)
           ]);
 
-          const socialFundBalance = socialFundResponse.balance || 0;
+          const socialFundBalance = Number(socialFundResponse?.balance ?? socialFundResponse?.data?.balance ?? 0);
+
+          const ledgerData = ledgerResponse?.data ?? ledgerResponse ?? {};
+          const summary = summaryResponse?.data ?? summaryResponse ?? {};
 
           // Flatten cycles into list of activities
           allLedgerItems = [];
-          const cyclesList = ledgerData.cycles || [];
+          const cyclesList = Array.isArray(ledgerData.cycles) ? ledgerData.cycles : [];
           
           cyclesList.forEach(c => {
             if (c.payout) {

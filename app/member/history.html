@@ -55,8 +55,9 @@
             getMyContributions(activeGroupId)
           ]);
 
-          const stats = statsResponse.data || statsResponse;
-          const myContributions = myContributionsResponse.data || myContributionsResponse || [];
+          const stats = statsResponse.data || statsResponse || {};
+          const rawContributions = myContributionsResponse?.data ?? myContributionsResponse;
+          const myContributions = Array.isArray(rawContributions) ? rawContributions : [];
 
           const totalPaid = myContributions
             .filter(c => c.status === 'confirmed')
