@@ -24,6 +24,7 @@
         resolveGroupContext,
         setStoredGroupId,
         waiveFine,
+        groupLabel
       } from '/src/js/api/njangi.js';
 
       const escapeHtml = (value) => String(value ?? '')
@@ -62,7 +63,7 @@
           const collected = fines.filter((fine) => fine.status === 'paid').reduce((sum, fine) => sum + Number(fine.amount || 0), 0);
           const waivers = fines.filter((fine) => fine.status === 'waived').length;
 
-          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(group.name)}</option>`).join('');
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
           const memberOptions = members.length
             ? members.map((member) => `<option value="${escapeHtml(member.users?.id || member.user_id)}">${escapeHtml(member.users?.full_name || member.users?.email || 'Member')}</option>`).join('')
             : '<option value="">No members available</option>';

@@ -23,6 +23,7 @@
         listPayouts,
         resolveGroupContext,
         setStoredGroupId,
+        groupLabel
       } from '/src/js/api/njangi.js';
 
       const escapeHtml = (value) => String(value ?? '')
@@ -59,7 +60,7 @@
           const eligibility = current.eligibility || {};
           const cycle = current.cycle || {};
 
-          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(group.name)}</option>`).join('');
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
           const historyRows = history.length
             ? history.map((entry) => `
                 <li class="flex items-center justify-between py-3 border-b border-subtle last:border-0">
