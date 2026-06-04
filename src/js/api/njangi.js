@@ -193,6 +193,14 @@ export async function renewSubscription(groupId, gateway) {
   return api.post(`/groups/${groupId}/billing/renew`, { gateway });
 }
 
+export async function updateGroupGateway(groupId, gateway) {
+  return api.patch(`/groups/${groupId}/gateway`, { gateway });
+}
+
+export async function updateGroupPayoutGateway(groupId, payout_gateway) {
+  return api.patch(`/groups/${groupId}/payout-gateway`, { payout_gateway });
+}
+
 export async function inviteMember(groupId, phone) {
   return api.post(`/groups/${groupId}/invitations`, { phone });
 }

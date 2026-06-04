@@ -104,6 +104,11 @@ class CampayService extends PaymentProvider {
     const normalized = this._normalizePhone(phone);
     const token = await this._getToken();
 
+    let sendAmount = amount;
+    if (this.baseUrl.includes('demo.campay.net') && amount > 25 && process.env.NODE_ENV !== 'test') {
+      sendAmount = 25;
+    }
+
     const collectRes = await fetch(`${this.baseUrl}/collect/`, {
       method: 'POST',
       headers: {
@@ -111,7 +116,7 @@ class CampayService extends PaymentProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: String(amount),
+        amount: String(sendAmount),
         currency: 'XAF',
         from: normalized,
         description: 'NjangiBridge contribution',
@@ -149,6 +154,11 @@ class CampayService extends PaymentProvider {
     const normalized = this._normalizePhone(phone);
     const token = await this._getToken();
 
+    let sendAmount = amount;
+    if (this.baseUrl.includes('demo.campay.net') && amount > 25 && process.env.NODE_ENV !== 'test') {
+      sendAmount = 25;
+    }
+
     const res = await fetch(`${this.baseUrl}/withdraw/`, {
       method: 'POST',
       headers: {
@@ -156,7 +166,7 @@ class CampayService extends PaymentProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: String(amount),
+        amount: String(sendAmount),
         to: normalized,
         description: 'NjangiBridge payout',
         external_reference: paymentRef,

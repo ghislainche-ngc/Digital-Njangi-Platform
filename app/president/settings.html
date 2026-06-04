@@ -19,6 +19,8 @@
         resolveGroupContext,
         updateSettings,
         renewSubscription,
+        updateGroupGateway,
+        updateGroupPayoutGateway,
         groupLabel,
         setStoredGroupId
       } from '/src/js/api/njangi.js';
@@ -195,6 +197,36 @@
                   </label>
                 </div>
               </section>
+
+              <!-- Payment Gateway Configuration -->
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Payment Gateways</h2>
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Preferred Collection Gateway</label>
+                    <select id="settings-collection-gateway" class="glass-input mt-1">
+                      <option value="mtn_momo" ${group.preferred_gateway === 'mtn_momo' ? 'selected' : ''}>MTN Mobile Money (Direct)</option>
+                      <option value="orange_money" ${group.preferred_gateway === 'orange_money' ? 'selected' : ''}>Orange Money (Direct)</option>
+                      <option value="campay" ${group.preferred_gateway === 'campay' ? 'selected' : ''}>Campay (Aggregator)</option>
+                    </select>
+                    <p class="mt-1 text-xs muted">Routing choice for members' cycle contributions.</p>
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Preferred Payout Gateway</label>
+                    <select id="settings-payout-gateway" class="glass-input mt-1">
+                      <option value="" ${group.preferred_payout_gateway === null || group.preferred_payout_gateway === '' ? 'selected' : ''}>Auto-detect (Phone Prefix)</option>
+                      <option value="mtn_momo" ${group.preferred_payout_gateway === 'mtn_momo' ? 'selected' : ''}>MTN Mobile Money (Direct)</option>
+                      <option value="orange_money" ${group.preferred_payout_gateway === 'orange_money' ? 'selected' : ''}>Orange Money (Direct)</option>
+                      <option value="campay" ${group.preferred_payout_gateway === 'campay' ? 'selected' : ''}>Campay (Aggregator)</option>
+                    </select>
+                    <p class="mt-1 text-xs muted">Routing choice for disbursements. Campay uses /withdraw/.</p>
+                  </div>
+                  <div class="pt-2">
+                    <button id="btn-save-gateways" class="btn-primary w-full">Save Gateways</button>
+                    <p id="gateways-msg" class="text-xs mt-2 text-center"></p>
+                  </div>
+                </div>
+              </section>
             </div>
           `);
 
@@ -266,6 +298,30 @@
             } catch (err) {
               billingMsg.className = 'text-xs text-center text-red-500';
               billingMsg.textContent = err.message || 'Failed to change plan.';
+            }
+          });
+
+          // Gateways Handler
+          const btnSaveGateways = document.querySelector('#btn-save-gateways');
+          const gatewaysMsg = document.querySelector('#gateways-msg');
+          btnSaveGateways.addEventListener('click', async () => {
+            gatewaysMsg.className = 'text-xs mt-2 text-center text-amber-500';
+            gatewaysMsg.textContent = 'Saving gateways…';
+            const gateway = document.querySelector('#settings-collection-gateway').value;
+            const payoutGatewayVal = document.querySelector('#settings-payout-gateway').value;
+            const payoutGateway = payoutGatewayVal === '' ? null : payoutGatewayVal;
+
+            try {
+              // Update preferred collection gateway
+              await updateGroupGateway(activeGroupId, gateway);
+              // Update preferred payout gateway
+              await updateGroupPayoutGateway(activeGroupId, payoutGateway);
+              gatewaysMsg.className = 'text-xs mt-2 text-center text-emerald-500 font-bold';
+              gatewaysMsg.textContent = '✓ Payment gateways saved successfully!';
+              setTimeout(renderPage, 1500);
+            } catch (err) {
+              gatewaysMsg.className = 'text-xs mt-2 text-center text-red-500';
+              gatewaysMsg.textContent = err.message || 'Failed to update gateways.';
             }
           });
 
