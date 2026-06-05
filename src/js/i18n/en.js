@@ -156,5 +156,6 @@ export default {
     section_personal: 'My Njangi',
     my_history: 'My payments',
     my_rotation: 'My turn',
+    my_overview: 'My Overview',
   },
 };

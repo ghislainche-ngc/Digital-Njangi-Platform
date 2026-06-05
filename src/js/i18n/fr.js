@@ -156,5 +156,6 @@ export default {
     section_personal: 'Mon Njangi',
     my_history: 'Mes paiements',
     my_rotation: 'Mon tour',
+    my_overview: 'Mon aperçu',
   },
 };

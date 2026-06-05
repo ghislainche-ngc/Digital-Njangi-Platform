@@ -24,7 +24,7 @@ router.get('/:groupId/announcements', auth, tenant, async (req, res, next) => {
  * POST /groups/:groupId/announcements
  * Publish a new announcement & broadcast (President/Secretary only).
  */
-router.post('/:groupId/announcements', auth, tenant, requireRole('president', 'secretary'), async (req, res, next) => {
+router.post('/:groupId/announcements', auth, tenant, requireRole('president', 'secretary', 'treasurer'), async (req, res, next) => {
   try {
     const { title, body, channels } = req.body;
     if (!title || !body) {
@@ -50,7 +50,7 @@ router.post('/:groupId/announcements', auth, tenant, requireRole('president', 's
  * DELETE /groups/:groupId/announcements/:id
  * Delete an announcement (President/Secretary only).
  */
-router.delete('/:groupId/announcements/:id', auth, tenant, requireRole('president', 'secretary'), async (req, res, next) => {
+router.delete('/:groupId/announcements/:id', auth, tenant, requireRole('president', 'secretary', 'treasurer'), async (req, res, next) => {
   try {
     await announcementsService.deleteAnnouncement(req.params.groupId, req.params.id);
     return res.status(200).json({ success: true });

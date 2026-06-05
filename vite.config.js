@@ -20,6 +20,7 @@ export default defineConfig({
 
         president:          resolve(__dirname, 'app/president/index.html'),
         president_members:  resolve(__dirname, 'app/president/members.html'),
+        president_announcements: resolve(__dirname, 'app/president/announcements.html'),
         president_reports:  resolve(__dirname, 'app/president/reports.html'),
         president_settings: resolve(__dirname, 'app/president/settings.html'),
 
@@ -28,6 +29,7 @@ export default defineConfig({
         treasurer_payouts:       resolve(__dirname, 'app/treasurer/payouts.html'),
         treasurer_fines:         resolve(__dirname, 'app/treasurer/fines.html'),
         treasurer_social:        resolve(__dirname, 'app/treasurer/social-fund.html'),
+        treasurer_announcements: resolve(__dirname, 'app/treasurer/announcements.html'),
 
         secretary:               resolve(__dirname, 'app/secretary/index.html'),
         secretary_directory:     resolve(__dirname, 'app/secretary/directory.html'),

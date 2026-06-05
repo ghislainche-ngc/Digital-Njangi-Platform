@@ -11,6 +11,7 @@ import { destinationFor } from '/src/js/auth/role-redirect.js';
 // a regular member sees (own history, own rotation turn, own ledger view, own
 // profile + wallet settings).
 const MEMBER_PERSONAL = [
+  { href: '/app/member/',               label: 'my_overview', icon: 'grid' },
   { href: '/app/member/history.html',  label: 'my_history',  icon: 'cash' },
   { href: '/app/member/rotation.html', label: 'my_rotation', icon: 'calendar' },
   { href: '/app/member/ledger.html',   label: 'ledger',      icon: 'chart' },
@@ -28,6 +29,7 @@ const NAV_BY_ROLE = {
     { section: 'section_manage' },
     { href: '/app/president/',              label: 'overview', icon: 'grid' },
     { href: '/app/president/members.html',  label: 'members',  icon: 'users' },
+    { href: '/app/president/announcements.html', label: 'announcements', icon: 'megaphone' },
     { href: '/app/president/reports.html',  label: 'reports',  icon: 'chart' },
     { href: '/app/president/settings.html', label: 'settings', icon: 'cog' },
     { section: 'section_personal' },
@@ -40,6 +42,7 @@ const NAV_BY_ROLE = {
     { href: '/app/treasurer/payouts.html',       label: 'payouts',       icon: 'send' },
     { href: '/app/treasurer/fines.html',         label: 'fines',         icon: 'alert' },
     { href: '/app/treasurer/social-fund.html',   label: 'social_fund',   icon: 'heart' },
+    { href: '/app/treasurer/announcements.html', label: 'announcements', icon: 'megaphone' },
     { section: 'section_personal' },
     ...MEMBER_PERSONAL,
   ],
@@ -88,7 +91,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
   const sessionUser = session.user();
   if (sessionUser && sessionUser.role && sessionUser.role !== role) {
     // Officers (president/treasurer/secretary) can access member personal pages
-    const memberPersonalPaths = ['/app/member/history.html', '/app/member/rotation.html', '/app/member/ledger.html', '/app/member/profile.html'];
+    const memberPersonalPaths = ['/app/member/', '/app/member/index.html', '/app/member/history.html', '/app/member/rotation.html', '/app/member/ledger.html', '/app/member/profile.html'];
     const isOfficerOnMemberPage = ['president', 'treasurer', 'secretary'].includes(sessionUser.role) && memberPersonalPaths.some(p => window.location.pathname.endsWith(p));
     if (!isOfficerOnMemberPage) {
       window.location.assign(destinationFor(sessionUser.role));
