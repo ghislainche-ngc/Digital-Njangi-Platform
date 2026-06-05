@@ -311,7 +311,7 @@ class AuthService {
   }
 
   async enable2FA({ userId, secret, code }) {
-    const result = await verify({ token: code, secret });
+    const result = await verify({ token: code, secret, window: 2 });
     if (!result || !result.valid) {
       const err = new Error('Invalid verification code.');
       err.statusCode = 400;
@@ -379,7 +379,7 @@ class AuthService {
       throw err;
     }
 
-    const result = await verify({ token: code, secret: user.two_factor_secret });
+    const result = await verify({ token: code, secret: user.two_factor_secret, window: 2 });
     if (!result || !result.valid) {
       await this.logLoginAttempt({
         userId: user.id,
