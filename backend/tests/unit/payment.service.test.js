@@ -179,7 +179,7 @@ describe('CampayService', () => {
         currency: 'XAF',
         from: '237677000001',
         description: expect.any(String),
-        external_reference: 'contrib-uuid-1',
+        external_reference: expect.stringContaining('contrib-uuid-1'),
       });
       expect(collectCall[1].headers.Authorization).toBe('Token tok');
     });
@@ -263,7 +263,7 @@ describe('CampayService', () => {
         amount: '2500',
         to: '237677000001',
         description: expect.any(String),
-        external_reference: 'payout-uuid-1',
+        external_reference: expect.stringContaining('payout-uuid-1'),
       });
     });
 

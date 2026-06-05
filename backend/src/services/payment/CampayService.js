@@ -120,7 +120,7 @@ class CampayService extends PaymentProvider {
         currency: 'XAF',
         from: normalized,
         description: 'NjangiBridge contribution',
-        external_reference: paymentRef,
+        external_reference: `${paymentRef}-${Date.now()}`,
       }),
     });
 
@@ -169,7 +169,7 @@ class CampayService extends PaymentProvider {
         amount: String(sendAmount),
         to: normalized,
         description: 'NjangiBridge payout',
-        external_reference: paymentRef,
+        external_reference: `${paymentRef}-${Date.now()}`,
       }),
     });
 
