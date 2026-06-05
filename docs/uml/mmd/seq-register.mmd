@@ -1,0 +1,14 @@
+%%{init: {'theme':'forest', 'themeVariables': {'primaryColor':'#f0f8ff','edgeLabelBackground':'#ffffff','tertiaryColor':'#c2dff9'}}}%%
+sequenceDiagram
+    autonumber
+    participant U as Member
+    participant FE as Frontend
+    participant BE as Backend
+    participant Auth as AuthService
+
+    U->>FE: submit registration form
+    FE->>BE: POST /api/auth/register
+    BE->>Auth: createUser(email,password)
+    Auth-->>BE: userCreated
+    BE-->>FE: 201 Created
+    FE-->>U: show success

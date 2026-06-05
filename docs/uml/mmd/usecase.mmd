@@ -1,0 +1,21 @@
+%%{init: {'theme':'forest', 'themeVariables': {'primaryColor':'#eef7f2','edgeLabelBackground':'#ffffff','tertiaryColor':'#c6e5d0'}}}%%
+graph LR
+    actor_M(Member)
+    actor_P(President)
+    actor_T(Treasurer)
+    actor_A(Admin)
+
+    Register((Register))
+    Contribute((Make Contribution))
+    RequestPayout((Request Payout))
+    ApprovePayout((Approve Payout))
+    ViewReports((View Reports))
+    ManageMembers((Manage Members))
+
+    actor_M --> Register
+    actor_M --> Contribute
+    actor_M --> RequestPayout
+    actor_P --> ApprovePayout
+    actor_T --> ApprovePayout
+    actor_A --> ManageMembers
+    actor_P --> ViewReports

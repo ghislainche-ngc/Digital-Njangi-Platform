@@ -1,0 +1,18 @@
+%%{init: {'theme':'forest', 'themeVariables': {'primaryColor':'#eef7fb','edgeLabelBackground':'#ffffff','tertiaryColor':'#c7def3'}}}%%
+sequenceDiagram
+    autonumber
+    participant M as Member
+    participant FE as Frontend
+    participant BE as Backend
+    participant Payout as PayoutEngine
+    participant Bank as BankService
+    participant Notif as NotificationService
+
+    M->>FE: request payout
+    FE->>BE: POST /api/payouts
+    BE->>Payout: calculateShare(userId)
+    Payout-->>BE: payoutDetails
+    BE->>Bank: transfer(amount)
+    Bank-->>BE: transferSuccess
+    BE->>Notif: sendPayoutNotice()
+    Notif-->>M: payout notification

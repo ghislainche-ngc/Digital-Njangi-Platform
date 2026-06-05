@@ -1,0 +1,38 @@
+%%{init: {'theme':'forest', 'themeVariables': {'primaryColor':'#f8f0e3','edgeLabelBackground':'#ffffff','tertiaryColor':'#efdfb6'}}}%%
+classDiagram
+    direction LR
+    class User {
+      +String id
+      +String name
+      +String email
+      +register()
+      +login()
+    }
+    class Group {
+      +String id
+      +String name
+      +createRotation()
+    }
+    class Contribution {
+      +String id
+      +Decimal amount
+      +Date date
+      +status
+    }
+    class Payout {
+      +String id
+      +Decimal amount
+      +Date date
+      +processPayout()
+    }
+    class Notification {
+      +String id
+      +String type
+      +send()
+    }
+    User "1" o-- "*" Group : memberOf
+    User --> Contribution : makes
+    Contribution --> Group : for
+    Group --> Payout : schedules
+    Payout --> User : pays
+    User --> Notification : receives

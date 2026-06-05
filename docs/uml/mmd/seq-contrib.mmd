@@ -1,0 +1,16 @@
+%%{init: {'theme':'forest', 'themeVariables': {'primaryColor':'#f7f3f2','edgeLabelBackground':'#ffffff','tertiaryColor':'#d9c7c2'}}}%%
+sequenceDiagram
+    autonumber
+    participant U as Member
+    participant FE as Frontend
+    participant BE as Backend
+    participant Payment as PaymentService
+    participant Notif as NotificationService
+
+    U->>FE: submit contribution
+    FE->>BE: POST /api/contributions
+    BE->>Payment: chargeCard()
+    Payment-->>BE: paymentSuccess
+    BE->>DB: saveContribution(status:confirmed)
+    BE->>Notif: sendReceipt()
+    Notif-->>U: emailReceipt

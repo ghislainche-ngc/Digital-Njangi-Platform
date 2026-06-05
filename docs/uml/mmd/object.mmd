@@ -1,0 +1,8 @@
+%%{init: {'theme':'forest', 'themeVariables': {'primaryColor':'#fef6e4','edgeLabelBackground':'#ffffff','tertiaryColor':'#f6e2ac'}}}%%
+graph LR
+    user1["user1 : User\n{id='u123', name='Alice', role='Member'}"]
+    group1["group1 : Group\n{id='g1', name='Market St Njangi'}"]
+    contrib1["contrib1 : Contribution\n{id='c456', amount=5000, date='2026-06-01'}"]
+    user1 --> group1
+    user1 --> contrib1
+    contrib1 --> group1
