@@ -110,6 +110,10 @@
           mountContent(`
             <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
               <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+              <div class="flex-1"></div>
+              <a href="${apiBase}/groups/${activeGroupId}/reports/my-history/pdf?token=${encodeURIComponent(session.token() || '')}" target="_blank" class="btn-primary text-xs">
+                ↓ Export PDF Statement
+              </a>
             </div>
 
             <div class="grid gap-4 md:grid-cols-3 mb-6">

@@ -23,6 +23,9 @@
         getSocialFundBalance,
         groupLabel
       } from '/src/js/api/njangi.js';
+      import { session } from '/src/js/auth/session.js';
+
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
 
       const escapeHtml = (value) => String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -35,6 +38,7 @@
 
       let allLedgerItems = [];
       let activeCycleFilter = 'all';
+      let activeGroupId = '';
 
       const renderTable = () => {
         const filtered = activeCycleFilter === 'all'
@@ -47,6 +51,16 @@
         tbody.innerHTML = filtered.length
           ? filtered.map(item => {
               const dateStr = item.date ? new Date(item.date).toLocaleDateString() : '—';
+              
+              let receiptBtn = '<span class="muted text-xs">—</span>';
+              if (item.id) {
+                if (item.type === 'contribution' && item.status === 'paid') {
+                  receiptBtn = `<a href="${apiBase}/groups/${activeGroupId}/contributions/${item.id}/receipt?token=${encodeURIComponent(session.token() || '')}" target="_blank" class="nav-link text-xs inline-flex justify-center">↓ Receipt</a>`;
+                } else if (item.type === 'payout') {
+                  receiptBtn = `<a href="${apiBase}/groups/${activeGroupId}/payouts/${item.id}/receipt?token=${encodeURIComponent(session.token() || '')}" target="_blank" class="nav-link text-xs inline-flex justify-center">↓ Receipt</a>`;
+                }
+              }
+
               return `
                 <tr>
                   <td class="px-5 py-3">${escapeHtml(dateStr)}</td>
@@ -54,13 +68,14 @@
                   <td class="font-medium">${escapeHtml(item.member)}</td>
                   <td>${escapeHtml(item.method)}</td>
                   <td class="font-mono">${escapeHtml(item.amount)}</td>
-                  <td class="text-right pr-5"><span class="chip chip-${item.status}">${escapeHtml(item.statusLabel)}</span></td>
+                  <td><span class="chip chip-${item.status}">${escapeHtml(item.statusLabel)}</span></td>
+                  <td class="text-right pr-5">${receiptBtn}</td>
                 </tr>
               `;
             }).join('')
           : `
             <tr>
-              <td colspan="6" class="px-5 py-8 text-center muted">No activities found in this cycle.</td>
+              <td colspan="7" class="px-5 py-8 text-center muted">No activities found in this cycle.</td>
             </tr>
           `;
       };
@@ -69,7 +84,11 @@
         mountContent(`<div class="glass-card p-6">Loading ledger…</div>`);
 
         try {
-          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          const context = await resolveGroupContext();
+          activeGroupId = context.activeGroupId;
+          const activeGroup = context.activeGroup;
+          const groups = context.groups;
+
           if (!activeGroupId) {
             mountContent(`
               <div class="glass-card p-6">
@@ -98,6 +117,7 @@
           cyclesList.forEach(c => {
             if (c.payout) {
               allLedgerItems.push({
+                id: c.payout.id,
                 date: c.payout.date || '',
                 type: 'payout',
                 member: c.payout.recipientName,
@@ -113,6 +133,7 @@
             contributions.forEach(contrib => {
               const chipClass = contrib.status === 'confirmed' ? 'paid' : contrib.status === 'failed' ? 'failed' : 'due';
               allLedgerItems.push({
+                id: contrib.id,
                 date: contrib.date || '',
                 type: `contribution`,
                 member: contrib.memberName,
@@ -183,7 +204,8 @@
                     <th>Member</th>
                     <th>Method</th>
                     <th>Amount (FCFA)</th>
-                    <th class="text-right pr-5">Status</th>
+                    <th>Status</th>
+                    <th class="text-right pr-5">Receipt</th>
                   </tr>
                 </thead>
                 <tbody id="ledger-tbody" class="divide-y divide-[var(--border-subtle)]"></tbody>

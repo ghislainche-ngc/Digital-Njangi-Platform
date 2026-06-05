@@ -138,4 +138,39 @@ router.post(
   }
 );
 
+/**
+ * @swagger
+ * /groups/{groupId}/reports/my-history/pdf:
+ *   get:
+ *     summary: Download personal statement report PDF for authenticated member
+ *     tags: [Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: PDF personal statement returned }
+ *       401: { description: Not authenticated }
+ *       500: { description: Server error }
+ */
+router.get(
+  '/:groupId/reports/my-history/pdf',
+  auth,
+  tenant,
+  async (req, res, next) => {
+    try {
+      const buffer = await reportService.generatePersonalStatementPDF(req.params.groupId, req.user.sub);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=personal-statement-${req.user.sub}.pdf`);
+      return res.send(buffer);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 module.exports = router;

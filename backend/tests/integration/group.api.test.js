@@ -198,6 +198,23 @@ describeDb('Groups & Members API', () => {
       const groupId = createRes.body.group.id;
       createdGroupIds.add(groupId);
 
+      const { data: cycle } = await supabase
+        .from('cycles')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('status', 'active')
+        .single();
+
+      await supabase.from('contributions').insert({
+        cycle_id: cycle.id,
+        user_id: creator.id,
+        group_id: groupId,
+        amount: 10000,
+        status: 'confirmed',
+        payment_method: 'cash',
+        confirmed_at: new Date().toISOString(),
+      });
+
       const res = await request(app)
         .patch(`/groups/${groupId}`)
         .set('Authorization', `Bearer ${getToken(creator.id, groupId)}`)
@@ -217,6 +234,23 @@ describeDb('Groups & Members API', () => {
 
       const groupId = createRes.body.group.id;
       createdGroupIds.add(groupId);
+
+      const { data: cycle } = await supabase
+        .from('cycles')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('status', 'active')
+        .single();
+
+      await supabase.from('contributions').insert({
+        cycle_id: cycle.id,
+        user_id: creator.id,
+        group_id: groupId,
+        amount: 5000,
+        status: 'confirmed',
+        payment_method: 'cash',
+        confirmed_at: new Date().toISOString(),
+      });
 
       const res = await request(app)
         .patch(`/groups/${groupId}`)

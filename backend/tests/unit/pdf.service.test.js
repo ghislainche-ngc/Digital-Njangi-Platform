@@ -93,4 +93,58 @@ describe('PDFService', () => {
       expect(buffer.slice(0, 4).toString()).toBe('%PDF');
     });
   });
+
+  describe('generatePayoutReceiptPDF', () => {
+    it('returns a valid PDF buffer for a payout confirmation', async () => {
+      const payout = {
+        recipientName: 'Marie Ngo',
+        amount: 150000,
+        method: 'MTN Mobile Money',
+        date: '2026-05-20T14:30:00.000Z',
+        groupName: 'Mboa Savings Circle',
+        cycleNumber: 2,
+        status: 'completed',
+      };
+
+      const buffer = await pdfService.generatePayoutReceiptPDF(payout);
+
+      expect(Buffer.isBuffer(buffer)).toBe(true);
+      expect(buffer.slice(0, 4).toString()).toBe('%PDF');
+    });
+  });
+
+  describe('generatePersonalStatementPDF', () => {
+    it('returns a valid PDF buffer for a personal financial statement', async () => {
+      const memberData = {
+        memberName: 'Achille Fomum',
+        groupName: 'Mboa Savings Circle',
+        successRate: 100,
+        totalPaid: 75000,
+      };
+
+      const history = {
+        contributions: [
+          {
+            amount: 25000,
+            status: 'confirmed',
+            created_at: '2026-03-01T10:00:00.000Z',
+            cycles: { cycle_number: 1 },
+          },
+        ],
+        payouts: [
+          {
+            amount: 100000,
+            status: 'completed',
+            executed_at: '2026-04-01T12:00:00.000Z',
+            cycles: { cycle_number: 2 },
+          },
+        ],
+      };
+
+      const buffer = await pdfService.generatePersonalStatementPDF(memberData, history);
+
+      expect(Buffer.isBuffer(buffer)).toBe(true);
+      expect(buffer.slice(0, 4).toString()).toBe('%PDF');
+    });
+  });
 });
