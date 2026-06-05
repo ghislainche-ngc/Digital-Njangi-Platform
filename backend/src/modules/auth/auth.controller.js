@@ -1,7 +1,8 @@
 'use strict';
 
 const authService = require('./auth.service');
-const { registerSchema, loginSchema, otpVerifySchema } = require('./auth.validation');
+const { registerSchema, loginSchema, otpVerifySchema, changePasswordSchema } = require('./auth.validation');
+
 
 /**
  * Auth controller — route handlers only, no business logic.
@@ -80,4 +81,22 @@ const getTelegramBotUrl = async (req, res, next) => {
   }
 };
 
-module.exports = { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl };
+const changePassword = async (req, res, next) => {
+  try {
+    const { error, value } = changePasswordSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message, code: 'VALIDATION_ERROR' });
+
+    const result = await authService.changePassword({
+      userId: req.user.sub,
+      oldPassword: value.oldPassword,
+      newPassword: value.newPassword,
+    });
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+module.exports = { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl, changePassword };
+

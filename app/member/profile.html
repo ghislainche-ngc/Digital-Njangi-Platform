@@ -131,7 +131,7 @@
               <section class="glass-card p-6">
                 <h2 class="font-display text-xl font-bold mb-4">Security</h2>
                 <div class="space-y-4">
-                  <button type="button" class="btn-ghost w-full text-left">Change password →</button>
+                  <button type="button" class="btn-ghost w-full text-left" id="btn-change-password">Change password →</button>
                   <button type="button" class="btn-ghost w-full text-left">Enable SMS OTP (2FA) →</button>
                   <button type="button" class="btn-ghost w-full text-left">View login history →</button>
                 </div>
@@ -139,6 +139,33 @@
                   <a href="/login.html" id="btn-signout">Sign out of NjangiBridge →</a>
                 </p>
               </section>
+
+              <!-- Change Password Modal -->
+              <dialog id="change-password-modal" class="glass-card-heavy p-6 max-w-md w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="font-display font-bold text-lg">Change Password</h3>
+                  <button type="button" onclick="document.getElementById('change-password-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
+                </div>
+                <form id="change-password-form" class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Current Password</label>
+                    <input type="password" name="oldPassword" class="glass-input mt-1" required />
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">New Password</label>
+                    <input type="password" name="newPassword" class="glass-input mt-1" required />
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Confirm New Password</label>
+                    <input type="password" name="confirmPassword" class="glass-input mt-1" required />
+                  </div>
+                  <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="document.getElementById('change-password-modal').close()" class="btn-ghost border border-subtle flex-1">Cancel</button>
+                    <button type="submit" class="btn-primary flex-1">Change Password</button>
+                  </div>
+                  <p id="change-password-msg" class="text-xs text-center mt-2"></p>
+                </form>
+              </dialog>
             </div>
 
             <div class="mt-6 flex justify-end gap-3 items-center">
@@ -254,6 +281,44 @@
             statusMsg.textContent = 'Telegram Bot not configured on server.';
           }
         }
+
+        // Change Password Modal triggers & form submit
+        const changePasswordModal = document.getElementById('change-password-modal');
+        document.getElementById('btn-change-password').addEventListener('click', () => {
+          changePasswordModal.showModal();
+        });
+
+        const changePasswordForm = document.getElementById('change-password-form');
+        changePasswordForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const msg = document.getElementById('change-password-msg');
+          msg.textContent = '';
+          msg.className = 'text-xs text-center mt-2';
+
+          const oldPassword = changePasswordForm.elements.oldPassword.value;
+          const newPassword = changePasswordForm.elements.newPassword.value;
+          const confirmPassword = changePasswordForm.elements.confirmPassword.value;
+
+          if (newPassword !== confirmPassword) {
+            msg.textContent = 'New passwords do not match.';
+            msg.className = 'text-xs text-center mt-2 text-red-500';
+            return;
+          }
+
+          try {
+            await api.post('/auth/change-password', { oldPassword, newPassword });
+            msg.textContent = 'Password changed successfully!';
+            msg.className = 'text-xs text-center mt-2 text-emerald-500';
+            setTimeout(() => {
+              changePasswordModal.close();
+              changePasswordForm.reset();
+              msg.textContent = '';
+            }, 1500);
+          } catch (err) {
+            msg.textContent = err.message || 'Failed to change password.';
+            msg.className = 'text-xs text-center mt-2 text-red-500';
+          }
+        });
 
         document.querySelector('#btn-signout').addEventListener('click', () => {
           session.clear();

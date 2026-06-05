@@ -26,6 +26,7 @@ function chainMock(finalData = null, finalError = null) {
   const chain = {};
   chain.select = jest.fn().mockReturnValue(chain);
   chain.insert = jest.fn().mockReturnValue(chain);
+  chain.update = jest.fn().mockReturnValue(chain);
   chain.delete = jest.fn().mockReturnValue(chain);
   chain.eq = jest.fn().mockReturnValue(chain);
   chain.or = jest.fn().mockReturnValue(chain);
@@ -206,3 +207,49 @@ describe('AuthService.verifyOTP', () => {
     });
   });
 });
+
+describe('AuthService.changePassword', () => {
+  it('successfully updates password when current password matches', async () => {
+    const bcrypt = require('bcrypt');
+    const oldHash = await bcrypt.hash('OldSecurePassword!', 4);
+
+    const userChain = chainMock({
+      password_hash: oldHash,
+    });
+    const updateChain = chainMock();
+
+    let callCount = 0;
+    mockFrom.mockImplementation((table) => {
+      callCount++;
+      return callCount === 1 ? userChain : updateChain;
+    });
+
+    const result = await authService.changePassword({
+      userId: 'user-123',
+      oldPassword: 'OldSecurePassword!',
+      newPassword: 'NewSecurePassword!',
+    });
+
+    expect(result.message).toBe('Password changed successfully.');
+  });
+
+  it('throws 400 when current password does not match', async () => {
+    const bcrypt = require('bcrypt');
+    const oldHash = await bcrypt.hash('OldSecurePassword!', 4);
+
+    const userChain = chainMock({
+      password_hash: oldHash,
+    });
+
+    mockFrom.mockReturnValue(userChain);
+
+    await expect(
+      authService.changePassword({
+        userId: 'user-123',
+        oldPassword: 'WrongOldPassword',
+        newPassword: 'NewSecurePassword!',
+      })
+    ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_CURRENT_PASSWORD' });
+  });
+});
+

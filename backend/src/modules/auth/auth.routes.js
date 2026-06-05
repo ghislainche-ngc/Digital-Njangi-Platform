@@ -2,7 +2,8 @@
 
 const express = require('express');
 const router = express.Router();
-const { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl } = require('./auth.controller');
+const { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl, changePassword } = require('./auth.controller');
+
 const auth = require('../../middleware/auth.middleware');
 const { createRateLimiter } = require('../../middleware/rateLimit.middleware');
 const WhatsAppNotificationService = require('../../services/notification/WhatsAppNotificationService');
@@ -176,5 +177,7 @@ router.get('/whatsapp/qr', (req, res) => {
 
 router.post('/avatar', auth, uploadAvatar);
 router.get('/telegram/bot-url', auth, getTelegramBotUrl);
+router.post('/change-password', auth, changePassword);
 
 module.exports = router;
+

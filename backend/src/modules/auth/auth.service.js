@@ -202,6 +202,40 @@ class AuthService {
     const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/avatars/${fileName}`;
     return { avatarUrl: publicUrl };
   }
+
+  async changePassword({ userId, oldPassword, newPassword }) {
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('password_hash')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !user) {
+      const err = new Error('User not found.');
+      err.statusCode = 404;
+      err.code = 'USER_NOT_FOUND';
+      throw err;
+    }
+
+    const match = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!match) {
+      const err = new Error('Invalid current password.');
+      err.statusCode = 400;
+      err.code = 'INVALID_CURRENT_PASSWORD';
+      throw err;
+    }
+
+    const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: newHash })
+      .eq('id', userId);
+
+    if (updateError) throw updateError;
+
+    return { message: 'Password changed successfully.' };
+  }
 }
+
 
 module.exports = new AuthService();

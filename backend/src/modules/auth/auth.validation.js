@@ -22,4 +22,11 @@ const otpVerifySchema = Joi.object({
   code: Joi.string().length(6).required(),
 });
 
-module.exports = { registerSchema, loginSchema, otpVerifySchema };
+const changePasswordSchema = Joi.object({
+  oldPassword: Joi.string().required(),
+  newPassword: Joi.string().min(8).required()
+    .messages({ 'string.min': 'New password must be at least 8 characters' }),
+});
+
+module.exports = { registerSchema, loginSchema, otpVerifySchema, changePasswordSchema };
+

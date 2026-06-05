@@ -270,5 +270,24 @@ CREATE TABLE IF NOT EXISTS meeting_minutes (
 
 ALTER TABLE meeting_minutes ENABLE ROW LEVEL SECURITY;
 
+-- ============================================================
+-- Security Upgrades: 2FA & Login History (added 2026-06-05)
+-- ============================================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret TEXT DEFAULT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS login_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  ip_address TEXT,
+  user_agent TEXT,
+  status TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+  failure_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE login_history ENABLE ROW LEVEL SECURITY;
+
+
 
 
