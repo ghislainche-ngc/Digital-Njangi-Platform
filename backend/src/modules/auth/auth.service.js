@@ -311,7 +311,7 @@ class AuthService {
   }
 
   async enable2FA({ userId, secret, code }) {
-    const result = await verify({ token: code, secret, window: 2 });
+    const result = await verify({ token: code, secret, epochTolerance: 120 });
     if (!result || !result.valid) {
       const serverTime = new Date().toISOString();
       const err = new Error(`Invalid verification code. (Server time: ${serverTime}. Please sync your VPS clock if it is incorrect.)`);
@@ -380,7 +380,7 @@ class AuthService {
       throw err;
     }
 
-    const result = await verify({ token: code, secret: user.two_factor_secret, window: 2 });
+    const result = await verify({ token: code, secret: user.two_factor_secret, epochTolerance: 120 });
     if (!result || !result.valid) {
       await this.logLoginAttempt({
         userId: user.id,
