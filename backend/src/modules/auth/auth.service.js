@@ -313,7 +313,8 @@ class AuthService {
   async enable2FA({ userId, secret, code }) {
     const result = await verify({ token: code, secret, window: 2 });
     if (!result || !result.valid) {
-      const err = new Error('Invalid verification code.');
+      const serverTime = new Date().toISOString();
+      const err = new Error(`Invalid verification code. (Server time: ${serverTime}. Please sync your VPS clock if it is incorrect.)`);
       err.statusCode = 400;
       err.code = 'INVALID_MFA_CODE';
       throw err;
