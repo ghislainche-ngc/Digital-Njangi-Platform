@@ -102,6 +102,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
   const user = sessionUser || { full_name: 'Demo User', role };
   const displayName = user.full_name || user.name || 'Demo User';
   const activeRole = user.role || role;
+  const logoHref = destinationFor(activeRole);
   const items = NAV_BY_ROLE[activeRole] || [];
   const initials = displayName.split(' ').map(s => s[0]).slice(0, 2).join('');
   const path = window.location.pathname.replace(/\/+$/, '/');
@@ -132,7 +133,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
         <!-- Drawer content -->
         <aside x-transition:enter="transition ease-in-out duration-300 transform" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in-out duration-300 transform" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full" class="relative flex flex-col w-64 max-w-xs h-full p-4 gap-1 bg-[var(--glass-bg-heavy)] border-r border-subtle backdrop-blur-lg">
           <div class="flex items-center justify-between px-3 py-3">
-            <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg">
+            <a href="${logoHref}" class="flex items-center gap-2 font-display font-extrabold text-lg">
               <span class="font-display font-black text-2xl tracking-[-0.07em]">
                 <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
               </span>
@@ -160,7 +161,7 @@ export function renderShell({ role, title, mount = '#app-shell' } = {}) {
 
       <!-- Desktop Sidebar -->
       <aside class="hidden md:flex md:flex-col w-64 glass-card-heavy rounded-none border-r border-subtle p-4 gap-1 h-full overflow-y-auto">
-        <a href="/" class="flex items-center select-none font-display font-black text-2xl tracking-[-0.07em] px-3 py-3">
+        <a href="${logoHref}" class="flex items-center select-none font-display font-black text-2xl tracking-[-0.07em] px-3 py-3">
           <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
         </span>
       </a>

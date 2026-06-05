@@ -24,8 +24,7 @@
         groupLabel
       } from '/src/js/api/njangi.js';
       import { session } from '/src/js/auth/session.js';
-
-      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      import { apiBase } from '/src/js/api/client.js';
 
       const escapeHtml = (value) => String(value ?? '')
         .replaceAll('&', '&amp;')

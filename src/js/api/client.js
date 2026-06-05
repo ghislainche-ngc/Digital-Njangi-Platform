@@ -2,7 +2,8 @@
   Reads VITE_API_BASE_URL and attaches the JWT header.
   Normalizes legacy /api/* paths to the root-mounted backend routes. */
 
-const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+export const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
+const BASE = apiBase;
 
 function normalizePath(path) {
   const clean = path.startsWith('/api/') ? path.slice(4) : path;

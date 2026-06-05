@@ -19,3 +19,10 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .catch((err) => console.warn('SW registration failed:', err));
   });
 }
+
+// Security: prevent back-button access after logout by checking token on page show
+window.addEventListener('pageshow', () => {
+  if (window.location.pathname.includes('/app/') && !localStorage.getItem('naas.jwt')) {
+    window.location.replace('/login.html');
+  }
+});
