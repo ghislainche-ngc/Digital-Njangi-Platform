@@ -2,7 +2,8 @@
 
 const express = require('express');
 const router = express.Router();
-const { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl, changePassword } = require('./auth.controller');
+const { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl, changePassword, generate2FA, enable2FA, disable2FA, verify2FALogin } = require('./auth.controller');
+
 
 const auth = require('../../middleware/auth.middleware');
 const { createRateLimiter } = require('../../middleware/rateLimit.middleware');
@@ -178,6 +179,12 @@ router.get('/whatsapp/qr', (req, res) => {
 router.post('/avatar', auth, uploadAvatar);
 router.get('/telegram/bot-url', auth, getTelegramBotUrl);
 router.post('/change-password', auth, changePassword);
+
+// 2FA Routes
+router.post('/2fa/generate', auth, generate2FA);
+router.post('/2fa/enable', auth, enable2FA);
+router.post('/2fa/disable', auth, disable2FA);
+router.post('/2fa/verify-login', loginLimiter, verify2FALogin);
 
 module.exports = router;
 

@@ -132,7 +132,9 @@
                 <h2 class="font-display text-xl font-bold mb-4">Security</h2>
                 <div class="space-y-4">
                   <button type="button" class="btn-ghost w-full text-left" id="btn-change-password">Change password →</button>
-                  <button type="button" class="btn-ghost w-full text-left">Enable SMS OTP (2FA) →</button>
+                  <button type="button" class="btn-ghost w-full text-left" id="btn-toggle-2fa">
+                    ${user.two_factor_enabled ? 'Disable 2FA (Authenticator App) →' : 'Enable 2FA (Authenticator App) →'}
+                  </button>
                   <button type="button" class="btn-ghost w-full text-left">View login history →</button>
                 </div>
                 <p class="mt-6 text-xs text-red-500">
@@ -165,6 +167,37 @@
                   </div>
                   <p id="change-password-msg" class="text-xs text-center mt-2"></p>
                 </form>
+              </dialog>
+
+              <!-- 2FA Setup Modal -->
+              <dialog id="setup-2fa-modal" class="glass-card-heavy p-6 max-w-md w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="font-display font-bold text-lg">Set Up Authenticator (2FA)</h3>
+                  <button type="button" onclick="document.getElementById('setup-2fa-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
+                </div>
+                <div class="space-y-4">
+                  <p class="text-sm text-[var(--text-muted)]">
+                    1. Scan this QR code using an authenticator app (like <strong>Aegis</strong> or <strong>Ente Auth</strong>) on your mobile device.
+                  </p>
+                  <div class="flex justify-center p-3 bg-white rounded-xl">
+                    <img id="qr-code-img" src="" alt="Scan QR Code" style="width: 200px; height: 200px;" />
+                  </div>
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider muted">Or enter this secret key manually:</p>
+                    <code id="secret-key-text" class="block p-2 bg-[var(--bg-muted)] border border-subtle rounded-lg text-center font-mono mt-1 text-sm select-all"></code>
+                  </div>
+                  <form id="verify-2fa-form" class="space-y-3">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Enter 6-Digit Code</label>
+                      <input type="text" name="mfaCode" pattern="\d{6}" placeholder="e.g. 123456" class="glass-input mt-1 text-center font-mono tracking-widest text-lg" required />
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                      <button type="button" onclick="document.getElementById('setup-2fa-modal').close()" class="btn-ghost border border-subtle flex-1">Cancel</button>
+                      <button type="submit" class="btn-primary flex-1">Verify & Enable</button>
+                    </div>
+                    <p id="setup-2fa-msg" class="text-xs text-center mt-2"></p>
+                  </form>
+                </div>
               </dialog>
             </div>
 
@@ -316,6 +349,65 @@
             }, 1500);
           } catch (err) {
             msg.textContent = err.message || 'Failed to change password.';
+            msg.className = 'text-xs text-center mt-2 text-red-500';
+          }
+        });
+
+        // 2FA Setup triggers and submit
+        const toggle2faBtn = document.getElementById('btn-toggle-2fa');
+        const setup2faModal = document.getElementById('setup-2fa-modal');
+        let tempSecret = '';
+
+        toggle2faBtn.addEventListener('click', async () => {
+          if (user.two_factor_enabled) {
+            if (confirm('Are you sure you want to disable 2FA? This will decrease your account security.')) {
+              try {
+                await api.post('/auth/2fa/disable');
+                user.two_factor_enabled = false;
+                localStorage.setItem('naas.user', JSON.stringify(user));
+                alert('2FA disabled successfully.');
+                window.location.reload();
+              } catch (err) {
+                alert('Failed to disable 2FA: ' + err.message);
+              }
+            }
+          } else {
+            try {
+              const res = await api.post('/auth/2fa/generate');
+              tempSecret = res.secret;
+              document.getElementById('secret-key-text').textContent = res.secret;
+              document.getElementById('qr-code-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(res.otpauthUrl)}`;
+              document.getElementById('setup-2fa-msg').textContent = '';
+              setup2faModal.showModal();
+            } catch (err) {
+              alert('Failed to generate 2FA secret: ' + err.message);
+            }
+          }
+        });
+
+        const verify2faForm = document.getElementById('verify-2fa-form');
+        verify2faForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const msg = document.getElementById('setup-2fa-msg');
+          msg.textContent = 'Verifying...';
+          msg.className = 'text-xs text-center mt-2 text-yellow-500';
+
+          const code = verify2faForm.elements.mfaCode.value;
+          try {
+            await api.post('/auth/2fa/enable', { secret: tempSecret, code });
+            msg.textContent = '✓ 2FA enabled successfully!';
+            msg.className = 'text-xs text-center mt-2 text-emerald-500';
+            
+            user.two_factor_enabled = true;
+            localStorage.setItem('naas.user', JSON.stringify(user));
+
+            setTimeout(() => {
+              setup2faModal.close();
+              verify2faForm.reset();
+              window.location.reload();
+            }, 1500);
+          } catch (err) {
+            msg.textContent = err.message || 'Verification failed. Try again.';
             msg.className = 'text-xs text-center mt-2 text-red-500';
           }
         });

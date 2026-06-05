@@ -98,5 +98,65 @@ const changePassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl, changePassword };
+const generate2FA = async (req, res, next) => {
+  try {
+    const result = await authService.generate2FASecret(req.user.sub);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+const enable2FA = async (req, res, next) => {
+  try {
+    const { secret, code } = req.body;
+    if (!secret || !code) {
+      return res.status(400).json({ error: 'Secret and verification code are required.', code: 'VALIDATION_ERROR' });
+    }
+    const result = await authService.enable2FA({ userId: req.user.sub, secret, code });
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+const disable2FA = async (req, res, next) => {
+  try {
+    const result = await authService.disable2FA(req.user.sub);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+const verify2FALogin = async (req, res, next) => {
+  try {
+    const { mfaToken, code } = req.body;
+    if (!mfaToken || !code) {
+      return res.status(400).json({ error: 'MFA session token and verification code are required.', code: 'VALIDATION_ERROR' });
+    }
+    const result = await authService.verify2FALogin({ mfaToken, code });
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+module.exports = {
+  register,
+  verifyOTP,
+  login,
+  uploadAvatar,
+  getTelegramBotUrl,
+  changePassword,
+  generate2FA,
+  enable2FA,
+  disable2FA,
+  verify2FALogin,
+};
+
 

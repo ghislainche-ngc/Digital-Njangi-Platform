@@ -19,6 +19,21 @@ jest.mock('../../src/config/supabase', () => {
   };
 });
 
+jest.mock('otplib', () => {
+  const mockSecret = 'mocked-secret-key';
+  const mockCode = '123456';
+  return {
+    authenticator: {
+      generateSecret: jest.fn().mockReturnValue(mockSecret),
+      keyuri: jest.fn().mockReturnValue(`otpauth://totp/NjangiBridge:test%40naas.cm?secret=${mockSecret}`),
+      verify: jest.fn().mockImplementation(({ token, secret }) => {
+        return token === mockCode || token === '123456';
+      }),
+      generate: jest.fn().mockReturnValue(mockCode),
+    }
+  };
+});
+
 const { __mockFrom: mockFrom, __mockUpload: mockUpload } = require('../../src/config/supabase');
 const authService = require('../../src/modules/auth/auth.service');
 
@@ -252,4 +267,104 @@ describe('AuthService.changePassword', () => {
     ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_CURRENT_PASSWORD' });
   });
 });
+
+describe('AuthService 2FA operations', () => {
+  it('generate2FASecret returns a secret and otpauthUrl', async () => {
+    const userChain = chainMock({ email: 'test@naas.cm' });
+    mockFrom.mockReturnValue(userChain);
+
+    const result = await authService.generate2FASecret('user-123');
+    expect(result.secret).toBeDefined();
+    expect(result.otpauthUrl).toContain('otpauth://totp/NjangiBridge:test%40naas.cm');
+  });
+
+  it('enable2FA enables 2FA with valid code', async () => {
+    const { authenticator } = require('otplib');
+    const secret = authenticator.generateSecret();
+    const code = authenticator.generate(secret);
+
+    const updateChain = chainMock();
+    mockFrom.mockReturnValue(updateChain);
+
+    const result = await authService.enable2FA({
+      userId: 'user-123',
+      secret,
+      code,
+    });
+
+    expect(result.message).toContain('enabled successfully');
+  });
+
+  it('enable2FA throws for invalid code', async () => {
+    const { authenticator } = require('otplib');
+    const secret = authenticator.generateSecret();
+
+    await expect(
+      authService.enable2FA({
+        userId: 'user-123',
+        secret,
+        code: '000000',
+      })
+    ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_MFA_CODE' });
+  });
+
+  it('disable2FA disables 2FA', async () => {
+    const updateChain = chainMock();
+    mockFrom.mockReturnValue(updateChain);
+
+    const result = await authService.disable2FA('user-123');
+    expect(result.message).toContain('disabled successfully');
+  });
+
+  it('login redirects to 2FA when enabled', async () => {
+    const bcrypt = require('bcrypt');
+    const hash = await bcrypt.hash('Password123!', 4);
+
+    const userChain = chainMock({
+      id: 'user-123',
+      email: 'test@naas.cm',
+      full_name: 'Test User',
+      password_hash: hash,
+      two_factor_enabled: true,
+    });
+    mockFrom.mockReturnValue(userChain);
+
+    const result = await authService.login({
+      email: 'test@naas.cm',
+      password: 'Password123!',
+    });
+
+    expect(result.status).toBe('2fa_required');
+    expect(result.mfaToken).toBeDefined();
+  });
+
+  it('verify2FALogin logs in user with valid token and code', async () => {
+    const { authenticator } = require('otplib');
+    const secret = authenticator.generateSecret();
+    const code = authenticator.generate(secret);
+
+    const mfaToken = jwt.sign(
+      { sub: 'user-123', email: 'test@naas.cm', mfa_pending: true },
+      process.env.JWT_SECRET,
+      { expiresIn: '5m' }
+    );
+
+    const userChain = chainMock({
+      id: 'user-123',
+      email: 'test@naas.cm',
+      full_name: 'Test User',
+      two_factor_secret: secret,
+    });
+    mockFrom.mockReturnValue(userChain);
+
+    const result = await authService.verify2FALogin({
+      mfaToken,
+      code,
+    });
+
+    expect(result.token).toBeDefined();
+    expect(result.user.id).toBe('user-123');
+  });
+});
+
 

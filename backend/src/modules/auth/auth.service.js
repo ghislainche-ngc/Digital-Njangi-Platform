@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../../config/supabase');
+const { authenticator } = require('otplib');
 
 const SALT_ROUNDS = 12;
 const JWT_EXPIRY = '24h';
@@ -63,7 +64,7 @@ class AuthService {
 
     const { data: user } = await supabase
       .from('users')
-      .select('id, email, full_name, is_admin')
+      .select('id, email, full_name, is_admin, two_factor_enabled')
       .eq('phone', phone)
       .single();
 
@@ -77,6 +78,7 @@ class AuthService {
         full_name: user.full_name,
         role: user.is_admin ? 'admin' : (membership?.role || 'member'),
         group_id: membership?.group_id || null,
+        two_factor_enabled: !!user.two_factor_enabled,
       },
     };
   }
@@ -84,7 +86,7 @@ class AuthService {
   async login({ email, password }) {
     const { data: user } = await supabase
       .from('users')
-      .select('id, email, full_name, password_hash, is_admin')
+      .select('id, email, full_name, password_hash, is_admin, two_factor_enabled')
       .eq('email', email)
       .single();
 
@@ -103,6 +105,18 @@ class AuthService {
       throw err;
     }
 
+    if (user.two_factor_enabled) {
+      const mfaToken = jwt.sign(
+        { sub: user.id, email: user.email, mfa_pending: true },
+        process.env.JWT_SECRET,
+        { expiresIn: '5m' }
+      );
+      return {
+        status: '2fa_required',
+        mfaToken
+      };
+    }
+
     const token = this._signToken(user);
     const membership = await this._getPrimaryMembership(user.id);
     return {
@@ -113,6 +127,7 @@ class AuthService {
         full_name: user.full_name,
         role: user.is_admin ? 'admin' : (membership?.role || 'member'),
         group_id: membership?.group_id || null,
+        two_factor_enabled: !!user.two_factor_enabled,
       },
     };
   }
@@ -234,6 +249,110 @@ class AuthService {
     if (updateError) throw updateError;
 
     return { message: 'Password changed successfully.' };
+  }
+
+  async generate2FASecret(userId) {
+    const { data: user } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .single();
+
+    if (!user) {
+      const err = new Error('User not found.');
+      err.statusCode = 404;
+      err.code = 'USER_NOT_FOUND';
+      throw err;
+    }
+
+    const secret = authenticator.generateSecret();
+    const otpauthUrl = authenticator.keyuri(user.email, 'NjangiBridge', secret);
+
+    return { secret, otpauthUrl };
+  }
+
+  async enable2FA({ userId, secret, code }) {
+    const isValid = authenticator.verify({ token: code, secret });
+    if (!isValid) {
+      const err = new Error('Invalid verification code.');
+      err.statusCode = 400;
+      err.code = 'INVALID_MFA_CODE';
+      throw err;
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .update({ two_factor_secret: secret, two_factor_enabled: true })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    return { message: '2FA enabled successfully.' };
+  }
+
+  async disable2FA(userId) {
+    const { error } = await supabase
+      .from('users')
+      .update({ two_factor_secret: null, two_factor_enabled: false })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    return { message: '2FA disabled successfully.' };
+  }
+
+  async verify2FALogin({ mfaToken, code }) {
+    let decoded;
+    try {
+      decoded = jwt.verify(mfaToken, process.env.JWT_SECRET);
+    } catch (e) {
+      const err = new Error('MFA session expired or invalid.');
+      err.statusCode = 401;
+      err.code = 'MFA_SESSION_EXPIRED';
+      throw err;
+    }
+
+    if (!decoded.mfa_pending) {
+      const err = new Error('Invalid MFA session.');
+      err.statusCode = 400;
+      err.code = 'INVALID_MFA_SESSION';
+      throw err;
+    }
+
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, email, full_name, is_admin, two_factor_secret, two_factor_enabled')
+      .eq('id', decoded.sub)
+      .single();
+
+    if (!user) {
+      const err = new Error('User not found.');
+      err.statusCode = 404;
+      err.code = 'USER_NOT_FOUND';
+      throw err;
+    }
+
+    const isValid = authenticator.verify({ token: code, secret: user.two_factor_secret });
+    if (!isValid) {
+      const err = new Error('Invalid verification code.');
+      err.statusCode = 400;
+      err.code = 'INVALID_MFA_CODE';
+      throw err;
+    }
+
+    const token = this._signToken(user);
+    const membership = await this._getPrimaryMembership(user.id);
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.is_admin ? 'admin' : (membership?.role || 'member'),
+        group_id: membership?.group_id || null,
+        two_factor_enabled: !!user.two_factor_enabled,
+      },
+    };
   }
 }
 
