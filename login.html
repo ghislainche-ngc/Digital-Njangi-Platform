@@ -237,9 +237,6 @@
               <span x-text="$t('login.new_user')">Don't have an account?</span>
               <a :href="new URLSearchParams(window.location.search).get('token') ? `/register.html?token=${new URLSearchParams(window.location.search).get('token')}` : '/register.html'" class="text-black dark:text-white font-semibold underline ml-1 hover:opacity-80 transition" x-text="$t('login.create_account')">Join the network</a>
             </div>
-            <div class="border-t border-zinc-200 dark:border-zinc-850 py-3 text-center text-sm text-zinc-600 dark:text-zinc-400">
-              Want to lead your community? <a href="#" class="text-black dark:text-white font-semibold underline ml-1 hover:opacity-80 transition">Start a Chapter</a>
-            </div>
           </div>
         </div>
 
