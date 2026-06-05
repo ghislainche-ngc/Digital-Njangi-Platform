@@ -147,7 +147,7 @@ class GroupService {
   }
 
   async updateSettings(groupId, data) {
-    if (data.rotation_type || data.contribution_amount !== undefined) {
+    if (data.rotation_type !== undefined || data.contribution_amount !== undefined) {
       const { data: activeCycle } = await supabase
         .from('cycles')
         .select('id')
@@ -156,11 +156,22 @@ class GroupService {
         .single();
 
       if (activeCycle) {
-        const fieldName = data.rotation_type ? 'rotation type' : 'contribution amount';
-        const err = new Error(`Cannot change ${fieldName} while a cycle is active.`);
-        err.statusCode = 400;
-        err.code = data.rotation_type ? 'ROTATION_LOCKED' : 'CONTRIBUTION_AMOUNT_LOCKED';
-        throw err;
+        const { data: current } = await supabase
+          .from('njangi_groups')
+          .select('rotation_type, contribution_amount')
+          .eq('id', groupId)
+          .single();
+
+        const hasRotationChanged = data.rotation_type !== undefined && data.rotation_type !== current.rotation_type;
+        const hasAmountChanged = data.contribution_amount !== undefined && Number(data.contribution_amount) !== Number(current.contribution_amount);
+
+        if (hasRotationChanged || hasAmountChanged) {
+          const fieldName = hasRotationChanged ? 'rotation type' : 'contribution amount';
+          const err = new Error(`Cannot change ${fieldName} while a cycle is active.`);
+          err.statusCode = 400;
+          err.code = hasRotationChanged ? 'ROTATION_LOCKED' : 'CONTRIBUTION_AMOUNT_LOCKED';
+          throw err;
+        }
       }
     }
 
@@ -170,7 +181,7 @@ class GroupService {
         .select('subscription_tier, contribution_amount')
         .eq('id', groupId)
         .single();
-      
+
       const newTier = data.subscription_tier !== undefined ? data.subscription_tier : (current?.subscription_tier || 'starter');
       const newAmount = data.contribution_amount !== undefined ? Number(data.contribution_amount) : (current?.contribution_amount || 0);
 
