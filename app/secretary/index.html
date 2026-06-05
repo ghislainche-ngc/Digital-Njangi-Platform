@@ -38,8 +38,29 @@
       function getNextMeeting(groupId) {
         const key = `njangi.next_meeting.${groupId}`;
         const data = localStorage.getItem(key);
-        if (data) return JSON.parse(data);
-        const defaults = { date: 'April 28, 2026', time: '18:00', location: 'Yaoundé' };
+        
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        let meetingDate = new Date(year, month, 28, 18, 0, 0);
+        if (now > meetingDate) {
+          meetingDate = new Date(year, month + 1, 28, 18, 0, 0);
+        }
+        const options = { month: 'long', day: 'numeric', year: 'numeric' };
+        const dynamicDate = meetingDate.toLocaleDateString('en-US', options);
+
+        if (data) {
+          const parsed = JSON.parse(data);
+          const storedDate = new Date(parsed.date);
+          if (parsed.date === 'April 28, 2026' || isNaN(storedDate.getTime()) || now > storedDate) {
+            const updated = { ...parsed, date: dynamicDate };
+            localStorage.setItem(key, JSON.stringify(updated));
+            return updated;
+          }
+          return parsed;
+        }
+
+        const defaults = { date: dynamicDate, time: '18:00', location: 'Yaoundé' };
         localStorage.setItem(key, JSON.stringify(defaults));
         return defaults;
       }
