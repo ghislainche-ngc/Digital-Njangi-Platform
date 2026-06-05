@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../../config/supabase');
-const { authenticator } = require('otplib');
+const { generateSecret, verify, generateURI } = require('otplib');
 
 const SALT_ROUNDS = 12;
 const JWT_EXPIRY = '24h';
@@ -304,15 +304,15 @@ class AuthService {
       throw err;
     }
 
-    const secret = authenticator.generateSecret();
-    const otpauthUrl = authenticator.keyuri(user.email, 'NjangiBridge', secret);
+    const secret = generateSecret();
+    const otpauthUrl = generateURI({ label: user.email, issuer: 'NjangiBridge', secret });
 
     return { secret, otpauthUrl };
   }
 
   async enable2FA({ userId, secret, code }) {
-    const isValid = authenticator.verify({ token: code, secret });
-    if (!isValid) {
+    const result = await verify({ token: code, secret });
+    if (!result || !result.valid) {
       const err = new Error('Invalid verification code.');
       err.statusCode = 400;
       err.code = 'INVALID_MFA_CODE';
@@ -379,8 +379,8 @@ class AuthService {
       throw err;
     }
 
-    const isValid = authenticator.verify({ token: code, secret: user.two_factor_secret });
-    if (!isValid) {
+    const result = await verify({ token: code, secret: user.two_factor_secret });
+    if (!result || !result.valid) {
       await this.logLoginAttempt({
         userId: user.id,
         ipAddress,

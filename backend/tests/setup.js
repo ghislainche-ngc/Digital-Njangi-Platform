@@ -30,15 +30,22 @@ global.testGroup = {
 jest.mock('otplib', () => {
   const mockSecret = 'mocked-secret-key';
   const mockCode = '123456';
+  const mockAuthenticator = {
+    generateSecret: jest.fn().mockReturnValue(mockSecret),
+    keyuri: jest.fn().mockReturnValue(`otpauth://totp/NjangiBridge:test%40naas.cm?secret=${mockSecret}`),
+    verify: jest.fn().mockImplementation(({ token, secret }) => {
+      return token === mockCode || token === '123456';
+    }),
+    generate: jest.fn().mockReturnValue(mockCode),
+  };
   return {
-    authenticator: {
-      generateSecret: jest.fn().mockReturnValue(mockSecret),
-      keyuri: jest.fn().mockReturnValue(`otpauth://totp/NjangiBridge:test%40naas.cm?secret=${mockSecret}`),
-      verify: jest.fn().mockImplementation(({ token, secret }) => {
-        return token === mockCode || token === '123456';
-      }),
-      generate: jest.fn().mockReturnValue(mockCode),
-    }
+    authenticator: mockAuthenticator,
+    generateSecret: mockAuthenticator.generateSecret,
+    generateURI: jest.fn().mockReturnValue(`otpauth://totp/NjangiBridge:test%40naas.cm?secret=${mockSecret}&issuer=NjangiBridge`),
+    verify: jest.fn().mockImplementation(({ token, secret }) => {
+      return Promise.resolve({ valid: token === mockCode || token === '123456' });
+    }),
+    generate: jest.fn().mockResolvedValue(mockCode),
   };
 });
 
