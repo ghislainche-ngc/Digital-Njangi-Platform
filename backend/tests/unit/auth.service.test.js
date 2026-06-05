@@ -46,7 +46,14 @@ function chainMock(finalData = null, finalError = null) {
   chain.eq = jest.fn().mockReturnValue(chain);
   chain.or = jest.fn().mockReturnValue(chain);
   chain.gt = jest.fn().mockReturnValue(chain);
+  chain.order = jest.fn().mockReturnValue(chain);
+  chain.limit = jest.fn().mockReturnValue(chain);
   chain.single = jest.fn().mockResolvedValue({ data: finalData, error: finalError });
+
+  const promise = Promise.resolve({ data: finalData, error: finalError });
+  chain.then = promise.then.bind(promise);
+  chain.catch = promise.catch.bind(promise);
+
   return chain;
 }
 
@@ -366,5 +373,43 @@ describe('AuthService 2FA operations', () => {
     expect(result.user.id).toBe('user-123');
   });
 });
+
+describe('AuthService Login History', () => {
+  it('logLoginAttempt inserts into login_history table', async () => {
+    const insertChain = chainMock(null);
+    mockFrom.mockReturnValue(insertChain);
+
+    await authService.logLoginAttempt({
+      userId: 'user-123',
+      ipAddress: '127.0.0.1',
+      userAgent: 'Mozilla/5.0',
+      status: 'success',
+    });
+
+    expect(mockFrom).toHaveBeenCalledWith('login_history');
+    expect(insertChain.insert).toHaveBeenCalledWith({
+      user_id: 'user-123',
+      ip_address: '127.0.0.1',
+      user_agent: 'Mozilla/5.0',
+      status: 'success',
+      failure_reason: null,
+    });
+  });
+
+  it('getLoginHistory retrieves records from login_history table', async () => {
+    const records = [
+      { id: '1', ip_address: '127.0.0.1', user_agent: 'Mozilla/5.0', status: 'success', created_at: new Date().toISOString() }
+    ];
+    const selectChain = chainMock(records);
+    mockFrom.mockReturnValue(selectChain);
+
+    const result = await authService.getLoginHistory('user-123');
+
+    expect(mockFrom).toHaveBeenCalledWith('login_history');
+    expect(selectChain.eq).toHaveBeenCalledWith('user_id', 'user-123');
+    expect(result).toEqual(records);
+  });
+});
+
 
 

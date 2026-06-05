@@ -29,7 +29,11 @@ const verifyOTP = async (req, res, next) => {
     const { error, value } = otpVerifySchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message, code: 'VALIDATION_ERROR' });
 
-    const result = await authService.verifyOTP(value);
+    const result = await authService.verifyOTP({
+      ...value,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
@@ -42,7 +46,11 @@ const login = async (req, res, next) => {
     const { error, value } = loginSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message, code: 'VALIDATION_ERROR' });
 
-    const result = await authService.login(value);
+    const result = await authService.login({
+      ...value,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
@@ -138,7 +146,22 @@ const verify2FALogin = async (req, res, next) => {
     if (!mfaToken || !code) {
       return res.status(400).json({ error: 'MFA session token and verification code are required.', code: 'VALIDATION_ERROR' });
     }
-    const result = await authService.verify2FALogin({ mfaToken, code });
+    const result = await authService.verify2FALogin({
+      mfaToken,
+      code,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
+const getLoginHistory = async (req, res, next) => {
+  try {
+    const result = await authService.getLoginHistory(req.user.sub);
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
@@ -157,6 +180,7 @@ module.exports = {
   enable2FA,
   disable2FA,
   verify2FALogin,
+  getLoginHistory,
 };
 
 

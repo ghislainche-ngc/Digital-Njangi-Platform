@@ -135,7 +135,7 @@
                   <button type="button" class="btn-ghost w-full text-left" id="btn-toggle-2fa">
                     ${user.two_factor_enabled ? 'Disable 2FA (Authenticator App) →' : 'Enable 2FA (Authenticator App) →'}
                   </button>
-                  <button type="button" class="btn-ghost w-full text-left">View login history →</button>
+                  <button type="button" class="btn-ghost w-full text-left" id="btn-view-history">View login history →</button>
                 </div>
                 <p class="mt-6 text-xs text-red-500">
                   <a href="/login.html" id="btn-signout">Sign out of NjangiBridge →</a>
@@ -197,6 +197,25 @@
                     </div>
                     <p id="setup-2fa-msg" class="text-xs text-center mt-2"></p>
                   </form>
+                </div>
+              </dialog>
+
+              <!-- Login History Modal -->
+              <dialog id="login-history-modal" class="glass-card-heavy p-6 max-w-lg w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="font-display font-bold text-lg">Login History</h3>
+                  <button type="button" onclick="document.getElementById('login-history-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
+                </div>
+                <div class="space-y-4">
+                  <p class="text-xs muted">Showing your last 20 login attempts. If you see unrecognized activity, please change your password immediately.</p>
+                  
+                  <div class="overflow-y-auto max-h-96 pr-1 space-y-3" id="login-history-list">
+                    <div class="text-center py-6 muted text-sm">Loading history...</div>
+                  </div>
+
+                  <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="document.getElementById('login-history-modal').close()" class="btn-primary flex-1">Close</button>
+                  </div>
                 </div>
               </dialog>
             </div>
@@ -409,6 +428,73 @@
           } catch (err) {
             msg.textContent = err.message || 'Verification failed. Try again.';
             msg.className = 'text-xs text-center mt-2 text-red-500';
+          }
+        });
+
+        // Login History logic
+        const parseUserAgent = (ua) => {
+          if (!ua) return 'Unknown Device';
+          let os = 'Unknown OS';
+          let browser = 'Unknown Browser';
+
+          if (ua.includes('Windows')) os = 'Windows';
+          else if (ua.includes('Macintosh') || ua.includes('Mac OS X')) os = 'macOS';
+          else if (ua.includes('Linux') && !ua.includes('Android')) os = 'Linux';
+          else if (ua.includes('Android')) os = 'Android';
+          else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+          if (ua.includes('Chrome') || ua.includes('CriOS')) browser = 'Chrome';
+          else if (ua.includes('Firefox')) browser = 'Firefox';
+          else if (ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('CriOS')) browser = 'Safari';
+          else if (ua.includes('Edge') || ua.includes('Edg')) browser = 'Edge';
+
+          return `${browser} on ${os}`;
+        };
+
+        const viewHistoryBtn = document.getElementById('btn-view-history');
+        const loginHistoryModal = document.getElementById('login-history-modal');
+        const loginHistoryList = document.getElementById('login-history-list');
+
+        viewHistoryBtn.addEventListener('click', async () => {
+          loginHistoryModal.showModal();
+          loginHistoryList.innerHTML = '<div class="text-center py-6 text-yellow-500 text-sm">Loading history...</div>';
+
+          try {
+            const history = await api.get('/auth/login-history');
+            if (!history || history.length === 0) {
+              loginHistoryList.innerHTML = '<div class="text-center py-6 muted text-sm">No login attempts recorded yet.</div>';
+              return;
+            }
+
+            loginHistoryList.innerHTML = history.map(item => {
+              const date = new Date(item.created_at).toLocaleString();
+              const isSuccess = item.status === 'success';
+              const statusBadge = isSuccess
+                ? '<span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Success</span>'
+                : `<span class="px-2 py-0.5 rounded text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Failed</span>`;
+              
+              const deviceDetails = parseUserAgent(item.user_agent);
+              const ip = item.ip_address || 'Unknown IP';
+              const reasonStr = !isSuccess && item.failure_reason
+                ? `<p class="text-xs text-rose-400 mt-1 font-mono">${escapeHtml(item.failure_reason)}</p>`
+                : '';
+
+              return `
+                <div class="p-3 rounded-xl border border-subtle bg-[var(--bg-muted)] flex flex-col gap-1 text-sm">
+                  <div class="flex justify-between items-start">
+                    <span class="font-semibold text-white">${escapeHtml(deviceDetails)}</span>
+                    ${statusBadge}
+                  </div>
+                  <div class="flex justify-between items-center text-xs muted mt-1 font-mono">
+                    <span>IP: ${escapeHtml(ip)}</span>
+                    <span>${escapeHtml(date)}</span>
+                  </div>
+                  ${reasonStr}
+                </div>
+              `;
+            }).join('');
+          } catch (err) {
+            loginHistoryList.innerHTML = `<div class="text-center py-6 text-rose-500 text-sm">Failed to load history: ${escapeHtml(err.message)}</div>`;
           }
         });
 

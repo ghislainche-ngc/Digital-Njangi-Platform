@@ -44,7 +44,7 @@ class AuthService {
     };
   }
 
-  async verifyOTP({ phone, code }) {
+  async verifyOTP({ phone, code, ipAddress, userAgent }) {
     const { data: record } = await supabase
       .from('otp_verifications')
       .select('*')
@@ -54,6 +54,15 @@ class AuthService {
       .single();
 
     if (!record) {
+      const { data: user } = await supabase.from('users').select('id').eq('phone', phone).single();
+      await this.logLoginAttempt({
+        userId: user?.id || null,
+        ipAddress,
+        userAgent,
+        status: 'failed',
+        failureReason: 'Invalid or expired OTP code.'
+      });
+
       const err = new Error('Invalid or expired OTP code.');
       err.statusCode = 400;
       err.code = 'INVALID_OTP';
@@ -67,6 +76,13 @@ class AuthService {
       .select('id, email, full_name, is_admin, two_factor_enabled')
       .eq('phone', phone)
       .single();
+
+    await this.logLoginAttempt({
+      userId: user?.id || null,
+      ipAddress,
+      userAgent,
+      status: 'success'
+    });
 
     const token = this._signToken(user);
     const membership = await this._getPrimaryMembership(user.id);
@@ -83,7 +99,7 @@ class AuthService {
     };
   }
 
-  async login({ email, password }) {
+  async login({ email, password, ipAddress, userAgent }) {
     const { data: user } = await supabase
       .from('users')
       .select('id, email, full_name, password_hash, is_admin, two_factor_enabled')
@@ -91,6 +107,14 @@ class AuthService {
       .single();
 
     if (!user) {
+      await this.logLoginAttempt({
+        userId: null,
+        ipAddress,
+        userAgent,
+        status: 'failed',
+        failureReason: 'User not found'
+      });
+
       const err = new Error('Invalid email or password.');
       err.statusCode = 401;
       err.code = 'INVALID_CREDENTIALS';
@@ -99,6 +123,14 @@ class AuthService {
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
+      await this.logLoginAttempt({
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        status: 'failed',
+        failureReason: 'Incorrect password'
+      });
+
       const err = new Error('Invalid email or password.');
       err.statusCode = 401;
       err.code = 'INVALID_CREDENTIALS';
@@ -116,6 +148,13 @@ class AuthService {
         mfaToken
       };
     }
+
+    await this.logLoginAttempt({
+      userId: user.id,
+      ipAddress,
+      userAgent,
+      status: 'success'
+    });
 
     const token = this._signToken(user);
     const membership = await this._getPrimaryMembership(user.id);
@@ -301,7 +340,7 @@ class AuthService {
     return { message: '2FA disabled successfully.' };
   }
 
-  async verify2FALogin({ mfaToken, code }) {
+  async verify2FALogin({ mfaToken, code, ipAddress, userAgent }) {
     let decoded;
     try {
       decoded = jwt.verify(mfaToken, process.env.JWT_SECRET);
@@ -326,6 +365,14 @@ class AuthService {
       .single();
 
     if (!user) {
+      await this.logLoginAttempt({
+        userId: null,
+        ipAddress,
+        userAgent,
+        status: 'failed',
+        failureReason: 'User not found during 2FA'
+      });
+
       const err = new Error('User not found.');
       err.statusCode = 404;
       err.code = 'USER_NOT_FOUND';
@@ -334,11 +381,26 @@ class AuthService {
 
     const isValid = authenticator.verify({ token: code, secret: user.two_factor_secret });
     if (!isValid) {
+      await this.logLoginAttempt({
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        status: 'failed',
+        failureReason: 'Invalid 2FA code'
+      });
+
       const err = new Error('Invalid verification code.');
       err.statusCode = 400;
       err.code = 'INVALID_MFA_CODE';
       throw err;
     }
+
+    await this.logLoginAttempt({
+      userId: user.id,
+      ipAddress,
+      userAgent,
+      status: 'success'
+    });
 
     const token = this._signToken(user);
     const membership = await this._getPrimaryMembership(user.id);
@@ -353,6 +415,34 @@ class AuthService {
         two_factor_enabled: !!user.two_factor_enabled,
       },
     };
+  }
+
+  async logLoginAttempt({ userId, ipAddress, userAgent, status, failureReason }) {
+    const { error } = await supabase
+      .from('login_history')
+      .insert({
+        user_id: userId || null,
+        ip_address: ipAddress || null,
+        user_agent: userAgent || null,
+        status,
+        failure_reason: failureReason || null,
+      });
+
+    if (error) {
+      console.error('Failed to log login attempt:', error.message);
+    }
+  }
+
+  async getLoginHistory(userId) {
+    const { data, error } = await supabase
+      .from('login_history')
+      .select('id, ip_address, user_agent, status, failure_reason, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    return data;
   }
 }
 

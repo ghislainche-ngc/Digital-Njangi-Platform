@@ -26,3 +26,19 @@ global.testGroup = {
 // Console suppression is handled per-test file where needed.
 // This file runs via setupFiles (before test framework), so
 // beforeEach/afterEach are not available here.
+
+jest.mock('otplib', () => {
+  const mockSecret = 'mocked-secret-key';
+  const mockCode = '123456';
+  return {
+    authenticator: {
+      generateSecret: jest.fn().mockReturnValue(mockSecret),
+      keyuri: jest.fn().mockReturnValue(`otpauth://totp/NjangiBridge:test%40naas.cm?secret=${mockSecret}`),
+      verify: jest.fn().mockImplementation(({ token, secret }) => {
+        return token === mockCode || token === '123456';
+      }),
+      generate: jest.fn().mockReturnValue(mockCode),
+    }
+  };
+});
+

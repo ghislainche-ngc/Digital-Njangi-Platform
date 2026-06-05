@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl, changePassword, generate2FA, enable2FA, disable2FA, verify2FALogin } = require('./auth.controller');
+const { register, verifyOTP, login, uploadAvatar, getTelegramBotUrl, changePassword, generate2FA, enable2FA, disable2FA, verify2FALogin, getLoginHistory } = require('./auth.controller');
 
 
 const auth = require('../../middleware/auth.middleware');
@@ -185,6 +185,9 @@ router.post('/2fa/generate', auth, generate2FA);
 router.post('/2fa/enable', auth, enable2FA);
 router.post('/2fa/disable', auth, disable2FA);
 router.post('/2fa/verify-login', loginLimiter, verify2FALogin);
+
+// Login History Route
+router.get('/login-history', auth, getLoginHistory);
 
 module.exports = router;
 
