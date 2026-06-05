@@ -198,7 +198,7 @@
               <form id="verify-2fa-form" class="space-y-3">
                 <div>
                   <label class="text-xs font-semibold uppercase tracking-wider muted">Enter 6-Digit Code</label>
-                  <input type="text" name="mfaCode" pattern="\d{6}" maxlength="6" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="e.g. 123456" class="glass-input mt-1 text-center font-mono tracking-widest text-lg" required />
+                  <input type="text" name="mfaCode" pattern="[0-9]{6}" maxlength="6" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="e.g. 123456" class="glass-input mt-1 text-center font-mono tracking-widest text-lg" required />
                 </div>
                 <div class="flex gap-3 mt-6">
                   <button type="button" onclick="document.getElementById('setup-2fa-modal').close()" class="btn-ghost border border-subtle flex-1">Cancel</button>
