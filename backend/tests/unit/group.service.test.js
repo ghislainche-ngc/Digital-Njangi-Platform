@@ -21,7 +21,12 @@ function chainMock(finalData = null, finalError = null) {
   chain.insert = jest.fn().mockReturnValue(chain);
   chain.update = jest.fn().mockReturnValue(chain);
   chain.eq = jest.fn().mockReturnValue(chain);
+  chain.in = jest.fn().mockReturnValue(chain);
   chain.single = jest.fn().mockResolvedValue({ data: finalData, error: finalError });
+
+  const promise = Promise.resolve({ data: finalData, error: finalError, count: 1 });
+  chain.then = promise.then.bind(promise);
+  chain.catch = promise.catch.bind(promise);
   return chain;
 }
 

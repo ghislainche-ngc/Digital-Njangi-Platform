@@ -166,11 +166,19 @@ class GroupService {
         const hasAmountChanged = data.contribution_amount !== undefined && Number(data.contribution_amount) !== Number(current.contribution_amount);
 
         if (hasRotationChanged || hasAmountChanged) {
-          const fieldName = hasRotationChanged ? 'rotation type' : 'contribution amount';
-          const err = new Error(`Cannot change ${fieldName} while a cycle is active.`);
-          err.statusCode = 400;
-          err.code = hasRotationChanged ? 'ROTATION_LOCKED' : 'CONTRIBUTION_AMOUNT_LOCKED';
-          throw err;
+          const { count } = await supabase
+            .from('contributions')
+            .select('id', { count: 'exact', head: true })
+            .eq('cycle_id', activeCycle.id)
+            .in('status', ['confirmed', 'processing']);
+
+          if (count > 0) {
+            const fieldName = hasRotationChanged ? 'rotation type' : 'contribution amount';
+            const err = new Error(`Cannot change ${fieldName} while a cycle is active with recorded payments.`);
+            err.statusCode = 400;
+            err.code = hasRotationChanged ? 'ROTATION_LOCKED' : 'CONTRIBUTION_AMOUNT_LOCKED';
+            throw err;
+          }
         }
       }
     }
