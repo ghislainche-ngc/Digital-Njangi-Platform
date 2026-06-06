@@ -17,6 +17,13 @@
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
       import { fetchAdminStats, fetchAdminGroups, fetchAdminTransactions } from '/src/js/api/admin.js';
 
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'admin', title: 'Platform analytics' });
 
       const renderPage = async () => {
@@ -89,13 +96,6 @@
                 <td colspan="7" class="py-8 text-center muted">No transaction logs available.</td>
               </tr>
             `;
-
-          const escapeHtml = (value) => String(value ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
 
           mountContent(`
             <div class="grid gap-6 md:grid-cols-4 animate-fade-up">
