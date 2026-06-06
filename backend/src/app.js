@@ -22,6 +22,8 @@ const webhookRoutes = require('./modules/webhooks/campay.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const announcementsRoutes = require('./modules/announcements/announcements.routes');
 const minutesRoutes = require('./modules/minutes/minutes.routes');
+const publicRoutes = require('./modules/public/public.routes');
+
 
 const errorMiddleware = require('./middleware/error.middleware');
 
@@ -78,6 +80,8 @@ app.use('/groups', announcementsRoutes);
 app.use('/groups', minutesRoutes);
 app.use('/webhooks', webhookRoutes);
 app.use('/admin', adminRoutes);
+app.use('/public', publicRoutes);
+
 
 // ─── Global error handler (must be last) ──────────────────────────────────
 app.use(errorMiddleware);

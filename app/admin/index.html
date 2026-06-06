@@ -20,6 +20,13 @@
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
       import { fetchAdminStats, fetchAdminGroups } from '/src/js/api/admin.js';
 
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'admin', title: 'Platform overview' });
 
       const renderPage = async () => {
@@ -37,19 +44,21 @@
           // Render rows
           const rows = groups.length
             ? groups.map(g => {
-                const groupMRR = g.subscription_status === 'active'
-                  ? (g.subscription_tier === 'growth' ? 5000 : (g.subscription_tier === 'enterprise' ? 15000 : 0))
+                const tier = g.subscription_tier || 'starter';
+                const status = g.subscription_status || 'active';
+                const groupMRR = status === 'active'
+                  ? (tier === 'growth' ? 5000 : (tier === 'enterprise' ? 15000 : 0))
                   : 0;
                 
-                const chipClass = g.subscription_status === 'active' 
+                const chipClass = status === 'active' 
                   ? 'paid' 
-                  : (g.subscription_status === 'past_due' ? 'due' : 'info');
+                  : (status === 'past_due' ? 'due' : 'info');
 
                 return `
                   <tr>
-                    <td class="py-3 font-medium">${g.name}</td>
-                    <td>${g.memberCount}</td>
-                    <td><span class="chip chip-${chipClass} uppercase text-[10px] font-bold">${g.subscription_tier} / ${g.subscription_status}</span></td>
+                    <td class="py-3 font-medium">${escapeHtml(g.name)}</td>
+                    <td>${Number(g.memberCount || 0)}</td>
+                    <td><span class="chip chip-${chipClass} uppercase text-[10px] font-bold">${escapeHtml(tier)} / ${escapeHtml(status)}</span></td>
                     <td>${groupMRR.toLocaleString()} FCFA</td>
                   </tr>
                 `;
@@ -58,6 +67,7 @@
               <tr>
                 <td colspan="4" class="py-8 text-center muted">No active groups in the platform.</td>
               </tr>
+
             `;
 
           mountContent(`
