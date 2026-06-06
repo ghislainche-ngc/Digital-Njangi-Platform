@@ -33,6 +33,20 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+## 3.5 Scrum Artifacts
+
+### 3.5.1 Product Backlog
+The Product Backlog below contains the estimated user stories, priority values, and effort estimations using Fibonacci planning points.
+
+| ID | Requirement (User Story) | Acceptance Criteria | Priority | Initial Estimate (hrs) | Adjustment Factor | Adjusted Estimate (hrs) |
+|---|---|---|---|---|---|---|
+| **1** | As a group president, I want to register my Njangi on the platform by providing the name, contribution amount, and frequency, so that my group has a digital space to operate. | Given valid group fields, when the president clicks submit, then the group is created and the user is assigned the President role. | 1 | 15 | 1.5 | 22.5 |
+| **2** | As a user, I want to register with my phone number and email and verify via SMS OTP, so that I can securely access the platform. | Given details, when submitted, a 6-digit OTP is sent and must be validated before the account transitions to verified. | 1 | 13 | 1.0 | 13.0 |
+| **3** | As a president, I want to invite members by generating invitation links so that I can easily add them to the Njangi group. | Given an active group, when the president clicks generate, a tokenized invitation link is created with a 48-hour expiration. | 1 | 10 | 1.5 | 15.0 |
+| **4** | As a president, I want to assign the Treasurer and Secretary roles to existing members, so that the group has designated officers with appropriate permissions. | When a role is updated, the user's membership entry changes role status and they receive a notification. | 1 | 8 | 1.0 | 8.0 |
+| **5** | As a president, I want to configure the contribution details, schedules, and fines so that they reflect the group's agreement. | When settings are updated, they are logged in the audit trail and applied to all future contribution cycles. | 1 | 10 | 1.5 | 15.0 |
+
+<!-- APPEND_MARKER -->
 ### 3.4.2 Workflow Management
 Sprints were planned weekly using a **GitHub Projects Kanban Board**. Task sizes were estimated using Planning Poker with Fibonacci points (1, 2, 3, 5, 8, 13). Daily standup ceremonies were run asynchronously in a dedicated WhatsApp group to maximize flexibility under academic schedules. At the end of each week, a retrospective was conducted.
 
