@@ -33,6 +33,27 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+## 4.2 API Request/Response Samples
+The Express server generates Swagger schemas visible at `https://njangibridge.online/api-docs`. Below are key REST request samples:
+* **POST `/auth/login`**:
+	* Request: `{ "email": "admin@naas.app", "password": "SecurePassword" }`
+	* Response: `{ "token": "eyJhbGciOi...", "user": { "id": "...", "email": "admin@naas.app", "role": "admin" } }`
+* **POST `/groups/:id/contributions`**:
+	* Request: `{ "amount": 10000, "payment_method": "MTN_MOMO" }`
+	* Response: `{ "status": "pending", "id": "contrib-101" }`
+
+---
+
+## 4.3 OOP Design Patterns Demonstrated
+The NAAS platform applies several GoF (Gang of Four) object-oriented design patterns to keep the codebase cohesive, modular, and maintainable:
+
+| Pattern | Application in NAAS | OOP Pillar(s) |
+|---|---|---|
+| **Abstract Class** | `NotificationService` defines interface contracts for subclasses. | **Abstraction** |
+| **Strategy Pattern** | `RotationEngine` accepts any `RotationStrategy` (`FixedRotationStrategy`, `RandomDrawStrategy`, `PresidentDecisionStrategy`) dynamically. | **Polymorphism** |
+| **Factory Method** | `PaymentProvider.getProvider(gateway)` dynamically returns the correct payment handler (e.g. `CampayService`, `MTNMoMoService`). | **Abstraction + Polymorphism** |
+
+<!-- APPEND_MARKER -->
 ### 3.7.2 Random Draw Algorithm
 ```
 ALGORITHM RandomDraw
