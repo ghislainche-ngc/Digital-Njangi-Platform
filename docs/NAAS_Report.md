@@ -33,6 +33,42 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+* **TC-08**: Duplicate contribution (Idempotency check) -> Returns `200 OK` (original contribution details).
+* **TC-09**: MTN MoMo contribution initiated -> Returns `202 Accepted` with state `pending`.
+* **TC-10**: MoMo Webhook Success -> Returns status `CONFIRMED` and registers ledger entry.
+* **TC-11**: MoMo Webhook Failed -> Returns status `FAILED` and notifies member.
+* **TC-12**: Ledger access by group member -> Returns `200 OK` with group ledger records.
+* **TC-13**: Cross-tenant ledger access blocked -> Returns `403 Forbidden` (RLS isolates data).
+* **TC-14**: Fixed rotation computation -> RotationEngine returns member IDs in registration order.
+* **TC-15**: Random draw rotation computation -> RotationEngine returns randomized list.
+* **TC-16**: Payout eligibility check for user with arrears -> Returns `eligible: false`, blocking execution.
+* **TC-17**: Penalty applied for late contribution -> Fee added to member's account.
+* **TC-18**: PDF report download -> Returns `200 OK` with PDF binary.
+* **TC-19**: Admin views all platform groups -> Returns `200 OK` with all groups.
+* **TC-20**: Member attempts to access admin space -> Returns `403 Forbidden`.
+
+---
+
+## 3.7 Proposed Algorithms
+
+### 3.7.1 Fixed Rotation Algorithm
+```
+ALGORITHM FixedRotation
+INPUT: members[] — list of active group members, sorted by join date
+INPUT: cycle_number — index of the current cycle (1-indexed)
+OUTPUT: recipient — selected recipient for this cycle
+BEGIN
+	n <- LENGTH(members)
+	IF n = 0 THEN 
+		RAISE Error("No members registered in the group")
+	END IF
+	index <- (cycle_number - 1) MOD n
+	recipient <- members[index]
+	RETURN recipient
+END
+```
+
+<!-- APPEND_MARKER -->
 ### 3.5.2 Sprint Backlog
 The table below illustrates the allocation of user stories across our development releases.
 
