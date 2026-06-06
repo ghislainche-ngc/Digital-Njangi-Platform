@@ -33,6 +33,51 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+## 3.2 System Requirements
+
+### 3.2.1 Functional Requirements
+* **FR-01 [High]**: User Registration & Multi-Tenant Onboarding. Users can register and create or join a group.
+* **FR-02 [High]**: Role-Based Access Control. Supports Member, President, Treasurer, Secretary, and Platform Admin roles.
+* **FR-03 [High]**: Group Profile Management. Setting contribution amounts, frequency, penalties, and plans.
+* **FR-04 [High]**: Member Invitation & Approval. Inviting members via unique tokenized signup links.
+* **FR-05 [High]**: MTN MoMo & Orange Money Integration. Automating contribution collection and payouts via API.
+* **FR-06 [High]**: Transparent Ledger. Real-time, append-only financial ledger visible to all members.
+* **FR-07 [High]**: Rotation Scheduling. Automating rotation calendar calculations.
+* **FR-08 [Medium]**: Fine & Penalty Management. Recording late contribution fines and daily fees.
+* **FR-09 [Medium]**: Solidarity Social Fund. Separate accounting for births, weddings, and bereavement.
+* **FR-10 [Medium]**: Multi-Channel Notifications. Bot integration for Telegram and SMS alerts.
+* **FR-11 [Medium]**: Meeting Minutes Recording. Logging meeting summaries and attendance by the Secretary.
+* **FR-12 [Medium]**: PDF Report Generation. Downloading formal receipt details and group summaries.
+* **FR-13 [High]**: Admin Dashboard. Global system overrides (tiers, status), user directories, and audit logs.
+
+### 3.2.2 Non-Functional Requirements
+* **NFR-01 (Performance)**: Key pages must load in under 3 seconds on a 3G network.
+* **NFR-02 (Security)**: Database multi-tenancy enforced using Supabase Row Level Security (RLS) policies.
+* **NFR-03 (Security)**: Payouts above a configurable limit require explicit, multi-criteria President approval.
+* **NFR-04 (Usability)**: Interface must support English and French with manual toggle overrides.
+* **NFR-05 (Availability)**: Maintain a 99.5% uptime target outside scheduled maintenance windows.
+* **NFR-06 (Maintainability)**: Service classes must follow clean Object-Oriented design with clear business separation.
+
+---
+
+## 3.3 System Design
+
+### 3.3.1 High-Level Architecture (HLD)
+NAAS utilizes a four-tier architecture separating concerns:
+1. **Presentation Tier (PWA)**: Desktop/mobile responsive client built with HTML5, Vanilla CSS, and Alpine.js. Caches assets using Service Workers.
+2. **Application Tier (REST API)**: Node.js/Express.js web server exposing JSON endpoints. Automates API docs via Swagger.
+3. **Business Logic Tier (Services)**: Domain-driven service classes (`GroupService`, `PaymentService`, `PayoutEngine`) encapsulating object models and rules.
+4. **Data Tier (Supabase PostgreSQL)**: Handles data storage and enforces strict isolation policies (RLS).
+
+---
+
+### 3.3.2 UML Diagrams
+The system design includes a set of UML diagrams to describe static and dynamic aspects (Use Case, Class, Object, Component, Sequence, and Activity diagrams).
+
+#### 1. Use Case Diagram
+Demonstrates actors, generalization, include/extend relationships and system boundary for core features like authenticate, pay, payout, invite, and minutes.
+
+<!-- APPEND_MARKER -->
 ## 2.2 Comparison between Methodologies
 | Criterion | Waterfall | Spiral | Scrum | Kanban |
 |---|---|---|---|---|
