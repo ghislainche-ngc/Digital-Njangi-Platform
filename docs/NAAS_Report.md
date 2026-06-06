@@ -33,6 +33,13 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+##### Activity Diagram 1: User Sign-Up & Phone OTP Verification Flow
+Describes the flow from user registration to OTP generation, SMS dispatch, OTP verification, JWT generation and final redirect.
+
+##### Activity Diagram 2: Group Creation & Subscription Limit Enforcement Flow
+Describes President input, tier selection, server-side validation, group initialization, membership creation, and audit logging including tier-limit checks and error handling.
+
+<!-- APPEND_MARKER -->
 #### 2. Class Diagram
 Describes core classes: `User`, `Group`, `Membership`, `Contribution`, `Payout`, `SocialFund`, rotation strategies, notification interfaces, and `PayoutEngine` dependencies. Shows composition, aggregation, multiplicity and inheritance among strategies.
 
