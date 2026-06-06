@@ -19,7 +19,33 @@ const tenantMiddleware = async (req, res, next) => {
   }
 
   try {
-    // Verify membership
+    // Check if user is a Platform Admin
+    const { data: userRecord } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', req.user.sub)
+      .single();
+
+    if (userRecord && userRecord.is_admin) {
+      const { data: group, error: groupError } = await supabase
+        .from('njangi_groups')
+        .select('*')
+        .eq('id', groupId)
+        .single();
+
+      if (groupError || !group) {
+        return res.status(404).json({
+          error: 'Group not found.',
+          code: 'GROUP_NOT_FOUND',
+        });
+      }
+
+      req.group = group;
+      req.membership = { role: 'admin', status: 'active', group_id: groupId, user_id: req.user.sub };
+      return next();
+    }
+
+    // Verify membership for regular users
     const { data: membership, error: memError } = await supabase
       .from('memberships')
       .select('*, njangi_groups(*)')

@@ -15,65 +15,190 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { fetchAdminStats, fetchAdminGroups, fetchAdminTransactions } from '/src/js/api/admin.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'admin', title: 'Platform analytics' });
-      const bars = [40, 55, 48, 62, 70, 68, 82, 75, 90].map(h => `
-        <div class="flex-1 rounded-t-md" style="height: ${h}%; background: var(--text-primary); opacity: .85;"></div>
-      `).join('');
-      mountContent(`
-        <div class="grid gap-4 md:grid-cols-4">
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">Active groups</p>
-            <p class="mt-2 font-display text-3xl font-bold">47</p>
-            <p class="mt-1 text-xs text-emerald-500">+5 this month</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">MoMo volume (30d)</p>
-            <p class="mt-2 font-display text-3xl font-bold">24.8M</p>
-            <p class="mt-1 text-xs muted">FCFA · +12%</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">Churn rate</p>
-            <p class="mt-2 font-display text-3xl font-bold">2.1%</p>
-            <p class="mt-1 text-xs text-emerald-500">−0.4 pp</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">Payout success</p>
-            <p class="mt-2 font-display text-3xl font-bold">98.3%</p>
-            <p class="mt-1 text-xs muted">last 7 days</p>
-          </div>
-        </div>
 
-        <div class="mt-6 grid gap-4 lg:grid-cols-2">
-          <div class="glass-card p-5">
-            <h2 class="font-display text-xl font-bold mb-4">MoMo volume by week</h2>
-            <div class="flex items-end gap-2 h-48">${bars}</div>
-            <p class="mt-3 text-xs muted">Weeks 6 → 14, 2026 · FCFA millions.</p>
-          </div>
-          <div class="glass-card p-5">
-            <h2 class="font-display text-xl font-bold mb-4">Plan distribution</h2>
-            <ul class="space-y-3 text-sm">
-              <li>
-                <div class="flex items-center justify-between mb-1"><span>Starter</span><span class="muted">12</span></div>
-                <div class="h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden"><div class="h-full accent-bg" style="width: 25%"></div></div>
-              </li>
-              <li>
-                <div class="flex items-center justify-between mb-1"><span>Growth</span><span class="muted">24</span></div>
-                <div class="h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden"><div class="h-full accent-bg" style="width: 51%"></div></div>
-              </li>
-              <li>
-                <div class="flex items-center justify-between mb-1"><span>Pro</span><span class="muted">9</span></div>
-                <div class="h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden"><div class="h-full accent-bg" style="width: 19%"></div></div>
-              </li>
-              <li>
-                <div class="flex items-center justify-between mb-1"><span>Enterprise</span><span class="muted">2</span></div>
-                <div class="h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden"><div class="h-full accent-bg" style="width: 5%"></div></div>
-              </li>
-            </ul>
-          </div>
-        </div>
+      const renderPage = async () => {
+        mountContent(`
+          <div class="glass-card p-6">Loading analytics data...</div>
+        `);
 
-        <p class="mt-4 text-xs muted">Per PR-42: active groups, MoMo volume, churn.</p>
-      `);
+        try {
+          const stats = await fetchAdminStats();
+          const groups = await fetchAdminGroups();
+          const transactions = await fetchAdminTransactions();
+
+          // Calculate Plan Distribution
+          let starterCount = 0;
+          let growthCount = 0;
+          let enterpriseCount = 0;
+
+          groups.forEach(g => {
+            if (g.subscription_tier === 'growth') growthCount++;
+            else if (g.subscription_tier === 'enterprise') enterpriseCount++;
+            else starterCount++;
+          });
+
+          const totalGroups = groups.length || 1;
+          const starterPct = Math.round((starterCount / totalGroups) * 100);
+          const growthPct = Math.round((growthCount / totalGroups) * 100);
+          const enterprisePct = Math.round((enterpriseCount / totalGroups) * 100);
+
+          // Calculate Payout/Contribution Success Rate
+          const successCount = transactions.filter(t => t.status === 'success').length;
+          const totalTx = transactions.length;
+          const successRate = totalTx > 0 ? ((successCount / totalTx) * 100).toFixed(1) : '100';
+
+          const volumeFormatted = Number(stats.totalVolume || 0).toLocaleString();
+
+          // Render transaction log rows
+          const rows = transactions.length
+            ? transactions.map(tx => {
+                const date = new Date(tx.created_at).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                const amountFormatted = Number(tx.amount).toLocaleString();
+                const directionText = tx.direction === 'debit' ? 'Deposit' : 'Payout';
+                const typeClass = tx.direction === 'debit' ? 'paid' : 'info';
+                
+                const statusClass = tx.status === 'success' 
+                  ? 'paid' 
+                  : (tx.status === 'failed' ? 'failed' : 'due');
+
+                return `
+                  <tr>
+                    <td class="py-3 text-xs muted px-5">${date}</td>
+                    <td class="font-medium">${escapeHtml(tx.groupName || 'System')}</td>
+                    <td>${escapeHtml(tx.userName || 'System')}</td>
+                    <td><span class="chip chip-${typeClass} text-[10px] uppercase font-bold">${directionText}</span></td>
+                    <td class="font-mono font-semibold">${amountFormatted} FCFA</td>
+                    <td><span class="capitalize text-xs">${escapeHtml(tx.gateway.replace('_', ' '))}</span></td>
+                    <td>
+                      <span class="chip chip-${statusClass} text-[10px] uppercase font-bold">${tx.status}</span>
+                      ${tx.failure_reason ? `<span class="block text-[10px] text-red-500 mt-0.5 truncate max-w-[150px]" title="${escapeHtml(tx.failure_reason)}">${escapeHtml(tx.failure_reason)}</span>` : ''}
+                    </td>
+                  </tr>
+                `;
+              }).join('')
+            : `
+              <tr>
+                <td colspan="7" class="py-8 text-center muted">No transaction logs available.</td>
+              </tr>
+            `;
+
+          mountContent(`
+            <div class="grid gap-6 md:grid-cols-4 animate-fade-up">
+              <div class="glass-card p-5">
+                <p class="text-xs muted uppercase tracking-wider">Active groups</p>
+                <p class="mt-2 font-display text-3xl font-bold">${stats.totalGroups}</p>
+                <p class="mt-1 text-xs text-emerald-500">Live count</p>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs muted uppercase tracking-wider">MoMo volume (total)</p>
+                <p class="mt-2 font-display text-3xl font-bold">${volumeFormatted}</p>
+                <p class="mt-1 text-xs text-emerald-500">FCFA volume</p>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs muted uppercase tracking-wider">Total users</p>
+                <p class="mt-2 font-display text-3xl font-bold">${stats.totalUsers}</p>
+                <p class="mt-1 text-xs text-emerald-500">Active accounts</p>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs muted uppercase tracking-wider">Tx success rate</p>
+                <p class="mt-2 font-display text-3xl font-bold text-[var(--accent)]">${successRate}%</p>
+                <p class="mt-1 text-xs muted">MTN / Orange Money</p>
+              </div>
+            </div>
+
+            <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_360px] animate-fade-up" style="animation-delay: 100ms">
+              <!-- Live Activity Feed -->
+              <section class="glass-card p-0 overflow-hidden">
+                <div class="p-5 border-b border-[var(--border-subtle)]">
+                  <h2 class="font-display text-xl font-bold">Live Transaction Log</h2>
+                  <p class="text-xs muted mt-1">Real-time deposit and payout statuses flowing through MTN MoMo / Orange Money / Campay</p>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+                      <tr>
+                        <th class="px-5 py-3">Date</th>
+                        <th>Group</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Gateway</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[var(--border-subtle)]">
+                      ${rows}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <!-- Dynamic Plan Distribution -->
+              <section class="glass-card p-6 flex flex-col justify-between">
+                <div>
+                  <h2 class="font-display text-xl font-bold mb-4">SaaS Tier Distribution</h2>
+                  <ul class="space-y-4 text-sm">
+                    <li>
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="font-medium font-sans">Starter (Free)</span>
+                        <span class="muted font-mono">${starterCount} (${starterPct}%)</span>
+                      </div>
+                      <div class="h-2.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
+                        <div class="h-full bg-blue-500" style="width: ${starterPct}%"></div>
+                      </div>
+                    </li>
+                    <li>
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="font-medium text-emerald-400 font-sans">Growth (5k)</span>
+                        <span class="muted font-mono">${growthCount} (${growthPct}%)</span>
+                      </div>
+                      <div class="h-2.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
+                        <div class="h-full bg-emerald-500" style="width: ${growthPct}%"></div>
+                      </div>
+                    </li>
+                    <li>
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="font-medium text-[var(--accent)] font-sans">Enterprise (15k)</span>
+                        <span class="muted font-mono">${enterpriseCount} (${enterprisePct}%)</span>
+                      </div>
+                      <div class="h-2.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
+                        <div class="h-full accent-bg" style="width: ${enterprisePct}%"></div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+                <div class="mt-6 pt-4 border-t border-[var(--border-subtle)] text-center">
+                  <p class="text-xs uppercase tracking-widest muted font-semibold">Active MRR</p>
+                  <p class="text-3xl font-display font-extrabold text-[var(--accent)] mt-1">${Number(stats.mrr || 0).toLocaleString()} FCFA</p>
+                </div>
+              </section>
+            </div>
+          `);
+        } catch (error) {
+          mountContent(`
+            <div class="glass-card p-6">
+              <p class="text-red-500">Error loading analytics: ${error.message || error}</p>
+            </div>
+          `);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

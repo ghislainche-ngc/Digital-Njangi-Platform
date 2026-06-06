@@ -14,73 +14,364 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        listMembers,
+        groupLabel,
+        listContributions,
+        getContributionStats,
+        inviteMember,
+        listAnnouncements
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'secretary', title: 'Secretariat' });
-      mountContent(`
-        <div class="glass-card p-4 mb-4 flex flex-wrap items-center gap-3 animate-fade-up">
-          <span class="chip chip-info">You</span>
-          <p class="text-sm"><span class="muted">Your cycle 4 contribution:</span> <span class="font-semibold">Paid · Orange Money · Apr 14</span></p>
-          <span class="text-sm muted hidden sm:inline">·</span>
-          <p class="text-sm"><span class="muted">Your rotation position:</span> <span class="font-semibold">1 · Done (Jan 28)</span></p>
-          <a href="/app/member/history.html" class="ml-auto nav-link text-xs">My Njangi →</a>
-        </div>
 
-        <div class="grid gap-4 md:grid-cols-3 animate-fade-up">
-          <div class="glass-card p-5">
-            <p class="text-xs uppercase tracking-widest muted">Members</p>
-            <p class="mt-2 font-display text-3xl font-bold">14</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs uppercase tracking-widest muted">Announcements</p>
-            <p class="mt-2 font-display text-3xl font-bold">3</p>
-            <p class="mt-1 text-xs muted">This month</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs uppercase tracking-widest muted">Next meeting</p>
-            <p class="mt-2 font-display text-2xl font-bold">April 28</p>
-            <p class="mt-1 text-xs muted">18:00 · Yaoundé</p>
-          </div>
-        </div>
+      function getNextMeeting(groupId) {
+        const key = `njangi.next_meeting.${groupId}`;
+        const data = localStorage.getItem(key);
+        
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        let meetingDate = new Date(year, month, 28, 18, 0, 0);
+        if (now > meetingDate) {
+          meetingDate = new Date(year, month + 1, 28, 18, 0, 0);
+        }
+        const options = { month: 'long', day: 'numeric', year: 'numeric' };
+        const dynamicDate = meetingDate.toLocaleDateString('en-US', options);
 
-        <div class="mt-6 grid gap-4 lg:grid-cols-2">
-          <div class="glass-card p-5">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="font-display text-xl font-bold">Directory</h2>
-              <button class="btn-primary text-xs">+ Add member</button>
-            </div>
-            <ul class="divide-y divide-[var(--border-subtle)]">
-              <li class="flex items-center gap-3 py-3">
-                <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">MT</div>
-                <div class="flex-1"><p class="text-sm font-medium">Marie Tchinda</p><p class="text-xs muted">President · +237 6XX XXX XX1</p></div>
-              </li>
-              <li class="flex items-center gap-3 py-3">
-                <div class="h-9 w-9 rounded-full bg-emerald-500 text-white grid place-items-center font-semibold text-sm">JP</div>
-                <div class="flex-1"><p class="text-sm font-medium">Jean-Pierre Mbarga</p><p class="text-xs muted">Treasurer · +237 6XX XXX XX2</p></div>
-              </li>
-              <li class="flex items-center gap-3 py-3">
-                <div class="h-9 w-9 rounded-full bg-pink-500 text-white grid place-items-center font-semibold text-sm">FN</div>
-                <div class="flex-1"><p class="text-sm font-medium">Fatou Ngo</p><p class="text-xs muted">Member · +237 6XX XXX XX3</p></div>
-              </li>
-            </ul>
-          </div>
+        if (data) {
+          const parsed = JSON.parse(data);
+          const storedDate = new Date(parsed.date);
+          if (parsed.date === 'April 28, 2026' || isNaN(storedDate.getTime()) || now > storedDate) {
+            const updated = { ...parsed, date: dynamicDate };
+            localStorage.setItem(key, JSON.stringify(updated));
+            return updated;
+          }
+          return parsed;
+        }
 
-          <div class="glass-card p-5">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="font-display text-xl font-bold">Announcements</h2>
-              <button class="btn-primary text-xs">New</button>
-            </div>
-            <div class="space-y-3">
-              <div class="p-3 rounded-xl bg-[var(--bg-muted)]">
-                <p class="text-sm font-medium">April contribution reminder</p>
-                <p class="text-xs muted mt-1">Sent via Telegram · 14 recipients · 2h ago</p>
+        const defaults = { date: dynamicDate, time: '18:00', location: 'Yaoundé' };
+        localStorage.setItem(key, JSON.stringify(defaults));
+        return defaults;
+      }
+
+      function saveNextMeeting(groupId, meeting) {
+        const key = `njangi.next_meeting.${groupId}`;
+        localStorage.setItem(key, JSON.stringify(meeting));
+      }
+
+      function timeAgo(dateString) {
+        const date = new Date(dateString);
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days} days ago`;
+        const weeks = Math.floor(days / 7);
+        if (weeks < 4) return `${weeks} weeks ago`;
+        return date.toLocaleDateString();
+      }
+
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading secretary overview…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose or create a group first.</p>
               </div>
+            `);
+            return;
+          }
+
+          const currentUser = session.user() || {};
+          const [membersResponse, statsResponse, contributionsResponse, announcementsResponse] = await Promise.all([
+            listMembers(activeGroupId),
+            getContributionStats(activeGroupId),
+            listContributions(activeGroupId),
+            listAnnouncements(activeGroupId)
+          ]);
+
+          const rawMembers = membersResponse?.data ?? membersResponse;
+          const members = Array.isArray(rawMembers) ? rawMembers : [];
+          const stats = statsResponse?.data ?? statsResponse ?? {};
+          const rawContributions = contributionsResponse?.data ?? contributionsResponse;
+          const contributions = Array.isArray(rawContributions) ? rawContributions : [];
+          const rawAnnouncements = announcementsResponse?.data ?? announcementsResponse;
+          const announcementsList = Array.isArray(rawAnnouncements) ? rawAnnouncements : [];
+
+          // Group picker options
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          // Personal Status details
+          const myMembership = members.find(m => 
+            m.user_id === currentUser.id || 
+            m.users?.id === currentUser.id ||
+            m.users?.email === currentUser.email
+          );
+          const myPos = myMembership?.rotation_position || '—';
+          const activeCycleNumber = stats.cycleNumber || 1;
+          const hasPaidCurrent = contributions.some(c => 
+            c.user_id === currentUser.id && c.cycle_id === stats.cycleId && c.status === 'confirmed'
+          );
+          const personalStatusText = hasPaidCurrent ? 'Paid' : 'Unpaid';
+
+          // Load next meeting from localStorage
+          const nextMeeting = getNextMeeting(activeGroupId);
+
+          // Renders the Directory Preview list (first 3 members)
+          const directoryPreviewHtml = members.slice(0, 3).map(m => {
+            const name = m.users?.full_name || m.users?.email || 'Member';
+            const role = m.role || 'member';
+            const phone = m.users?.phone || m.phone || '—';
+            const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+            
+            return `
+              <li class="flex items-center gap-3 py-3">
+                <div class="h-9 w-9 rounded-full accent-bg text-white grid place-items-center font-semibold text-sm">${escapeHtml(initials)}</div>
+                <div class="flex-1"><p class="text-sm font-medium">${escapeHtml(name)}</p><p class="text-xs muted">${escapeHtml(role.charAt(0).toUpperCase() + role.slice(1))} · ${escapeHtml(phone)}</p></div>
+              </li>
+            `;
+          }).join('') || '<li class="py-4 text-center muted text-sm">No members in directory.</li>';
+
+          // Renders the Announcements Preview list (last 2 announcements)
+          const announcementsPreviewHtml = announcementsList.slice(0, 2).map(a => {
+            const relativeTime = timeAgo(a.created_at || a.date);
+            return `
               <div class="p-3 rounded-xl bg-[var(--bg-muted)]">
-                <p class="text-sm font-medium">March meeting minutes</p>
-                <p class="text-xs muted mt-1">Posted · 5 days ago</p>
+                <p class="text-sm font-medium">${escapeHtml(a.title)}</p>
+                <p class="text-xs muted mt-1">${escapeHtml(relativeTime)} · via ${escapeHtml(a.channel)}</p>
+              </div>
+            `;
+          }).join('') || '<p class="py-4 text-center muted text-sm">No announcements yet.</p>';
+
+          mountContent(`
+            <div class="glass-card p-4 mb-4 flex flex-wrap items-center gap-3 animate-fade-up">
+              <span class="chip chip-info">Secretary</span>
+              <p class="text-sm"><span class="muted">Your cycle ${activeCycleNumber} contribution:</span> <span class="font-semibold">${personalStatusText}</span></p>
+              <span class="text-sm muted hidden sm:inline">·</span>
+              <p class="text-sm"><span class="muted">Your rotation position:</span> <span class="font-semibold">${myPos}</span></p>
+              <a href="/app/member/history.html" class="ml-auto nav-link text-xs">My Njangi →</a>
+            </div>
+
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-3 animate-fade-up">
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Members</p>
+                <p class="mt-2 font-display text-3xl font-bold">${members.length}</p>
+                <a href="/app/secretary/directory.html" class="mt-2 text-xs nav-link block">View Roster →</a>
+              </div>
+              <div class="glass-card p-5">
+                <p class="text-xs uppercase tracking-widest muted">Announcements</p>
+                <p class="mt-2 font-display text-3xl font-bold">${announcementsList.length}</p>
+                <p class="mt-1 text-xs muted">Total posted</p>
+              </div>
+              <div class="glass-card p-5 relative">
+                <button id="btn-edit-meeting" class="absolute top-4 right-4 text-xs nav-link p-1">Edit</button>
+                <p class="text-xs uppercase tracking-widest muted">Next meeting</p>
+                <p class="mt-2 font-display text-2xl font-bold">${escapeHtml(nextMeeting.date)}</p>
+                <p class="mt-1 text-xs muted">${escapeHtml(nextMeeting.time)} · ${escapeHtml(nextMeeting.location)}</p>
               </div>
             </div>
-          </div>
-        </div>
-      `);
+
+            <div class="mt-6 grid gap-4 lg:grid-cols-2">
+              <div class="glass-card p-5">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="font-display text-xl font-bold">Directory</h2>
+                  <button id="btn-add-member" class="btn-primary text-xs">+ Add member</button>
+                </div>
+                <ul class="divide-y divide-[var(--border-subtle)]">
+                  ${directoryPreviewHtml}
+                </ul>
+              </div>
+
+              <div class="glass-card p-5">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="font-display text-xl font-bold">Announcements</h2>
+                  <a href="/app/secretary/announcements.html" class="btn-primary text-xs text-center px-3 py-1 flex items-center justify-center">New</a>
+                </div>
+                <div class="space-y-3">
+                  ${announcementsPreviewHtml}
+                </div>
+              </div>
+            </div>
+
+            <!-- Meeting Edit Modal -->
+            <div id="meeting-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+              <div class="glass-card max-w-md w-full p-6 space-y-4 animate-fade-up">
+                <h3 class="font-display text-lg font-bold">Edit Next Meeting Details</h3>
+                <form id="meeting-form" class="space-y-3">
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Date</label>
+                    <input type="text" name="date" value="${escapeHtml(nextMeeting.date)}" placeholder="e.g. April 28, 2026" required class="glass-input mt-1" />
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Time</label>
+                    <input type="text" name="time" value="${escapeHtml(nextMeeting.time)}" placeholder="e.g. 18:00" required class="glass-input mt-1" />
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Location</label>
+                    <input type="text" name="location" value="${escapeHtml(nextMeeting.location)}" placeholder="e.g. Yaoundé / Online" required class="glass-input mt-1" />
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="btn-meeting-cancel" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs py-2 px-4">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Invite Modal -->
+            <div id="invite-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+              <div class="glass-card max-w-md w-full p-6 space-y-4 animate-fade-up">
+                <h3 class="font-display text-lg font-bold">Invite New Member</h3>
+                <p class="text-xs muted">Enter the member's registered phone number to send an invitation token.</p>
+                <form id="invite-form" class="space-y-3">
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Phone Number</label>
+                    <input type="text" name="phone" placeholder="+237677000002" required class="glass-input mt-1" />
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="btn-invite-cancel" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs py-2 px-4">Send Invite</button>
+                  </div>
+                  <p id="invite-message" class="text-xs text-amber-500"></p>
+                </form>
+
+                <!-- Success container -->
+                <div id="invite-success" class="hidden space-y-4 pt-2">
+                  <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400">
+                    ✓ Invitation created successfully! Share the onboard link below with the member.
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Share Link</label>
+                    <div class="flex gap-2 mt-1">
+                      <input id="invite-link-input" type="text" readonly class="glass-input text-xs font-mono select-all bg-[var(--bg-muted)]" />
+                      <button id="btn-copy-link" class="btn-primary text-xs px-3">Copy</button>
+                    </div>
+                  </div>
+                  <div class="flex justify-end pt-2">
+                    <button id="btn-invite-done" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Close</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `);
+
+          // Event Listeners
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          // Meeting modal triggers
+          const meetingModal = document.querySelector('#meeting-modal');
+          document.querySelector('#btn-edit-meeting').addEventListener('click', () => {
+            meetingModal.classList.remove('hidden');
+          });
+          document.querySelector('#btn-meeting-cancel').addEventListener('click', () => {
+            meetingModal.classList.add('hidden');
+          });
+          document.querySelector('#meeting-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            saveNextMeeting(activeGroupId, {
+              date: formData.get('date'),
+              time: formData.get('time'),
+              location: formData.get('location')
+            });
+            meetingModal.classList.add('hidden');
+            renderPage();
+          });
+
+          // Invite Modal triggers
+          const inviteModal = document.querySelector('#invite-modal');
+          const btnAddMember = document.querySelector('#btn-add-member');
+          const btnInviteCancel = document.querySelector('#btn-invite-cancel');
+          const inviteForm = document.querySelector('#invite-form');
+          const inviteMsg = document.querySelector('#invite-message');
+
+          const resetInviteModal = () => {
+            inviteForm.classList.remove('hidden');
+            document.querySelector('#invite-success').classList.add('hidden');
+            inviteForm.reset();
+            inviteMsg.textContent = '';
+          };
+
+          btnAddMember.addEventListener('click', () => {
+            inviteModal.classList.remove('hidden');
+            resetInviteModal();
+          });
+
+          btnInviteCancel.addEventListener('click', () => {
+            inviteModal.classList.add('hidden');
+          });
+
+          document.querySelector('#btn-invite-done').addEventListener('click', () => {
+            inviteModal.classList.add('hidden');
+            renderPage();
+          });
+
+          inviteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            inviteMsg.textContent = 'Sending invitation...';
+            const formData = new FormData(inviteForm);
+            const phone = formData.get('phone').trim();
+
+            try {
+              const invitation = await inviteMember(activeGroupId, phone);
+              inviteForm.classList.add('hidden');
+              const successContainer = document.querySelector('#invite-success');
+              const linkInput = document.querySelector('#invite-link-input');
+              const copyBtn = document.querySelector('#btn-copy-link');
+              
+              const link = `${window.location.origin}/invite.html?token=${invitation.token}`;
+              linkInput.value = link;
+              copyBtn.textContent = 'Copy';
+              
+              copyBtn.replaceWith(copyBtn.cloneNode(true));
+              const newCopyBtn = document.querySelector('#btn-copy-link');
+              newCopyBtn.addEventListener('click', async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  newCopyBtn.textContent = 'Copied!';
+                  setTimeout(() => { newCopyBtn.textContent = 'Copy'; }, 2000);
+                } catch (copyErr) {
+                  linkInput.select();
+                }
+              });
+
+              successContainer.classList.remove('hidden');
+            } catch (err) {
+              inviteMsg.textContent = err.message || 'Failed to send invitation.';
+            }
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load secretary overview.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

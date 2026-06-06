@@ -15,64 +15,263 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        listMembers,
+        inviteMember,
+        updateMemberRole,
+        removeMember,
+        groupLabel
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'president', title: 'Member management' });
-      const rows = [
-        { name: 'Marie Tchinda',      role: 'President',  phone: '+237 6XX XXX 001', status: 'paid', initials: 'MT' },
-        { name: 'Jean-Pierre Mbarga', role: 'Treasurer',  phone: '+237 6XX XXX 002', status: 'paid', initials: 'JP' },
-        { name: 'Claire Biya',        role: 'Secretary',  phone: '+237 6XX XXX 003', status: 'paid', initials: 'CB' },
-        { name: 'Fatou Ngo',          role: 'Member',     phone: '+237 6XX XXX 004', status: 'paid', initials: 'FN' },
-        { name: 'Pa Ngwa',            role: 'Member',     phone: '+237 6XX XXX 005', status: 'due',  initials: 'PN' },
-        { name: 'Alice Fotso',        role: 'Member',     phone: '+237 6XX XXX 006', status: 'failed', initials: 'AF' },
-      ].map(m => {
-        const label = m.status === 'paid' ? 'Current' : m.status === 'due' ? 'Due' : 'Failed';
-        return `
-          <tr>
-            <td class="px-5 py-3">
-              <div class="flex items-center gap-3">
-                <div class="h-8 w-8 rounded-full accent-bg text-[var(--text-on-brand)] grid place-items-center text-xs font-semibold">${m.initials}</div>
-                <span class="font-medium">${m.name}</span>
+
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading members…</div>`);
+
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose or create a group first.</p>
               </div>
-            </td>
-            <td>
-              <select class="glass-input w-auto py-1 text-xs">
-                <option ${m.role === 'President' ? 'selected' : ''}>President</option>
-                <option ${m.role === 'Treasurer' ? 'selected' : ''}>Treasurer</option>
-                <option ${m.role === 'Secretary' ? 'selected' : ''}>Secretary</option>
-                <option ${m.role === 'Member' ? 'selected' : ''}>Member</option>
-              </select>
-            </td>
-            <td class="font-mono text-xs">${m.phone}</td>
-            <td><span class="chip chip-${m.status}">${label}</span></td>
-            <td class="text-right pr-5">
-              <button class="nav-link text-xs">Message</button>
-              <button class="nav-link text-xs text-red-500">Remove</button>
-            </td>
-          </tr>
-        `;
-      }).join('');
-      mountContent(`
-        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
-          <input type="search" placeholder="Search members…" class="glass-input flex-1 min-w-[220px]" />
-          <button class="btn-primary">+ Invite member</button>
-        </div>
+            `);
+            return;
+          }
 
-        <div class="glass-card p-0 overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
-              <tr>
-                <th class="px-5 py-3">Name</th>
-                <th>Role</th>
-                <th>Phone (MoMo)</th>
-                <th>Payment</th>
-                <th class="text-right pr-5">Actions</th>
+          const membersResponse = await listMembers(activeGroupId);
+          const rawMembers = membersResponse?.data ?? membersResponse;
+          const members = Array.isArray(rawMembers) ? rawMembers : [];
+          const currentUser = session.user() || {};
+
+          // Group picker options
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          const rows = members.map(m => {
+            const userId = m.users?.id || m.user_id;
+            const name = m.users?.full_name || m.users?.email || 'Member';
+            const phone = m.users?.phone || m.phone || '—';
+            const role = m.role || 'member';
+            const status = m.status || 'active';
+            const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+
+            const isSelf = userId === currentUser.id;
+            const disabledAttr = isSelf ? 'disabled' : '';
+
+            return `
+              <tr data-user-id="${escapeHtml(userId)}">
+                <td class="px-5 py-3">
+                  <div class="flex items-center gap-3">
+                    <div class="h-8 w-8 rounded-full accent-bg text-white grid place-items-center text-xs font-semibold">${escapeHtml(initials)}</div>
+                    <span class="font-medium">${escapeHtml(name)} ${isSelf ? '(You)' : ''}</span>
+                  </div>
+                </td>
+                <td>
+                  <select class="glass-input w-auto py-1 text-xs role-select" ${disabledAttr}>
+                    <option value="president" ${role === 'president' ? 'selected' : ''}>President</option>
+                    <option value="treasurer" ${role === 'treasurer' ? 'selected' : ''}>Treasurer</option>
+                    <option value="secretary" ${role === 'secretary' ? 'selected' : ''}>Secretary</option>
+                    <option value="member" ${role === 'member' ? 'selected' : ''}>Member</option>
+                  </select>
+                </td>
+                <td class="font-mono text-xs">${escapeHtml(phone)}</td>
+                <td><span class="chip chip-${status === 'active' ? 'paid' : 'failed'}">${escapeHtml(status)}</span></td>
+                <td class="text-right pr-5">
+                  <button class="nav-link text-xs btn-remove text-red-500" ${disabledAttr}>Remove</button>
+                </td>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
-          </table>
-        </div>
+            `;
+          }).join('');
 
-        <p class="mt-4 text-xs muted">PR-06: assign Treasurer/Secretary · PR-07: remove member (audit-logged).</p>
-      `);
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3 animate-fade-up">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+              <div class="flex-1"></div>
+              <button id="btn-invite" class="btn-primary">+ Invite member</button>
+            </div>
+
+            <!-- Invite Modal -->
+            <div id="invite-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+              <div class="glass-card max-w-md w-full p-6 space-y-4 animate-fade-up">
+                <h3 class="font-display text-lg font-bold">Invite New Member</h3>
+                <p class="text-xs muted">Enter the member's registered phone number to send an invitation token.</p>
+                <form id="invite-form" class="space-y-3">
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Phone Number</label>
+                    <input type="text" name="phone" placeholder="+237677000002" required class="glass-input mt-1" />
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="btn-invite-cancel" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs py-2 px-4">Send Invite</button>
+                  </div>
+                  <p id="invite-message" class="text-xs text-amber-500"></p>
+                </form>
+
+                <!-- Success container (initially hidden) -->
+                <div id="invite-success" class="hidden space-y-4 pt-2">
+                  <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400">
+                    ✓ Invitation created successfully! Share the onboard link below with the member.
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Share Link</label>
+                    <div class="flex gap-2 mt-1">
+                      <input id="invite-link-input" type="text" readonly class="glass-input text-xs font-mono select-all bg-[var(--bg-muted)]" />
+                      <button id="btn-copy-link" class="btn-primary text-xs px-3">Copy</button>
+                    </div>
+                  </div>
+                  <div class="flex justify-end pt-2">
+                    <button id="btn-invite-done" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Close</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card p-0 overflow-hidden animate-fade-up">
+              <table class="w-full text-sm">
+                <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+                  <tr>
+                    <th class="px-5 py-3">Name</th>
+                    <th>Role</th>
+                    <th>Phone (MoMo)</th>
+                    <th>Status</th>
+                    <th class="text-right pr-5">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border-subtle)]">${rows || '<tr><td colspan="5" class="px-5 py-8 text-center muted">No members found.</td></tr>'}</tbody>
+              </table>
+            </div>
+
+            <p class="mt-4 text-xs muted">PR-06: assign Treasurer/Secretary · PR-07: remove member (audit-logged).</p>
+          `);
+
+          // Event Listeners
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          // Invite Modal triggers
+          const inviteModal = document.querySelector('#invite-modal');
+          const btnInvite = document.querySelector('#btn-invite');
+          const btnInviteCancel = document.querySelector('#btn-invite-cancel');
+          const inviteForm = document.querySelector('#invite-form');
+          const inviteMsg = document.querySelector('#invite-message');
+
+          const resetInviteModal = () => {
+            inviteForm.classList.remove('hidden');
+            document.querySelector('#invite-success').classList.add('hidden');
+            inviteForm.reset();
+            inviteMsg.textContent = '';
+          };
+
+          btnInvite.addEventListener('click', () => {
+            inviteModal.classList.remove('hidden');
+            resetInviteModal();
+          });
+
+          btnInviteCancel.addEventListener('click', () => {
+            inviteModal.classList.add('hidden');
+          });
+
+          document.querySelector('#btn-invite-done').addEventListener('click', () => {
+            inviteModal.classList.add('hidden');
+            renderPage();
+          });
+
+          inviteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            inviteMsg.textContent = 'Sending invitation...';
+            const formData = new FormData(inviteForm);
+            const phone = formData.get('phone').trim();
+
+            try {
+              const invitation = await inviteMember(activeGroupId, phone);
+              
+              // Hide form, show success with copyable link
+              inviteForm.classList.add('hidden');
+              const successContainer = document.querySelector('#invite-success');
+              const linkInput = document.querySelector('#invite-link-input');
+              const copyBtn = document.querySelector('#btn-copy-link');
+              
+              const link = `${window.location.origin}/invite.html?token=${invitation.token}`;
+              linkInput.value = link;
+              copyBtn.textContent = 'Copy';
+              
+              // Setup copy listener
+              copyBtn.replaceWith(copyBtn.cloneNode(true)); // remove old listeners
+              const newCopyBtn = document.querySelector('#btn-copy-link');
+              newCopyBtn.addEventListener('click', async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  newCopyBtn.textContent = 'Copied!';
+                  setTimeout(() => { newCopyBtn.textContent = 'Copy'; }, 2000);
+                } catch (copyErr) {
+                  linkInput.select();
+                }
+              });
+
+              successContainer.classList.remove('hidden');
+            } catch (err) {
+              inviteMsg.textContent = err.message || 'Failed to send invitation.';
+            }
+          });
+
+          // Role selection changes
+          document.querySelectorAll('.role-select').forEach(select => {
+            select.addEventListener('change', async (e) => {
+              const row = e.target.closest('tr');
+              const userId = row.dataset.userId;
+              const newRole = e.target.value;
+              
+              try {
+                await updateMemberRole(activeGroupId, userId, newRole);
+                alert(`Role updated to ${newRole} successfully.`);
+                renderPage();
+              } catch (err) {
+                alert(err.message || 'Failed to update role.');
+                renderPage();
+              }
+            });
+          });
+
+          // Member removal trigger
+          document.querySelectorAll('.btn-remove').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              const row = e.target.closest('tr');
+              const userId = row.dataset.userId;
+              const name = row.querySelector('.font-medium').textContent.trim();
+
+              if (!confirm(`Are you sure you want to remove ${name} from this Njangi? This action is permanent and audit-logged.`)) {
+                return;
+              }
+
+              try {
+                await removeMember(activeGroupId, userId);
+                alert(`${name} removed successfully.`);
+                renderPage();
+              } catch (err) {
+                alert(err.message || 'Failed to remove member.');
+              }
+            });
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load members.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

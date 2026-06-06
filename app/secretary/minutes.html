@@ -15,38 +15,292 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import {
+        resolveGroupContext,
+        setStoredGroupId,
+        groupLabel,
+        listMinutes,
+        createMinutes,
+        updateMinutesStatus,
+        deleteMinutes
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'secretary', title: 'Meeting minutes' });
-      const cards = [
-        { title: 'April 2026 monthly meeting', date: 'Apr 28, 2026', attendees: 13, pages: 2, status: 'draft' },
-        { title: 'March 2026 monthly meeting', date: 'Mar 28, 2026', attendees: 14, pages: 3, status: 'published' },
-        { title: 'February 2026 monthly meeting', date: 'Feb 28, 2026', attendees: 12, pages: 2, status: 'published' },
-        { title: 'January 2026 kickoff meeting', date: 'Jan 15, 2026', attendees: 14, pages: 4, status: 'published' },
-      ].map(m => `
-        <div class="glass-card p-5">
-          <div class="flex items-start justify-between mb-3">
-            <div class="h-10 w-10 rounded-xl bg-[var(--bg-muted)] grid place-items-center">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+
+      let activeGroupId = '';
+      let minutesList = [];
+
+      function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      }
+
+      const renderGrid = (list) => {
+        const grid = document.querySelector('#minutes-grid');
+        if (!grid) return;
+
+        grid.innerHTML = list.map(m => {
+          return `
+            <div class="glass-card p-5 relative" data-id="${escapeHtml(m.id)}">
+              <button class="btn-delete absolute top-4 right-4 text-xs text-red-500 nav-link p-1">Delete</button>
+              <div class="flex items-start justify-between mb-3 pr-12">
+                <div class="h-10 w-10 rounded-xl bg-[var(--bg-muted)] grid place-items-center">
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                </div>
+                <button class="btn-status-toggle chip chip-${m.status === 'draft' ? 'due' : 'paid'} cursor-pointer" title="Click to toggle status">${escapeHtml(m.status)}</button>
+              </div>
+              <p class="font-semibold">${escapeHtml(m.title)}</p>
+              <p class="text-xs muted mt-1">${escapeHtml(formatDate(m.date))} · ${escapeHtml(m.attendees)} attendees · ${escapeHtml(m.pages)} pages</p>
+              <div class="mt-4 flex gap-2">
+                <button class="btn-open btn-ghost flex-1 text-xs">Open</button>
+                <button class="btn-pdf btn-ghost text-xs">↓ PDF</button>
+              </div>
             </div>
-            <span class="chip chip-${m.status === 'draft' ? 'due' : 'paid'}">${m.status}</span>
-          </div>
-          <p class="font-semibold">${m.title}</p>
-          <p class="text-xs muted mt-1">${m.date} · ${m.attendees} attendees · ${m.pages} pages</p>
-          <div class="mt-4 flex gap-2">
-            <button class="btn-ghost flex-1 text-xs">Open</button>
-            <button class="btn-ghost text-xs">↓ PDF</button>
-          </div>
-        </div>
-      `).join('');
-      mountContent(`
-        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
-          <input type="search" placeholder="Search minutes…" class="glass-input flex-1 min-w-[220px]" />
-          <button class="btn-primary">+ New minutes</button>
-        </div>
+          `;
+        }).join('') || '<div class="col-span-full py-8 text-center muted">No minutes found matching query.</div>';
 
-        <div class="grid gap-4 md:grid-cols-2">${cards}</div>
+        // Wire open buttons
+        grid.querySelectorAll('.btn-open').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const card = e.target.closest('[data-id]');
+            const id = card.dataset.id;
+            const item = minutesList.find(m => m.id === id);
+            if (item) {
+              openDetailsModal(item);
+            }
+          });
+        });
 
-        <p class="mt-4 text-xs muted">PR-11: Secretary creates, stores, and shares meeting minutes.</p>
-      `);
+        // Wire PDF buttons
+        grid.querySelectorAll('.btn-pdf').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const card = e.target.closest('[data-id]');
+            const id = card.dataset.id;
+            const item = minutesList.find(m => m.id === id);
+            if (item) {
+              const content = `Meeting Minutes\n====================\nTitle: ${item.title}\nDate: ${formatDate(item.date)}\nAttendees: ${item.attendees}\nPages: ${item.pages}\nStatus: ${item.status}\n\nNotes:\n${item.description || ''}`;
+              const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.setAttribute('href', url);
+              link.setAttribute('download', `${item.title.replace(/\s+/g, '_')}_minutes.txt`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+          });
+        });
+
+        // Wire delete buttons
+        grid.querySelectorAll('.btn-delete').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const card = e.target.closest('[data-id]');
+            const id = card.dataset.id;
+            if (confirm('Are you sure you want to delete these minutes?')) {
+              try {
+                await deleteMinutes(activeGroupId, id);
+                renderPage();
+              } catch (err) {
+                alert(err.message || 'Failed to delete meeting minutes.');
+              }
+            }
+          });
+        });
+
+        // Wire status toggle buttons
+        grid.querySelectorAll('.btn-status-toggle').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const card = e.target.closest('[data-id]');
+            const id = card.dataset.id;
+            const item = minutesList.find(m => m.id === id);
+            if (item) {
+              const nextStatus = item.status === 'draft' ? 'published' : 'draft';
+              try {
+                await updateMinutesStatus(activeGroupId, id, nextStatus);
+                renderPage();
+              } catch (err) {
+                alert(err.message || 'Failed to update status.');
+              }
+            }
+          });
+        });
+      };
+
+      const openDetailsModal = (item) => {
+        const modal = document.querySelector('#details-modal');
+        const modalTitle = document.querySelector('#details-modal-title');
+        const modalMeta = document.querySelector('#details-modal-meta');
+        const modalBody = document.querySelector('#details-modal-body');
+
+        modalTitle.textContent = item.title;
+        modalMeta.textContent = `${formatDate(item.date)} · ${item.attendees} attendees · ${item.pages} pages · Status: ${item.status}`;
+        modalBody.textContent = item.description || 'No detailed minutes description provided.';
+        modal.classList.remove('hidden');
+      };
+
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading meeting minutes…</div>`);
+
+        try {
+          const { groups, activeGroupId: id } = await resolveGroupContext();
+          activeGroupId = id;
+          if (!activeGroupId) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose or create a group first.</p>
+              </div>
+            `);
+            return;
+          }
+
+          const response = await listMinutes(activeGroupId);
+          minutesList = Array.isArray(response) ? response : (response?.data || []);
+
+          // Group picker options
+          const groupOptions = groups.map((group) => `<option value="${escapeHtml(group.id)}" ${group.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(group))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+              <input id="search-input" type="search" placeholder="Search minutes…" class="glass-input flex-1 min-w-[220px]" />
+              <button id="btn-new-minutes" class="btn-primary">+ New minutes</button>
+            </div>
+
+            <div id="minutes-grid" class="grid gap-4 md:grid-cols-2"></div>
+
+            <p class="mt-6 text-xs muted">PR-11: Secretary creates, stores, and shares meeting minutes.</p>
+
+            <!-- Create Modal -->
+            <div id="create-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+              <div class="glass-card max-w-md w-full p-6 space-y-4 animate-fade-up">
+                <h3 class="font-display text-lg font-bold">New Meeting Minutes</h3>
+                <form id="create-form" class="space-y-3">
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Title</label>
+                    <input type="text" name="title" required placeholder="e.g. May 2026 monthly meeting" class="glass-input mt-1" />
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Date</label>
+                    <input type="date" name="date" required class="glass-input mt-1" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="text-[10px] uppercase tracking-wider muted font-semibold">Attendees</label>
+                      <input type="number" name="attendees" required min="1" value="14" class="glass-input mt-1" />
+                    </div>
+                    <div>
+                      <label class="text-[10px] uppercase tracking-wider muted font-semibold">Pages</label>
+                      <input type="number" name="pages" required min="1" value="2" class="glass-input mt-1" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Status</label>
+                    <select name="status" class="glass-input mt-1">
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-[10px] uppercase tracking-wider muted font-semibold">Notes / Description</label>
+                    <textarea name="description" required class="glass-input mt-1 min-h-[100px]" placeholder="Add meeting discussions and resolutions..."></textarea>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="btn-create-cancel" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs py-2 px-4">Create</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Details View Modal -->
+            <div id="details-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+              <div class="glass-card max-w-lg w-full p-6 space-y-4 animate-fade-up max-h-[85vh] flex flex-col justify-between">
+                <div>
+                  <h3 id="details-modal-title" class="font-display text-xl font-bold">Meeting Minutes Details</h3>
+                  <p id="details-modal-meta" class="text-xs muted mt-1"></p>
+                  <div class="mt-4 p-4 rounded-xl bg-[var(--bg-muted)] text-sm font-mono whitespace-pre-wrap overflow-y-auto max-h-[40vh]" id="details-modal-body"></div>
+                </div>
+                <div class="flex justify-end pt-4 border-t border-[var(--border-subtle)]">
+                  <button id="btn-details-close" class="nav-link text-xs py-2 px-4 rounded-lg bg-[var(--bg-muted)]">Close</button>
+                </div>
+              </div>
+            </div>
+          `);
+
+          renderGrid(minutesList);
+
+          // Group picker change
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          // Search live filtering
+          const searchInput = document.querySelector('#search-input');
+          searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const filtered = minutesList.filter(m => m.title.toLowerCase().includes(query));
+            renderGrid(filtered);
+          });
+
+          // Create Modal Open/Close
+          const createModal = document.querySelector('#create-modal');
+          const btnNewMinutes = document.querySelector('#btn-new-minutes');
+          const btnCreateCancel = document.querySelector('#btn-create-cancel');
+          const createForm = document.querySelector('#create-form');
+
+          btnNewMinutes.addEventListener('click', () => {
+            createModal.classList.remove('hidden');
+            createForm.reset();
+            createForm.querySelector('[type="date"]').value = new Date().toISOString().split('T')[0];
+          });
+          btnCreateCancel.addEventListener('click', () => {
+            createModal.classList.add('hidden');
+          });
+          createForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            const formData = new FormData(createForm);
+            try {
+              await createMinutes(activeGroupId, {
+                title: formData.get('title').trim(),
+                date: formData.get('date'),
+                attendees: parseInt(formData.get('attendees')),
+                pages: parseInt(formData.get('pages')),
+                status: formData.get('status'),
+                description: formData.get('description').trim()
+              });
+              createModal.classList.add('hidden');
+              renderPage();
+            } catch (err) {
+              alert(err.message || 'Failed to create meeting minutes.');
+              btn.disabled = false;
+              btn.textContent = 'Create';
+            }
+          });
+
+          // Details Modal Close
+          document.querySelector('#btn-details-close').addEventListener('click', () => {
+            document.querySelector('#details-modal').classList.add('hidden');
+          });
+
+        } catch (error) {
+          mountContent(`<div class="glass-card p-6"><p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load meeting minutes.')}</p></div>`);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

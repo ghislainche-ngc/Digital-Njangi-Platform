@@ -18,62 +18,109 @@
 
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
-      renderShell({ role: 'admin', title: 'Platform overview' });
-      mountContent(`
-        <div class="grid gap-6 md:grid-cols-4">
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">Active groups</p>
-            <p class="mt-2 font-display text-3xl font-bold">47</p>
-            <p class="mt-1 text-xs text-emerald-500">+5 this month</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">Total members</p>
-            <p class="mt-2 font-display text-3xl font-bold">612</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">MoMo volume (FCFA)</p>
-            <p class="mt-2 font-display text-3xl font-bold">24.8M</p>
-          </div>
-          <div class="glass-card p-5">
-            <p class="text-xs muted uppercase tracking-wider">MRR (FCFA)</p>
-            <p class="mt-2 font-display text-3xl font-bold">612 000</p>
-          </div>
-        </div>
+      import { fetchAdminStats, fetchAdminGroups } from '/src/js/api/admin.js';
 
-        <div class="glass-card mt-6 p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="font-display text-xl font-bold">Subscribed Njangi groups</h2>
-            <button class="btn-primary">Add group</button>
-          </div>
-          <table class="w-full text-sm">
-            <thead class="text-left muted uppercase text-xs">
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+      renderShell({ role: 'admin', title: 'Platform overview' });
+
+      const renderPage = async () => {
+        mountContent(`
+          <div class="glass-card p-6">Loading platform data...</div>
+        `);
+
+        try {
+          const stats = await fetchAdminStats();
+          const groups = await fetchAdminGroups();
+
+          const mrrFormatted = Number(stats.mrr || 0).toLocaleString();
+          const volumeFormatted = Number(stats.totalVolume || 0).toLocaleString();
+
+          // Render rows
+          const rows = groups.length
+            ? groups.map(g => {
+                const tier = g.subscription_tier || 'starter';
+                const status = g.subscription_status || 'active';
+                const groupMRR = status === 'active'
+                  ? (tier === 'growth' ? 5000 : (tier === 'enterprise' ? 15000 : 0))
+                  : 0;
+                
+                const chipClass = status === 'active' 
+                  ? 'paid' 
+                  : (status === 'past_due' ? 'due' : 'info');
+
+                return `
+                  <tr>
+                    <td class="py-3 font-medium">${escapeHtml(g.name)}</td>
+                    <td>${Number(g.memberCount || 0)}</td>
+                    <td><span class="chip chip-${chipClass} uppercase text-[10px] font-bold">${escapeHtml(tier)} / ${escapeHtml(status)}</span></td>
+                    <td>${groupMRR.toLocaleString()} FCFA</td>
+                  </tr>
+                `;
+              }).join('')
+            : `
               <tr>
-                <th class="py-2">Group</th><th>Members</th><th>Status</th><th>MRR</th>
+                <td colspan="4" class="py-8 text-center muted">No active groups in the platform.</td>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-[var(--border-subtle)]">
-              <tr class="py-2">
-                <td class="py-3 font-medium">Les Amis de Yaoundé</td>
-                <td>14</td>
-                <td><span class="chip chip-paid">Active</span></td>
-                <td>12 000</td>
-              </tr>
-              <tr>
-                <td class="py-3 font-medium">Groupe Familial Mbarga</td>
-                <td>25</td>
-                <td><span class="chip chip-paid">Active</span></td>
-                <td>18 000</td>
-              </tr>
-              <tr>
-                <td class="py-3 font-medium">Youth Savers Douala</td>
-                <td>12</td>
-                <td><span class="chip chip-due">Trial</span></td>
-                <td>0</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      `);
+
+            `;
+
+          mountContent(`
+            <div class="grid gap-6 md:grid-cols-4">
+              <div class="glass-card p-5 animate-fade-up">
+                <p class="text-xs muted uppercase tracking-wider">Active groups</p>
+                <p class="mt-2 font-display text-3xl font-bold">${stats.totalGroups}</p>
+                <p class="mt-1 text-xs text-emerald-500">Live count</p>
+              </div>
+              <div class="glass-card p-5 animate-fade-up" style="animation-delay: 100ms">
+                <p class="text-xs muted uppercase tracking-wider">Total members</p>
+                <p class="mt-2 font-display text-3xl font-bold">${stats.totalUsers}</p>
+                <p class="mt-1 text-xs muted">Registered accounts</p>
+              </div>
+              <div class="glass-card p-5 animate-fade-up" style="animation-delay: 200ms">
+                <p class="text-xs muted uppercase tracking-wider">MoMo volume (FCFA)</p>
+                <p class="mt-2 font-display text-3xl font-bold">${volumeFormatted}</p>
+                <p class="mt-1 text-xs text-emerald-500">Total flows</p>
+              </div>
+              <div class="glass-card p-5 animate-fade-up" style="animation-delay: 300ms">
+                <p class="text-xs muted uppercase tracking-wider">MRR (FCFA)</p>
+                <p class="mt-2 font-display text-3xl font-bold text-[var(--accent)]">${mrrFormatted}</p>
+                <p class="mt-1 text-xs text-emerald-500">Monthly subscription revenue</p>
+              </div>
+            </div>
+
+            <div class="glass-card mt-6 p-6 animate-fade-up" style="animation-delay: 400ms">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="font-display text-xl font-bold">Subscribed Njangi groups</h2>
+                <a href="/app/admin/groups.html" class="btn-primary text-xs">Manage Groups</a>
+              </div>
+              <table class="w-full text-sm">
+                <thead class="text-left muted uppercase text-xs">
+                  <tr>
+                    <th class="py-2">Group</th><th>Members</th><th>Status</th><th>MRR</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border-subtle)]">
+                  ${rows}
+                </tbody>
+              </table>
+            </div>
+          `);
+        } catch (error) {
+          mountContent(`
+            <div class="glass-card p-6">
+              <p class="text-red-500">Error loading dashboard: ${error.message || error}</p>
+            </div>
+          `);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

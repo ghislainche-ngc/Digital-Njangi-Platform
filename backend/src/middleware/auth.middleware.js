@@ -10,16 +10,21 @@ const jwt = require('jsonwebtoken');
  * @task Dev A — Task A-04
  */
 const authMiddleware = (req, res, next) => {
+  let token = null;
   const header = req.headers.authorization;
 
-  if (!header || !header.startsWith('Bearer ')) {
+  if (header && header.startsWith('Bearer ')) {
+    token = header.split(' ')[1];
+  } else if (req.query?.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
     return res.status(401).json({
-      error: 'Authentication required. Include a Bearer token in the Authorization header.',
+      error: 'Authentication required. Include a Bearer token in the Authorization header or token query parameter.',
       code: 'MISSING_TOKEN',
     });
   }
-
-  const token = header.split(' ')[1];
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);

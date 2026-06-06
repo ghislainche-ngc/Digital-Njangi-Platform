@@ -11,13 +11,16 @@ export default defineConfig({
         landing:  resolve(__dirname, 'index.html'),
         login:    resolve(__dirname, 'login.html'),
         register: resolve(__dirname, 'register.html'),
+        invite:   resolve(__dirname, 'invite.html'),
 
         admin:           resolve(__dirname, 'app/admin/index.html'),
         admin_groups:    resolve(__dirname, 'app/admin/groups.html'),
         admin_analytics: resolve(__dirname, 'app/admin/analytics.html'),
+        admin_users:     resolve(__dirname, 'app/admin/users.html'),
 
         president:          resolve(__dirname, 'app/president/index.html'),
         president_members:  resolve(__dirname, 'app/president/members.html'),
+        president_announcements: resolve(__dirname, 'app/president/announcements.html'),
         president_reports:  resolve(__dirname, 'app/president/reports.html'),
         president_settings: resolve(__dirname, 'app/president/settings.html'),
 
@@ -26,6 +29,7 @@ export default defineConfig({
         treasurer_payouts:       resolve(__dirname, 'app/treasurer/payouts.html'),
         treasurer_fines:         resolve(__dirname, 'app/treasurer/fines.html'),
         treasurer_social:        resolve(__dirname, 'app/treasurer/social-fund.html'),
+        treasurer_announcements: resolve(__dirname, 'app/treasurer/announcements.html'),
 
         secretary:               resolve(__dirname, 'app/secretary/index.html'),
         secretary_directory:     resolve(__dirname, 'app/secretary/directory.html'),

@@ -15,107 +15,326 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import {
+        resolveGroupContext,
+        updateSettings,
+        renewSubscription,
+        updateGroupGateway,
+        updateGroupPayoutGateway,
+        groupLabel,
+        setStoredGroupId
+      } from '/src/js/api/njangi.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'president', title: 'Group settings' });
-      const rotationOptions = [
-        { key: 'fixed', title: 'Fixed schedule', hint: 'Order locked at cycle start.' },
-        { key: 'random', title: 'Random draw', hint: 'System picks next each cycle.' },
-        { key: 'president', title: 'President decides', hint: 'You nominate manually.' },
-      ].map((o, i) => `
-        <label class="glass-card p-4 flex gap-3 cursor-pointer ${i === 1 ? 'ring-2 ring-[var(--accent)]' : ''}">
-          <input type="radio" name="rotation" ${i === 1 ? 'checked' : ''} class="mt-1" />
-          <span>
-            <span class="block font-semibold">${o.title}</span>
-            <span class="block text-xs muted mt-0.5">${o.hint}</span>
-          </span>
-        </label>
-      `).join('');
-      mountContent(`
-        <div class="grid gap-6 lg:grid-cols-2">
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Contribution</h2>
-            <div class="space-y-4">
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted">Group name</label>
-                <input class="glass-input mt-1" value="Les Amis de Yaoundé" />
-              </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Amount (FCFA)</label>
-                  <input class="glass-input mt-1" type="number" value="10000" />
-                </div>
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Frequency</label>
-                  <select class="glass-input mt-1">
-                    <option selected>Monthly</option>
-                    <option>Bi-weekly</option>
-                    <option>Weekly</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted">Payout threshold</label>
-                <input class="glass-input mt-1" type="number" value="140000" />
-                <p class="mt-1 text-xs muted">Amounts above this require President approval (PR-21, NFR-07).</p>
-              </div>
-            </div>
-          </section>
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Rotation strategy</h2>
-            <div class="space-y-3">${rotationOptions}</div>
-            <div class="mt-4 p-3 rounded-xl bg-[var(--bg-muted)] text-xs muted">
-              ⚠ PR-09: rotation type is locked once a cycle starts. Changes only between full cycles.
-            </div>
-          </section>
+      const renderPage = async () => {
+        mountContent(`<div class="glass-card p-6">Loading settings…</div>`);
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Penalty rules</h2>
-            <div class="space-y-4">
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Late fee (FCFA)</label>
-                  <input class="glass-input mt-1" type="number" value="2000" />
-                </div>
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Grace period (days)</label>
-                  <input class="glass-input mt-1" type="number" value="3" />
-                </div>
+        try {
+          const { groups, activeGroupId, activeGroup } = await resolveGroupContext();
+          if (!activeGroupId || !activeGroup) {
+            mountContent(`
+              <div class="glass-card p-6">
+                <p class="font-semibold">No group selected</p>
+                <p class="mt-2 text-sm muted">Choose or create a group first.</p>
               </div>
-              <label class="flex items-center gap-3">
-                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
-                <span class="text-sm">Auto-deduct fine from next contribution</span>
-              </label>
-              <label class="flex items-center gap-3">
-                <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
-                <span class="text-sm">Notify President of every missed payment</span>
-              </label>
-            </div>
-          </section>
+            `);
+            return;
+          }
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Notifications</h2>
-            <div class="space-y-4">
-              <label class="flex items-center justify-between">
-                <span class="text-sm">Telegram alerts</span>
-                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-              <label class="flex items-center justify-between">
-                <span class="text-sm">SMS fallback</span>
-                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-              <label class="flex items-center justify-between">
-                <span class="text-sm">Email receipts</span>
-                <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-            </div>
-          </section>
-        </div>
+          const group = activeGroup;
+          
+          // Limits display
+          const maxMembers = group.subscription_tier === 'starter' ? 5 : (group.subscription_tier === 'growth' ? 20 : 'Unlimited');
+          const maxContrib = group.subscription_tier === 'starter' ? '10,000 FCFA' : (group.subscription_tier === 'growth' ? '100,000 FCFA' : 'Unlimited');
+          
+          const formattedExpiry = group.subscription_expires_at 
+            ? new Date(group.subscription_expires_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
+            : 'N/A';
 
-        <div class="mt-6 flex justify-end gap-3">
-          <button class="btn-ghost">Cancel</button>
-          <button class="btn-primary">Save changes</button>
-        </div>
-      `);
+          const groupOptions = groups.map((g) => `<option value="${escapeHtml(g.id)}" ${g.id === activeGroupId ? 'selected' : ''}>${escapeHtml(groupLabel(g))}</option>`).join('');
+
+          mountContent(`
+            <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
+              <select id="group-picker" class="glass-input w-auto">${groupOptions}</select>
+            </div>
+
+            <div class="grid gap-6 lg:grid-cols-2">
+              <!-- General Settings -->
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Contribution & Identity</h2>
+                <form id="general-settings-form" class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Group Name</label>
+                    <input id="settings-name" required class="glass-input mt-1" value="${escapeHtml(group.name)}" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Amount (FCFA)</label>
+                      <input id="settings-amount" required type="number" min="1" class="glass-input mt-1" value="${group.contribution_amount}" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Frequency</label>
+                      <select id="settings-frequency" class="glass-input mt-1">
+                        <option value="monthly" ${group.frequency === 'monthly' ? 'selected' : ''}>Monthly</option>
+                        <option value="weekly" ${group.frequency === 'weekly' ? 'selected' : ''}>Weekly</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Approval Threshold (FCFA)</label>
+                    <input id="settings-approval" type="number" min="0" class="glass-input mt-1" value="${group.approval_threshold || 0}" />
+                    <p class="mt-1 text-xs muted">Payouts above this threshold require manual approval (NFR-07).</p>
+                  </div>
+                  <div class="pt-2">
+                    <button type="submit" class="btn-primary w-full">Save Settings</button>
+                    <p id="general-settings-msg" class="text-xs mt-2 text-center"></p>
+                  </div>
+                </form>
+              </section>
+
+              <!-- SaaS Subscription Panel -->
+              <section class="glass-card p-6 flex flex-col justify-between">
+                <div>
+                  <h2 class="font-display text-xl font-bold mb-4">SaaS Subscription & Billing</h2>
+                  
+                  <div class="space-y-3">
+                    <div class="flex justify-between items-center py-2 border-b border-subtle">
+                      <span class="text-sm muted">Active Plan</span>
+                      <span class="chip chip-${group.subscription_tier === 'starter' ? 'info' : (group.subscription_tier === 'growth' ? 'paid' : 'premium')} uppercase text-xs font-bold">
+                        ${escapeHtml(group.subscription_tier)}
+                      </span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-subtle">
+                      <span class="text-sm muted">Billing Status</span>
+                      <span class="chip chip-${group.subscription_status === 'active' ? 'paid' : 'alert'} uppercase text-xs font-bold">
+                        ${escapeHtml(group.subscription_status)}
+                      </span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-subtle">
+                      <span class="text-sm muted">Expiration Date</span>
+                      <span class="text-sm font-semibold">${escapeHtml(formattedExpiry)}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-subtle">
+                      <span class="text-sm muted">Member Occupancy</span>
+                      <span class="text-sm font-semibold">${group.memberCount} / ${maxMembers}</span>
+                    </div>
+                    <div class="flex justify-between items-center py-2 border-b border-subtle">
+                      <span class="text-sm muted">Contribution Limit</span>
+                      <span class="text-sm font-semibold">${maxContrib}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Renew / Upgrade Actions -->
+                <div class="mt-6 pt-6 border-t border-subtle space-y-4">
+                  <!-- Renew form -->
+                  <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider muted mb-2">Renew Plan (Growth/Enterprise)</h3>
+                    <div class="flex gap-2">
+                      <select id="billing-gateway" class="glass-input text-xs w-auto">
+                        <option value="mtn_momo">MTN MoMo</option>
+                        <option value="orange_money">Orange Money</option>
+                        <option value="campay">Campay</option>
+                      </select>
+                      <button id="btn-renew" class="btn-primary text-xs flex-1">Pay & Renew 30 Days</button>
+                    </div>
+                  </div>
+
+                  <!-- Upgrade plan -->
+                  <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider muted mb-2">Change Plan Tier</h3>
+                    <div class="flex gap-2">
+                      <select id="upgrade-tier" class="glass-input text-xs w-auto">
+                        <option value="starter" ${group.subscription_tier === 'starter' ? 'selected' : ''}>Starter (Free)</option>
+                        <option value="growth" ${group.subscription_tier === 'growth' ? 'selected' : ''}>Growth (5,000 FCFA)</option>
+                        <option value="enterprise" ${group.subscription_tier === 'enterprise' ? 'selected' : ''}>Enterprise (15,000 FCFA)</option>
+                      </select>
+                      <button id="btn-upgrade" class="btn-ghost text-xs border border-subtle flex-1">Apply Plan</button>
+                    </div>
+                  </div>
+                  
+                  <p id="billing-msg" class="text-xs text-center"></p>
+                </div>
+              </section>
+
+              <!-- Rotation Strategy -->
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Rotation Rules</h2>
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Rotation Method</label>
+                    <select id="settings-rotation" class="glass-input mt-1">
+                      <option value="fixed" ${group.rotation_type === 'fixed' ? 'selected' : ''}>Fixed Sequential</option>
+                      <option value="random" ${group.rotation_type === 'random' ? 'selected' : ''}>Random Lottery</option>
+                      <option value="president" ${group.rotation_type === 'president' ? 'selected' : ''}>President Nomination</option>
+                    </select>
+                  </div>
+                  <div class="p-3 rounded-xl bg-[var(--bg-muted)] text-xs muted border border-subtle">
+                    ⚠ Note: Rotation type and contribution amount updates are locked while a cycle is active.
+                  </div>
+                </div>
+              </section>
+
+              <!-- Penalty & Rules -->
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Penalties & Late Fees</h2>
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Late Penalty per Day (FCFA)</label>
+                    <input id="settings-penalty" type="number" min="0" class="glass-input mt-1" value="${group.penalty_per_day || 0}" />
+                  </div>
+                  <label class="flex items-center gap-3">
+                    <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+                    <span class="text-sm">Auto-deduct fine from next contribution</span>
+                  </label>
+                </div>
+              </section>
+
+              <!-- Payment Gateway Configuration -->
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Payment Gateways</h2>
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Preferred Collection Gateway</label>
+                    <select id="settings-collection-gateway" class="glass-input mt-1">
+                      <option value="mtn_momo" ${group.preferred_gateway === 'mtn_momo' ? 'selected' : ''}>MTN Mobile Money (Direct)</option>
+                      <option value="orange_money" ${group.preferred_gateway === 'orange_money' ? 'selected' : ''}>Orange Money (Direct)</option>
+                      <option value="campay" ${group.preferred_gateway === 'campay' ? 'selected' : ''}>Campay (Aggregator)</option>
+                    </select>
+                    <p class="mt-1 text-xs muted">Routing choice for members' cycle contributions.</p>
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Preferred Payout Gateway</label>
+                    <select id="settings-payout-gateway" class="glass-input mt-1">
+                      <option value="" ${group.preferred_payout_gateway === null || group.preferred_payout_gateway === '' ? 'selected' : ''}>Auto-detect (Phone Prefix)</option>
+                      <option value="mtn_momo" ${group.preferred_payout_gateway === 'mtn_momo' ? 'selected' : ''}>MTN Mobile Money (Direct)</option>
+                      <option value="orange_money" ${group.preferred_payout_gateway === 'orange_money' ? 'selected' : ''}>Orange Money (Direct)</option>
+                      <option value="campay" ${group.preferred_payout_gateway === 'campay' ? 'selected' : ''}>Campay (Aggregator)</option>
+                    </select>
+                    <p class="mt-1 text-xs muted">Routing choice for disbursements. Campay uses /withdraw/.</p>
+                  </div>
+                  <div class="pt-2">
+                    <button id="btn-save-gateways" class="btn-primary w-full">Save Gateways</button>
+                    <p id="gateways-msg" class="text-xs mt-2 text-center"></p>
+                  </div>
+                </div>
+              </section>
+            </div>
+          `);
+
+          // Picker change handler
+          document.querySelector('#group-picker').addEventListener('change', (event) => {
+            setStoredGroupId(event.target.value);
+            renderPage();
+          });
+
+          // Save settings handler
+          const settingsForm = document.querySelector('#general-settings-form');
+          const settingsMsg = document.querySelector('#general-settings-msg');
+          settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            settingsMsg.className = 'text-xs mt-2 text-center text-amber-500';
+            settingsMsg.textContent = 'Saving changes…';
+
+            const payload = {
+              name: document.querySelector('#settings-name').value,
+              contribution_amount: Number(document.querySelector('#settings-amount').value),
+              frequency: document.querySelector('#settings-frequency').value,
+              approval_threshold: Number(document.querySelector('#settings-approval').value),
+              rotation_type: document.querySelector('#settings-rotation').value,
+              penalty_per_day: Number(document.querySelector('#settings-penalty').value),
+            };
+
+            try {
+              await updateSettings(activeGroupId, payload);
+              settingsMsg.className = 'text-xs mt-2 text-center text-emerald-500 font-bold';
+              settingsMsg.textContent = 'Settings saved successfully!';
+              setTimeout(renderPage, 1500);
+            } catch (err) {
+              settingsMsg.className = 'text-xs mt-2 text-center text-red-500';
+              settingsMsg.textContent = err.message || 'Failed to save settings.';
+            }
+          });
+
+          // Renew Handler
+          const btnRenew = document.querySelector('#btn-renew');
+          const billingMsg = document.querySelector('#billing-msg');
+          btnRenew.addEventListener('click', async () => {
+            billingMsg.className = 'text-xs text-center text-amber-500';
+            billingMsg.textContent = 'Processing renewal payment...';
+            const gateway = document.querySelector('#billing-gateway').value;
+
+            try {
+              await renewSubscription(activeGroupId, gateway);
+              billingMsg.className = 'text-xs text-center text-emerald-500 font-bold';
+              billingMsg.textContent = '✓ Plan renewed successfully for 30 days!';
+              setTimeout(renderPage, 1500);
+            } catch (err) {
+              billingMsg.className = 'text-xs text-center text-red-500';
+              billingMsg.textContent = err.message || 'Renewal failed.';
+            }
+          });
+
+          // Upgrade Handler
+          const btnUpgrade = document.querySelector('#btn-upgrade');
+          btnUpgrade.addEventListener('click', async () => {
+            billingMsg.className = 'text-xs text-center text-amber-500';
+            billingMsg.textContent = 'Applying plan tier...';
+            const tier = document.querySelector('#upgrade-tier').value;
+
+            try {
+              await updateSettings(activeGroupId, { subscription_tier: tier });
+              billingMsg.className = 'text-xs text-center text-emerald-500 font-bold';
+              billingMsg.textContent = '✓ Plan tier upgraded successfully!';
+              setTimeout(renderPage, 1500);
+            } catch (err) {
+              billingMsg.className = 'text-xs text-center text-red-500';
+              billingMsg.textContent = err.message || 'Failed to change plan.';
+            }
+          });
+
+          // Gateways Handler
+          const btnSaveGateways = document.querySelector('#btn-save-gateways');
+          const gatewaysMsg = document.querySelector('#gateways-msg');
+          btnSaveGateways.addEventListener('click', async () => {
+            gatewaysMsg.className = 'text-xs mt-2 text-center text-amber-500';
+            gatewaysMsg.textContent = 'Saving gateways…';
+            const gateway = document.querySelector('#settings-collection-gateway').value;
+            const payoutGatewayVal = document.querySelector('#settings-payout-gateway').value;
+            const payoutGateway = payoutGatewayVal === '' ? null : payoutGatewayVal;
+
+            try {
+              // Update preferred collection gateway
+              await updateGroupGateway(activeGroupId, gateway);
+              // Update preferred payout gateway
+              await updateGroupPayoutGateway(activeGroupId, payoutGateway);
+              gatewaysMsg.className = 'text-xs mt-2 text-center text-emerald-500 font-bold';
+              gatewaysMsg.textContent = '✓ Payment gateways saved successfully!';
+              setTimeout(renderPage, 1500);
+            } catch (err) {
+              gatewaysMsg.className = 'text-xs mt-2 text-center text-red-500';
+              gatewaysMsg.textContent = err.message || 'Failed to update gateways.';
+            }
+          });
+
+        } catch (error) {
+          mountContent(`
+            <div class="glass-card p-6">
+              <p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load settings.')}</p>
+            </div>
+          `);
+        }
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

@@ -7,10 +7,11 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0a0a0a" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
       rel="stylesheet"
     />
     <title>Log in — NjangiBridge</title>
+    <meta name="robots" content="noindex, nofollow" />
     <link rel="stylesheet" href="/src/css/app.css" />
     <!-- Define loginPage BEFORE boot.js calls Alpine.start() -->
     <script type="module">
@@ -19,145 +20,309 @@
       import { redirectByRole, destinationFor } from '/src/js/auth/role-redirect.js';
       window.loginPage = () => ({
         method: 'password',
-        form: { email: '', password: '', otp: '' },
+        form: { email: '', password: '', phone: '', code: '' },
         loading: false,
         error: '',
-        preview(role) { return destinationFor(role); },
+        mfaToken: '',
+        show2FAInput: false,
+        mfaCode: '',
+        preview(role) {
+          session.set('mock-token', {
+            id: 'mock-id',
+            email: `mock-${role}@naas.app`,
+            name: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            full_name: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            role: role,
+            group_id: 'group-demo-123'
+          });
+          redirectByRole(role);
+        },
         async submit() {
           this.error = '';
           this.loading = true;
           try {
-            const endpoint = this.method === 'otp' ? '/api/auth/otp-verify' : '/api/auth/login';
-            const { token, user } = await api.post(endpoint, this.form);
+            const endpoint = this.method === 'otp' ? '/auth/verify-otp' : '/auth/login';
+            const payload = this.method === 'otp'
+              ? { phone: this.form.phone, code: this.form.code }
+              : { email: this.form.email, password: this.form.password };
+            const response = await api.post(endpoint, payload);
+
+            if (response.status === '2fa_required') {
+              this.mfaToken = response.mfaToken;
+              this.show2FAInput = true;
+              this.loading = false;
+              return;
+            }
+
+            const { token, user } = response;
             session.set(token, user);
-            redirectByRole(user.role);
+ 
+            // Auto-accept invitation if token exists in query parameter
+            const inviteToken = new URLSearchParams(window.location.search).get('token');
+            if (inviteToken) {
+              try {
+                const membership = await api.post(`/groups/invitations/${inviteToken}/accept`);
+                if (membership && membership.group_id) {
+                  window.location.href = `/app/member/index.html?groupId=${membership.group_id}`;
+                  return;
+                }
+              } catch (inviteErr) {
+                console.warn('Auto-accept invitation failed:', inviteErr.message);
+              }
+            }
+ 
+            redirectByRole(user.role || 'member');
           } catch (err) {
             this.error = err.message || 'Login failed';
           } finally {
             this.loading = false;
           }
         },
+        async submit2FA() {
+          this.error = '';
+          this.loading = true;
+          try {
+            const { token, user } = await api.post('/auth/2fa/verify-login', {
+              mfaToken: this.mfaToken,
+              code: this.mfaCode
+            });
+            session.set(token, user);
+            redirectByRole(user.role || 'member');
+          } catch (err) {
+            this.error = err.message || '2FA verification failed';
+          } finally {
+            this.loading = false;
+          }
+        }
       });
     </script>
     <script type="module" src="/src/js/boot.js"></script>
   </head>
   <body
     x-data="loginPage()" x-init="$store.theme.init()" x-cloak
-    class="min-h-screen relative"
-  >
-    <!-- minimal top bar -->
-    <header class="mx-auto max-w-7xl px-6 py-5 flex items-center">
-      <a href="/" class="flex items-center gap-2 font-display font-extrabold text-lg">
-        <img src="/logo.png" alt="NjangiBridge" class="h-9 w-9 rounded-xl object-contain bg-white p-1" />
-        <span x-text="$t('brand.name')"></span>
-      </a>
-      <div class="ml-auto flex items-center gap-2">
-        <!-- language -->
-        <div x-data="{ open: false }" class="relative">
-          <button @click="open = !open" @click.outside="open = false" class="nav-link">
-            <span class="uppercase text-xs font-semibold" x-text="$store.i18n.locale"></span>
-          </button>
-          <div x-show="open" x-transition class="glass-card absolute right-0 mt-2 w-28 p-1">
-            <template x-for="l in $store.i18n.locales()" :key="l">
-              <button
-                @click="$store.i18n.setLocale(l); open = false"
-                class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-muted)]"
-                :class="$store.i18n.locale === l ? 'accent-text font-semibold' : ''"
-                x-text="l.toUpperCase()"
-              ></button>
-            </template>
-          </div>
-        </div>
-        <!-- theme -->
-        <button @click="$store.theme.toggle()" class="nav-link">
-          <svg x-show="$store.theme.effective === 'light'" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-          </svg>
-          <svg x-show="$store.theme.effective === 'dark'"  class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
-          </svg>
-        </button>
-      </div>
-    </header>
-
-    <main class="relative z-10 mx-auto max-w-md px-6 py-12">
-      <div class="glass-card-heavy p-8 animate-fade-up">
-        <h1 class="font-display text-3xl font-bold" x-text="$t('login.title')"></h1>
-        <p class="mt-2 text-sm text-secondary-app" x-text="$t('login.subtitle')"></p>
-
-        <!-- Method toggle (password / OTP) -->
-        <div class="mt-6 inline-flex p-1 rounded-xl bg-[var(--bg-muted)] text-sm">
-          <button
-            @click="method = 'password'"
-            :class="method === 'password' ? 'bg-[var(--bg-surface)] shadow-sm' : 'muted'"
-            class="px-4 py-2 rounded-lg font-medium"
-          >Email</button>
-          <button
-            @click="method = 'otp'"
-            :class="method === 'otp' ? 'bg-[var(--bg-surface)] shadow-sm' : 'muted'"
-            class="px-4 py-2 rounded-lg font-medium"
-            x-text="$t('login.otp_use')"
-          ></button>
-        </div>
-
-        <form @submit.prevent="submit" class="mt-6 space-y-4">
-          <div>
-            <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('login.email')"></label>
-            <input
-              x-model="form.email" type="email" required autocomplete="email"
-              class="glass-input mt-1" placeholder="you@example.com"
-            />
-          </div>
-
-          <div x-show="method === 'password'">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold uppercase tracking-wider muted" x-text="$t('login.password')"></label>
-              <a href="#" class="text-xs accent-text" x-text="$t('login.forgot')"></a>
+    class="min-h-screen flex flex-col md:flex-row bg-[#faf9f6] dark:bg-[#000000] text-black dark:text-white"
+  >    <!-- Left panel (form) -->
+    <div class="w-full md:w-1/2 flex flex-col justify-between p-6 md:p-8 lg:p-10 h-screen overflow-y-auto bg-[#fdfbf7] dark:bg-[#080808] relative z-10 shadow-xl md:shadow-none">
+      <!-- Header -->
+      <header class="flex items-center justify-between">
+        <a href="/" class="flex items-center select-none font-display font-black text-2xl tracking-[-0.07em]">
+          <span class="text-[#e53238]">N</span><span class="text-[#0064d2]">j</span><span class="text-[#f5af02]">a</span><span class="text-[#86b817]">n</span><span class="text-[#e53238]">g</span><span class="text-[#0064d2]">i</span><span class="text-black dark:text-white ml-0.5">Bridge</span>
+        </a>
+        <div class="flex items-center gap-2">
+          <!-- Language Select -->
+          <div x-data="{ open: false }" class="relative">
+            <button @click="open = !open" @click.outside="open = false" class="nav-link">
+              <span class="uppercase text-xs font-semibold" x-text="$store.i18n.locale"></span>
+            </button>
+            <div x-show="open" x-transition class="glass-card absolute right-0 mt-2 w-28 p-1 z-50">
+              <template x-for="l in $store.i18n.locales()" :key="l">
+                <button
+                  @click="$store.i18n.setLocale(l); open = false"
+                  class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--bg-muted)]"
+                  :class="$store.i18n.locale === l ? 'accent-text font-semibold' : ''"
+                  x-text="l.toUpperCase()"
+                ></button>
+              </template>
             </div>
-            <input
-              x-model="form.password" type="password" autocomplete="current-password"
-              class="glass-input mt-1" placeholder="••••••••"
-            />
           </div>
-
-          <div x-show="method === 'otp'">
-            <label class="text-xs font-semibold uppercase tracking-wider muted">OTP</label>
-            <input
-              x-model="form.otp" inputmode="numeric" pattern="[0-9]*" maxlength="6"
-              class="glass-input mt-1 tracking-[0.5em] text-center font-mono" placeholder="••••••"
-            />
-          </div>
-
-          <template x-if="error">
-            <p class="text-sm text-red-500" x-text="error"></p>
-          </template>
-
-          <button
-            type="submit" class="btn-primary w-full" :disabled="loading"
-            :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
-          >
-            <span x-show="!loading" x-text="$t('login.submit')"></span>
-            <span x-show="loading" x-text="$t('common.loading')"></span>
+          <!-- Theme toggle -->
+          <button @click="$store.theme.toggle()" class="nav-link">
+            <svg x-show="$store.theme.effective === 'light'" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+            </svg>
+            <svg x-show="$store.theme.effective === 'dark'"  class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+            </svg>
           </button>
-        </form>
+        </div>
+      </header>
 
-        <!-- Role quick-preview (mock mode) -->
-        <div class="mt-6 pt-6 border-t border-subtle">
-          <p class="text-xs uppercase tracking-widest muted">Preview a dashboard</p>
-          <div class="mt-3 grid grid-cols-5 gap-2">
-            <template x-for="role in ['admin','president','treasurer','secretary','member']" :key="role">
-              <a :href="preview(role)" class="nav-link justify-center text-xs capitalize" x-text="role"></a>
+      <!-- Center content -->
+      <div class="my-auto py-4 max-w-md w-full mx-auto animate-fade-up">
+        <!-- Login Form Container -->
+        <div x-show="!show2FAInput">
+          <h1 class="font-serif text-3xl md:text-4xl font-semibold tracking-tight text-black dark:text-white" x-text="$t('login.title')">Welcome back</h1>
+          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400" x-text="$t('login.subtitle')">Sign in to access your member dashboard</p>
+
+          <!-- Method toggle (password / OTP) -->
+          <div class="mt-6 inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-sm">
+            <button
+              @click="method = 'password'"
+              :class="method === 'password' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400'"
+              class="px-4 py-1.5 rounded-lg font-medium transition"
+            >Email</button>
+            <button
+              @click="method = 'otp'"
+              :class="method === 'otp' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400'"
+              class="px-4 py-1.5 rounded-lg font-medium transition"
+              x-text="$t('login.otp_use')"
+            >OTP</button>
+          </div>
+
+          <form @submit.prevent="submit" class="mt-6 space-y-4">
+            <div x-show="method === 'password'">
+              <label class="text-xs font-semibold text-zinc-650 dark:text-zinc-400 tracking-wide" x-text="$t('login.email')">Email Address</label>
+              <input
+                x-model="form.email" type="email" autocomplete="email"
+                :required="method === 'password'" :disabled="method !== 'password'"
+                class="w-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent transition placeholder-zinc-400 dark:placeholder-zinc-600 mt-1" placeholder="your.email@example.com"
+              />
+            </div>
+
+            <div x-show="method === 'otp'">
+              <label class="text-xs font-semibold text-zinc-650 dark:text-zinc-400 tracking-wide">Phone</label>
+              <input
+                x-model="form.phone" type="tel" required autocomplete="tel"
+                :required="method === 'otp'" :disabled="method !== 'otp'"
+                class="w-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent transition placeholder-zinc-400 dark:placeholder-zinc-600 mt-1" placeholder="+237677000001"
+              />
+            </div>
+
+            <div x-show="method === 'password'">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-semibold text-zinc-650 dark:text-zinc-400 tracking-wide" x-text="$t('login.password')">Password</label>
+                <a href="#" class="text-xs text-zinc-550 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:underline transition" x-text="$t('login.forgot')">Forgot password?</a>
+              </div>
+              <!-- Custom password input container with relative show/hide toggle -->
+              <div class="relative mt-1" x-data="{ show: false }">
+                <input
+                  x-model="form.password" :type="show ? 'text' : 'password'" autocomplete="current-password"
+                  :required="method === 'password'" :disabled="method !== 'password'"
+                  class="w-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-lg pl-3.5 pr-12 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent transition placeholder-zinc-400 dark:placeholder-zinc-600" placeholder="********"
+                />
+                <button type="button" @click="show = !show" class="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition">
+                  <svg x-show="!show" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <svg x-show="show" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div x-show="method === 'otp'">
+              <label class="text-xs font-semibold text-zinc-650 dark:text-zinc-400 tracking-wide">OTP</label>
+              <input
+                x-model="form.code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required
+                :required="method === 'otp'" :disabled="method !== 'otp'"
+                class="w-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-lg px-4 py-2.5 tracking-[0.5em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent transition placeholder-zinc-400 dark:placeholder-zinc-600 mt-1" placeholder="•••••"
+              />
+            </div>
+
+            <!-- Remember me checkbox -->
+            <div class="flex items-center">
+              <input id="remember-me" type="checkbox" class="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-black dark:text-white focus:ring-black dark:focus:ring-white accent-black dark:accent-white cursor-pointer" />
+              <label for="remember-me" class="ml-2 block text-sm text-zinc-500 dark:text-zinc-400 cursor-pointer select-none">Remember email on this device</label>
+            </div>
+
+            <template x-if="error">
+              <p class="text-sm text-red-500" x-text="error"></p>
             </template>
+
+            <button
+              type="submit" class="w-full bg-black hover:bg-zinc-900 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-black font-semibold py-3 px-6 rounded-lg shadow-sm hover:shadow transition duration-200" :disabled="loading"
+              :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
+            >
+              <span x-show="!loading" x-text="$t('login.submit')">Sign In</span>
+              <span x-show="loading" x-text="$t('common.loading')">Loading...</span>
+            </button>
+          </form>
+
+          <!-- Dividers and navigation links -->
+          <div class="mt-6 border-t border-zinc-200 dark:border-zinc-850">
+            <div class="py-3 text-center text-sm text-zinc-600 dark:text-zinc-400">
+              <span x-text="$t('login.new_user')">Don't have an account?</span>
+              <a :href="new URLSearchParams(window.location.search).get('token') ? `/register.html?token=${new URLSearchParams(window.location.search).get('token')}` : '/register.html'" class="text-black dark:text-white font-semibold underline ml-1 hover:opacity-80 transition" x-text="$t('login.create_account')">Join the network</a>
+            </div>
           </div>
         </div>
 
-        <p class="mt-6 text-sm text-center muted">
-          <span x-text="$t('login.new_user')"></span>
-          <a href="/register.html" class="accent-text font-semibold ml-1" x-text="$t('login.create_account')"></a>
-        </p>
-      </div>
-    </main>
+        <!-- 2FA Code Input Panel -->
+        <div x-show="show2FAInput">
+          <h2 class="font-serif text-2xl md:text-3xl font-semibold tracking-tight text-black dark:text-white">Security Verification</h2>
+          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Enter the 6-digit verification code generated by your authenticator app (like Aegis or Ente Auth).</p>
 
+          <form @submit.prevent="submit2FA" class="mt-6 space-y-4">
+            <div>
+              <label class="text-xs font-semibold text-zinc-650 dark:text-zinc-400 tracking-wide">Authenticator Code</label>
+              <input
+                x-model="mfaCode" @input="mfaCode = mfaCode.replace(/[^0-9]/g, '')" type="text" pattern="[0-9]{6}" maxlength="6" required placeholder="••••••"
+                class="w-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-lg px-4 py-2.5 tracking-[0.5em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent transition placeholder-zinc-400 dark:placeholder-zinc-600 mt-1"
+              />
+            </div>
+
+            <template x-if="error">
+              <p class="text-sm text-red-500" x-text="error"></p>
+            </template>
+
+            <button
+              type="submit" class="w-full bg-black hover:bg-zinc-900 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-black font-semibold py-3 px-6 rounded-lg shadow-sm hover:shadow transition duration-200" :disabled="loading"
+              :class="loading ? 'opacity-60 cursor-not-allowed' : ''"
+            >
+              <span x-show="!loading">Verify & Sign In</span>
+              <span x-show="loading">Verifying...</span>
+            </button>
+
+            <button
+              type="button" @click="show2FAInput = false; mfaCode = ''; error = ''" class="w-full text-center text-sm font-semibold muted hover:underline mt-4 bg-transparent border-0 cursor-pointer block text-black dark:text-white"
+            >
+              ← Back to Login
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Footer info on left -->
+      <footer class="text-xs text-zinc-400 dark:text-zinc-500">
+        &copy; 2026 NjangiBridge. All rights reserved.
+      </footer>
+    </div>
+
+    <!-- Right panel (brand illustration) -->
+    <div class="hidden md:flex w-full md:w-1/2 h-screen bg-[#0a0a0a] text-white flex-col justify-center p-8 lg:p-12 relative overflow-hidden">
+      <!-- Grid pattern -->
+      <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px); background-size: 28px 28px;"></div>
+      <!-- Ambient halo glow -->
+      <div class="absolute inset-0 opacity-30 pointer-events-none" style="background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.12) 0%, transparent 50%);"></div>
+
+      <!-- Centered content wrapper -->
+      <div class="relative z-10 max-w-lg w-full mx-auto flex flex-col items-center text-center">
+        <div class="space-y-1 font-serif text-4xl lg:text-5xl font-bold leading-tight">
+          <span class="block text-white">NjangiBridge.</span>
+          <span class="block text-zinc-400 italic font-normal">Empowering</span>
+          <span class="block text-white">Generations</span>
+        </div>
+        <p class="mt-4 text-zinc-400 text-sm leading-relaxed max-w-md">
+          Access your member dashboard to view campaigns, track contributions, and stay connected with the community worldwide.
+        </p>
+
+        <!-- Column lists like the layout image -->
+        <div class="grid grid-cols-3 gap-6 mt-8 w-full max-w-md">
+          <div>
+            <h4 class="font-serif text-base lg:text-lg font-bold text-white">Treasury</h4>
+            <p class="text-[11px] text-zinc-505 mt-1">Transactions</p>
+          </div>
+          <div>
+            <h4 class="font-serif text-base lg:text-lg font-bold text-white">Mutual Aid</h4>
+            <p class="text-[11px] text-zinc-505 mt-1">Member support</p>
+          </div>
+          <div>
+            <h4 class="font-serif text-base lg:text-lg font-bold text-white">Records</h4>
+            <p class="text-[11px] text-zinc-505 mt-1">Governance</p>
+          </div>
+        </div>
+
+        <!-- Divider line -->
+        <div class="w-full max-w-md border-t border-zinc-800/80 my-6"></div>
+
+        <!-- Bottom Link -->
+        <div class="text-xs text-zinc-500">
+          Chapter member? <a href="/login.html" class="underline text-zinc-300 hover:text-white font-semibold transition">Access Member Portal</a>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

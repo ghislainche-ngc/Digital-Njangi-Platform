@@ -15,106 +15,496 @@
     <div id="app-shell"></div>
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { session } from '/src/js/auth/session.js';
+      import { api } from '/src/js/api/client.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'member', title: 'My profile' });
-      mountContent(`
-        <div class="grid gap-6 lg:grid-cols-2">
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Personal info</h2>
-            <div class="flex items-center gap-4 mb-5">
-              <div class="h-16 w-16 rounded-full accent-bg text-[var(--text-on-brand)] grid place-items-center text-xl font-bold">FN</div>
-              <button class="btn-ghost text-sm">Change photo</button>
+
+      let isOrangeLinked = false;
+
+      const renderPage = async () => {
+        const user = session.user() || {};
+        const name = user.name || user.full_name || 'Demo User';
+        const email = user.email || 'demo@naas.app';
+        const phone = user.phone || '+237 600 000 000';
+        const initials = name.split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase() || 'U';
+
+        mountContent(`
+          <form id="profile-form">
+            <div class="grid gap-6 lg:grid-cols-2">
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Personal info</h2>
+                <div class="flex items-center gap-4 mb-5">
+                  <div class="h-16 w-16 rounded-full overflow-hidden bg-[var(--bg-muted)] border border-subtle flex items-center justify-center relative select-none">
+                    <img src="${user.avatar_url || ('https://fcgbqyiwiumzuqnwkzgf.supabase.co/storage/v1/object/public/avatars/' + user.id + '.png')}" 
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'" 
+                         class="h-full w-full object-cover" 
+                         style="${user.avatar_url ? 'display: block;' : 'display: none;'}" />
+                    <div class="h-full w-full accent-bg text-white grid place-items-center text-xl font-bold" 
+                         style="${user.avatar_url ? 'display: none;' : 'display: grid;'}">${escapeHtml(initials)}</div>
+                  </div>
+                  <button type="button" class="btn-ghost text-sm" id="btn-photo">Change photo</button>
+                </div>
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Full name</label>
+                    <input name="name" class="glass-input mt-1" required value="${escapeHtml(name)}" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Email</label>
+                      <input name="email" class="glass-input mt-1" type="email" required value="${escapeHtml(email)}" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Phone</label>
+                      <input name="phone" class="glass-input mt-1" type="tel" required value="${escapeHtml(phone)}" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Wallets</h2>
+                <div class="space-y-3">
+                  <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-lg bg-yellow-400 text-black grid place-items-center font-bold text-xs">MTN</div>
+                    <div class="flex-1">
+                      <p class="font-semibold">MTN Mobile Money</p>
+                      <p class="text-xs muted font-mono">${escapeHtml(phone)} · verified</p>
+                    </div>
+                    <span class="chip chip-paid">Primary</span>
+                  </div>
+                  <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-lg bg-orange-500 text-white grid place-items-center font-bold text-xs">OM</div>
+                    <div class="flex-1">
+                      <p class="font-semibold">Orange Money</p>
+                      <p class="text-xs muted" id="om-status">${isOrangeLinked ? `${escapeHtml(phone)} · verified` : 'Not linked'}</p>
+                    </div>
+                    <button type="button" class="${isOrangeLinked ? 'chip chip-paid' : 'nav-link text-xs'}" id="btn-link-om">
+                      ${isOrangeLinked ? 'Primary Alternative' : 'Link'}
+                    </button>
+                  </div>
+                </div>
+                <p class="mt-4 text-xs muted">PR-20: Orange Money as alternative payment channel.</p>
+              </section>
+
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Notifications</h2>
+                <div class="space-y-4">
+                  <label class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-sm">Telegram</p>
+                      <p class="text-xs muted">Primary channel for reminders + confirmations</p>
+                    </div>
+                    <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+                  </label>
+                  <label class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-sm">SMS</p>
+                      <p class="text-xs muted">Fallback when offline</p>
+                    </div>
+                    <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
+                  </label>
+                  <label class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-sm">Email receipts</p>
+                      <p class="text-xs muted">PDF copies emailed monthly</p>
+                    </div>
+                    <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
+                  </label>
+                </div>
+                <div class="mt-5 p-3 rounded-xl bg-[var(--bg-muted)] text-xs">
+                  <p class="font-semibold">Telegram bot</p>
+                  <p class="muted mt-1">Tap below to link your Telegram account to NjangiBridge.</p>
+                  <a href="#" target="_blank" id="btn-telegram" class="btn-ghost text-xs mt-3 inline-block text-center" style="display: none; text-decoration: none;">Open Bot & Link Account</a>
+                  <p id="telegram-status-msg" class="text-xs muted mt-2"></p>
+                </div>
+              </section>
+
+              <section class="glass-card p-6">
+                <h2 class="font-display text-xl font-bold mb-4">Security</h2>
+                <div class="space-y-4">
+                  <button type="button" class="btn-ghost w-full text-left" id="btn-change-password">Change password →</button>
+                  <button type="button" class="btn-ghost w-full text-left" id="btn-toggle-2fa">
+                    ${user.two_factor_enabled ? 'Disable 2FA (Authenticator App) →' : 'Enable 2FA (Authenticator App) →'}
+                  </button>
+                  <button type="button" class="btn-ghost w-full text-left" id="btn-view-history">View login history →</button>
+                </div>
+                <p class="mt-6 text-xs text-red-500">
+                  <a href="/login.html" id="btn-signout">Sign out of NjangiBridge →</a>
+                </p>
+              </section>
+
             </div>
-            <div class="space-y-4">
+
+            <div class="mt-6 flex justify-end gap-3 items-center">
+              <p id="profile-message" class="text-sm text-emerald-500 mr-4"></p>
+              <button type="button" id="btn-cancel" class="btn-ghost">Cancel</button>
+              <button type="submit" class="btn-primary">Save profile</button>
+            </div>
+          </form>
+
+          <!-- Change Password Modal -->
+          <dialog id="change-password-modal" class="glass-card-heavy p-6 max-w-md w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-display font-bold text-lg">Change Password</h3>
+              <button type="button" onclick="document.getElementById('change-password-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
+            </div>
+            <form id="change-password-form" class="space-y-4">
               <div>
-                <label class="text-xs font-semibold uppercase tracking-wider muted">Full name</label>
-                <input class="glass-input mt-1" value="Fatou Ngo" />
+                <label class="text-xs font-semibold uppercase tracking-wider muted">Current Password</label>
+                <input type="password" name="oldPassword" class="glass-input mt-1" required />
               </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Email</label>
-                  <input class="glass-input mt-1" type="email" value="fatou@example.cm" />
-                </div>
-                <div>
-                  <label class="text-xs font-semibold uppercase tracking-wider muted">Phone</label>
-                  <input class="glass-input mt-1" type="tel" value="+237 6XX XXX 004" />
-                </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted">New Password</label>
+                <input type="password" name="newPassword" class="glass-input mt-1" required />
               </div>
-            </div>
-          </section>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wider muted">Confirm New Password</label>
+                <input type="password" name="confirmPassword" class="glass-input mt-1" required />
+              </div>
+              <div class="flex gap-3 mt-6">
+                <button type="button" onclick="document.getElementById('change-password-modal').close()" class="btn-ghost border border-subtle flex-1">Cancel</button>
+                <button type="submit" class="btn-primary flex-1">Change Password</button>
+              </div>
+              <p id="change-password-msg" class="text-xs text-center mt-2"></p>
+            </form>
+          </dialog>
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Wallets</h2>
-            <div class="space-y-3">
-              <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
-                <div class="h-10 w-10 rounded-lg bg-yellow-400 text-black grid place-items-center font-bold text-xs">MTN</div>
-                <div class="flex-1">
-                  <p class="font-semibold">MTN Mobile Money</p>
-                  <p class="text-xs muted font-mono">+237 6XX XXX 004 · verified</p>
-                </div>
-                <span class="chip chip-paid">Primary</span>
-              </div>
-              <div class="p-4 rounded-xl border border-subtle flex items-center gap-3">
-                <div class="h-10 w-10 rounded-lg bg-orange-500 text-white grid place-items-center font-bold text-xs">OM</div>
-                <div class="flex-1">
-                  <p class="font-semibold">Orange Money</p>
-                  <p class="text-xs muted">Not linked</p>
-                </div>
-                <button class="nav-link text-xs">Link</button>
-              </div>
+          <!-- 2FA Setup Modal -->
+          <dialog id="setup-2fa-modal" class="glass-card-heavy p-6 max-w-md w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-display font-bold text-lg">Set Up Authenticator (2FA)</h3>
+              <button type="button" onclick="document.getElementById('setup-2fa-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
             </div>
-            <p class="mt-4 text-xs muted">PR-20: Orange Money as alternative payment channel.</p>
-          </section>
-
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Notifications</h2>
             <div class="space-y-4">
-              <label class="flex items-center justify-between">
+              <p class="text-sm text-[var(--text-muted)]">
+                1. Scan this QR code using an authenticator app (like <strong>Aegis</strong> or <strong>Ente Auth</strong>) on your mobile device.
+              </p>
+              <div class="flex justify-center p-3 bg-white rounded-xl">
+                <img id="qr-code-img" src="" alt="Scan QR Code" style="width: 200px; height: 200px;" />
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider muted">Or enter this secret key manually:</p>
+                <code id="secret-key-text" class="block p-2 bg-[var(--bg-muted)] border border-subtle rounded-lg text-center font-mono mt-1 text-sm select-all"></code>
+              </div>
+              <form id="verify-2fa-form" class="space-y-3">
                 <div>
-                  <p class="font-medium text-sm">Telegram</p>
-                  <p class="text-xs muted">Primary channel for reminders + confirmations</p>
+                  <label class="text-xs font-semibold uppercase tracking-wider muted">Enter 6-Digit Code</label>
+                  <input type="text" name="mfaCode" pattern="[0-9]{6}" maxlength="6" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="e.g. 123456" class="glass-input mt-1 text-center font-mono tracking-widest text-lg" required />
                 </div>
-                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-              <label class="flex items-center justify-between">
-                <div>
-                  <p class="font-medium text-sm">SMS</p>
-                  <p class="text-xs muted">Fallback when offline</p>
+                <div class="flex gap-3 mt-6">
+                  <button type="button" onclick="document.getElementById('setup-2fa-modal').close()" class="btn-ghost border border-subtle flex-1">Cancel</button>
+                  <button type="submit" class="btn-primary flex-1">Verify & Enable</button>
                 </div>
-                <input type="checkbox" checked class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
-              <label class="flex items-center justify-between">
-                <div>
-                  <p class="font-medium text-sm">Email receipts</p>
-                  <p class="text-xs muted">PDF copies emailed monthly</p>
-                </div>
-                <input type="checkbox" class="h-4 w-4 accent-[var(--accent)]" />
-              </label>
+                <p id="setup-2fa-msg" class="text-xs text-center mt-2"></p>
+              </form>
             </div>
-            <div class="mt-5 p-3 rounded-xl bg-[var(--bg-muted)] text-xs">
-              <p class="font-semibold">Telegram bot</p>
-              <p class="muted mt-1">Tap below to link your Telegram account to NjangiBridge.</p>
-              <button class="btn-ghost text-xs mt-3">Open @NjangiBridgeBot</button>
-            </div>
-          </section>
+          </dialog>
 
-          <section class="glass-card p-6">
-            <h2 class="font-display text-xl font-bold mb-4">Security</h2>
+          <!-- Login History Modal -->
+          <dialog id="login-history-modal" class="glass-card-heavy p-6 max-w-lg w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-display font-bold text-lg">Login History</h3>
+              <button type="button" onclick="document.getElementById('login-history-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
+            </div>
             <div class="space-y-4">
-              <button class="btn-ghost w-full text-left">Change password →</button>
-              <button class="btn-ghost w-full text-left">Enable SMS OTP (2FA) →</button>
-              <button class="btn-ghost w-full text-left">View login history →</button>
-            </div>
-            <p class="mt-6 text-xs text-red-500">
-              <a href="/login.html" onclick="localStorage.clear();">Sign out of NjangiBridge →</a>
-            </p>
-          </section>
-        </div>
+              <p class="text-xs muted">Showing your last 20 login attempts. If you see unrecognized activity, please change your password immediately.</p>
+              
+              <div class="overflow-y-auto max-h-96 pr-1 space-y-3" id="login-history-list">
+                <div class="text-center py-6 muted text-sm">Loading history...</div>
+              </div>
 
-        <div class="mt-6 flex justify-end gap-3">
-          <button class="btn-ghost">Cancel</button>
-          <button class="btn-primary">Save profile</button>
-        </div>
-      `);
+              <div class="flex gap-3 mt-6">
+                <button type="button" onclick="document.getElementById('login-history-modal').close()" class="btn-primary flex-1">Close</button>
+              </div>
+            </div>
+          </dialog>
+        `);
+
+        // Form elements event listeners
+        document.querySelector('#profile-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const newName = formData.get('name');
+          const newEmail = formData.get('email');
+          const newPhone = formData.get('phone');
+
+          // Save back into session
+          const updatedUser = {
+            ...user,
+            name: newName,
+            full_name: newName,
+            email: newEmail,
+            phone: newPhone
+          };
+          localStorage.setItem('naas.user', JSON.stringify(updatedUser));
+
+          const msg = document.querySelector('#profile-message');
+          msg.textContent = 'Profile saved successfully!';
+          setTimeout(() => {
+            window.location.reload();
+          }, 800);
+        });
+
+        document.querySelector('#btn-cancel').addEventListener('click', () => {
+          renderPage();
+        });
+
+        document.querySelector('#btn-link-om').addEventListener('click', (e) => {
+          isOrangeLinked = !isOrangeLinked;
+          renderPage();
+        });
+
+        document.querySelector('#btn-photo').addEventListener('click', () => {
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = 'image/png, image/jpeg, image/webp';
+          
+          fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.size > 2 * 1024 * 1024) {
+              alert('Image must be less than 2MB.');
+              return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async () => {
+              const base64Data = reader.result;
+              const btn = document.querySelector('#btn-photo');
+              const originalText = btn.textContent;
+              btn.textContent = 'Uploading...';
+              btn.disabled = true;
+
+              try {
+                const result = await api.post('/auth/avatar', { avatar: base64Data });
+                
+                const img = document.querySelector('#profile-form img');
+                if (img) {
+                  img.src = result.avatarUrl;
+                  img.style.display = 'block';
+                  if (img.nextElementSibling) {
+                    img.nextElementSibling.style.display = 'none';
+                  }
+                }
+                
+                const updatedUser = {
+                  ...user,
+                  avatar_url: result.avatarUrl
+                };
+                localStorage.setItem('naas.user', JSON.stringify(updatedUser));
+
+                alert('Profile picture uploaded successfully!');
+              } catch (err) {
+                alert('Upload failed: ' + err.message);
+              } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+              }
+            };
+            
+            reader.readAsDataURL(file);
+          });
+
+          fileInput.click();
+        });
+
+        // Fetch Telegram Bot dynamic link
+        try {
+          const res = await api.get('/auth/telegram/bot-url');
+          if (res && res.link) {
+            const btn = document.querySelector('#btn-telegram');
+            if (btn) {
+              btn.href = res.link;
+              btn.style.display = 'inline-block';
+            }
+          }
+        } catch (err) {
+          const statusMsg = document.querySelector('#telegram-status-msg');
+          if (statusMsg) {
+            statusMsg.textContent = 'Telegram Bot not configured on server.';
+          }
+        }
+
+        // Change Password Modal triggers & form submit
+        const changePasswordModal = document.getElementById('change-password-modal');
+        document.getElementById('btn-change-password').addEventListener('click', () => {
+          changePasswordModal.showModal();
+        });
+
+        const changePasswordForm = document.getElementById('change-password-form');
+        changePasswordForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const msg = document.getElementById('change-password-msg');
+          msg.textContent = '';
+          msg.className = 'text-xs text-center mt-2';
+
+          const oldPassword = changePasswordForm.elements.oldPassword.value;
+          const newPassword = changePasswordForm.elements.newPassword.value;
+          const confirmPassword = changePasswordForm.elements.confirmPassword.value;
+
+          if (newPassword !== confirmPassword) {
+            msg.textContent = 'New passwords do not match.';
+            msg.className = 'text-xs text-center mt-2 text-red-500';
+            return;
+          }
+
+          try {
+            await api.post('/auth/change-password', { oldPassword, newPassword });
+            msg.textContent = 'Password changed successfully!';
+            msg.className = 'text-xs text-center mt-2 text-emerald-500';
+            setTimeout(() => {
+              changePasswordModal.close();
+              changePasswordForm.reset();
+              msg.textContent = '';
+            }, 1500);
+          } catch (err) {
+            msg.textContent = err.message || 'Failed to change password.';
+            msg.className = 'text-xs text-center mt-2 text-red-500';
+          }
+        });
+
+        // 2FA Setup triggers and submit
+        const toggle2faBtn = document.getElementById('btn-toggle-2fa');
+        const setup2faModal = document.getElementById('setup-2fa-modal');
+        let tempSecret = '';
+
+        toggle2faBtn.addEventListener('click', async () => {
+          if (user.two_factor_enabled) {
+            if (confirm('Are you sure you want to disable 2FA? This will decrease your account security.')) {
+              try {
+                await api.post('/auth/2fa/disable');
+                user.two_factor_enabled = false;
+                localStorage.setItem('naas.user', JSON.stringify(user));
+                alert('2FA disabled successfully.');
+                window.location.reload();
+              } catch (err) {
+                alert('Failed to disable 2FA: ' + err.message);
+              }
+            }
+          } else {
+            try {
+              const res = await api.post('/auth/2fa/generate');
+              tempSecret = res.secret;
+              document.getElementById('secret-key-text').textContent = res.secret;
+              document.getElementById('qr-code-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(res.otpauthUrl)}`;
+              document.getElementById('setup-2fa-msg').textContent = '';
+              setup2faModal.showModal();
+            } catch (err) {
+              alert('Failed to generate 2FA secret: ' + err.message);
+            }
+          }
+        });
+
+        const verify2faForm = document.getElementById('verify-2fa-form');
+        verify2faForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const msg = document.getElementById('setup-2fa-msg');
+          msg.textContent = 'Verifying...';
+          msg.className = 'text-xs text-center mt-2 text-yellow-500';
+
+          const code = verify2faForm.elements.mfaCode.value;
+          try {
+            await api.post('/auth/2fa/enable', { secret: tempSecret, code });
+            msg.textContent = '✓ 2FA enabled successfully!';
+            msg.className = 'text-xs text-center mt-2 text-emerald-500';
+            
+            user.two_factor_enabled = true;
+            localStorage.setItem('naas.user', JSON.stringify(user));
+
+            setTimeout(() => {
+              setup2faModal.close();
+              verify2faForm.reset();
+              window.location.reload();
+            }, 1500);
+          } catch (err) {
+            msg.textContent = err.message || 'Verification failed. Try again.';
+            msg.className = 'text-xs text-center mt-2 text-red-500';
+          }
+        });
+
+        // Login History logic
+        const parseUserAgent = (ua) => {
+          if (!ua) return 'Unknown Device';
+          let os = 'Unknown OS';
+          let browser = 'Unknown Browser';
+
+          if (ua.includes('Windows')) os = 'Windows';
+          else if (ua.includes('Macintosh') || ua.includes('Mac OS X')) os = 'macOS';
+          else if (ua.includes('Linux') && !ua.includes('Android')) os = 'Linux';
+          else if (ua.includes('Android')) os = 'Android';
+          else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+          if (ua.includes('Chrome') || ua.includes('CriOS')) browser = 'Chrome';
+          else if (ua.includes('Firefox')) browser = 'Firefox';
+          else if (ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('CriOS')) browser = 'Safari';
+          else if (ua.includes('Edge') || ua.includes('Edg')) browser = 'Edge';
+
+          return `${browser} on ${os}`;
+        };
+
+        const viewHistoryBtn = document.getElementById('btn-view-history');
+        const loginHistoryModal = document.getElementById('login-history-modal');
+        const loginHistoryList = document.getElementById('login-history-list');
+
+        viewHistoryBtn.addEventListener('click', async () => {
+          loginHistoryModal.showModal();
+          loginHistoryList.innerHTML = '<div class="text-center py-6 text-yellow-500 text-sm">Loading history...</div>';
+
+          try {
+            const history = await api.get('/auth/login-history');
+            if (!history || history.length === 0) {
+              loginHistoryList.innerHTML = '<div class="text-center py-6 muted text-sm">No login attempts recorded yet.</div>';
+              return;
+            }
+
+            loginHistoryList.innerHTML = history.map(item => {
+              const date = new Date(item.created_at).toLocaleString();
+              const isSuccess = item.status === 'success';
+              const statusBadge = isSuccess
+                ? '<span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Success</span>'
+                : `<span class="px-2 py-0.5 rounded text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Failed</span>`;
+              
+              const deviceDetails = parseUserAgent(item.user_agent);
+              const ip = item.ip_address || 'Unknown IP';
+              const reasonStr = !isSuccess && item.failure_reason
+                ? `<p class="text-xs text-rose-400 mt-1 font-mono">${escapeHtml(item.failure_reason)}</p>`
+                : '';
+
+              return `
+                <div class="p-3 rounded-xl border border-subtle bg-[var(--bg-muted)] flex flex-col gap-1 text-sm">
+                  <div class="flex justify-between items-start">
+                    <span class="font-semibold text-white">${escapeHtml(deviceDetails)}</span>
+                    ${statusBadge}
+                  </div>
+                  <div class="flex justify-between items-center text-xs muted mt-1 font-mono">
+                    <span>IP: ${escapeHtml(ip)}</span>
+                    <span>${escapeHtml(date)}</span>
+                  </div>
+                  ${reasonStr}
+                </div>
+              `;
+            }).join('');
+          } catch (err) {
+            loginHistoryList.innerHTML = `<div class="text-center py-6 text-rose-500 text-sm">Failed to load history: ${escapeHtml(err.message)}</div>`;
+          }
+        });
+
+        document.querySelector('#btn-signout').addEventListener('click', () => {
+          session.clear();
+        });
+      };
+
+      renderPage();
     </script>
   </body>
 </html>

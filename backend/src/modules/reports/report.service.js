@@ -44,7 +44,7 @@ class ReportService {
       const contributionRows = await this.db.findAll(
         'contributions',
         { cycle_id: cycle.id },
-        { columns: 'amount,status,created_at,users(full_name)' }
+        { columns: 'id,amount,status,created_at,users!contributions_user_id_fkey(full_name)' }
       );
 
       const contributions = (contributionRows || []).map((row) => {
@@ -53,6 +53,7 @@ class ReportService {
           confirmedContributionTotal += amount;
         }
         return {
+          id: row.id,
           memberName: (row.users && row.users.full_name) || '—',
           amount,
           status: row.status,
@@ -63,7 +64,7 @@ class ReportService {
       const payoutRow = await this.db.findOne(
         'payouts',
         { cycle_id: cycle.id },
-        'amount,status,executed_at,users(full_name)'
+        'id,amount,status,executed_at,users!payouts_recipient_id_fkey(full_name)'
       );
 
       let payout = null;
@@ -73,6 +74,7 @@ class ReportService {
           completedPayoutTotal += payoutAmount;
         }
         payout = {
+          id: payoutRow.id,
           recipientName: (payoutRow.users && payoutRow.users.full_name) || '—',
           amount: payoutAmount,
           date: payoutRow.executed_at,
@@ -171,6 +173,69 @@ class ReportService {
 
     const { data: urlData } = client.storage.from('receipts').getPublicUrl(data.path);
     return urlData.publicUrl;
+  }
+
+  /**
+   * Generate a PDF personal statement for a member.
+   */
+  async generatePersonalStatementPDF(groupId, userId) {
+    const group = await this.db.findById('njangi_groups', groupId);
+    if (!group) {
+      const err = new Error('Group not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const membership = await this.db.findOne('memberships', {
+      group_id: groupId,
+      user_id: userId
+    }, 'id,status,rotation_position,users!memberships_user_id_fkey(full_name, email)');
+
+    if (!membership) {
+      const err = new Error('Membership not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const history = await this.getPersonalHistory(groupId, userId);
+
+    const contributionsWithCycles = [];
+    for (const c of (history.contributions || [])) {
+      const cycle = await this.db.findById('cycles', c.cycle_id);
+      contributionsWithCycles.push({
+        ...c,
+        cycles: { cycle_number: cycle ? cycle.cycle_number : 1 }
+      });
+    }
+
+    const payoutsWithCycles = [];
+    for (const p of (history.payouts || [])) {
+      const cycle = await this.db.findById('cycles', p.cycle_id);
+      payoutsWithCycles.push({
+        ...p,
+        cycles: { cycle_number: cycle ? cycle.cycle_number : 1 }
+      });
+    }
+
+    const confirmedContributions = contributionsWithCycles.filter(c => c.status === 'confirmed');
+    const totalPaid = confirmedContributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    const successRate = contributionsWithCycles.length > 0
+      ? Math.round((confirmedContributions.length / contributionsWithCycles.length) * 100)
+      : 100;
+
+    const memberData = {
+      memberName: membership.users?.full_name || membership.users?.email || 'Member',
+      groupName: group.name,
+      successRate,
+      totalPaid
+    };
+
+    const buffer = await this.pdfService.generatePersonalStatementPDF(memberData, {
+      contributions: contributionsWithCycles,
+      payouts: payoutsWithCycles
+    });
+
+    return buffer;
   }
 }
 

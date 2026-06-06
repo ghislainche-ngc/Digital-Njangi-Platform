@@ -17,9 +17,12 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /var/www/naas
-            git pull origin main
+            cd /home/ghislain/Digital-Njangi-Platform
+            git fetch origin
+            git reset --hard origin/main
+            npm install
+            npm run build
             cd backend
             npm install --production
-            pm2 restart naas-backend
+            pm2 restart njangi-backend --update-env
             echo "Deployment complete — $(date)"

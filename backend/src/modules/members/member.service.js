@@ -6,7 +6,54 @@ const { AuditService, AuditEvents } = require('../../services/audit/AuditService
 const auditService = new AuditService(supabase);
 
 class MemberService {
+  async _enforceSubscriptionMemberLimit(groupId) {
+    const { data: group, error: fetchError } = await supabase
+      .from('njangi_groups')
+      .select('subscription_tier, subscription_status, subscription_expires_at')
+      .eq('id', groupId)
+      .single();
+
+    if (fetchError || !group) {
+      const e = new Error('Group not found');
+      e.statusCode = 404;
+      e.code = 'GROUP_NOT_FOUND';
+      throw e;
+    }
+
+    const expiry = group.subscription_expires_at ? new Date(group.subscription_expires_at) : null;
+    if (group.subscription_status !== 'active' || (expiry && expiry < new Date())) {
+      const e = new Error('Your Njangi group space subscription is inactive or expired. Please renew in settings.');
+      e.statusCode = 402;
+      e.code = 'SUBSCRIPTION_EXPIRED';
+      throw e;
+    }
+
+    const { count, error: countError } = await supabase
+      .from('memberships')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', groupId)
+      .eq('status', 'active');
+
+    if (countError) throw countError;
+
+    const tier = group.subscription_tier || 'starter';
+    if (tier === 'starter' && count >= 5) {
+      const e = new Error('Starter plan member limit reached (Max 5 members). Please upgrade your plan in settings.');
+      e.statusCode = 403;
+      e.code = 'TIER_LIMIT_REACHED';
+      throw e;
+    }
+    if (tier === 'growth' && count >= 20) {
+      const e = new Error('Growth plan member limit reached (Max 20 members). Please upgrade your plan in settings.');
+      e.statusCode = 403;
+      e.code = 'TIER_LIMIT_REACHED';
+      throw e;
+    }
+  }
+
   async inviteMember(groupId, phone, invitedBy) {
+    await this._enforceSubscriptionMemberLimit(groupId);
+
     const { data: existing } = await supabase
       .from('invitations')
       .select('id')
@@ -64,6 +111,8 @@ class MemberService {
       err.code = 'INVALID_TOKEN';
       throw err;
     }
+
+    await this._enforceSubscriptionMemberLimit(invitation.group_id);
 
     if (new Date(invitation.expires_at) < new Date()) {
       await supabase.from('invitations').update({ status: 'expired' }).eq('id', invitation.id);

@@ -13,58 +13,282 @@
   </head>
   <body x-data x-init="$store.theme.init()" x-cloak class="relative">
     <div id="app-shell"></div>
+
+    <!-- Management Modal -->
+    <dialog id="manage-group-modal" class="glass-card-heavy p-6 max-w-md w-full border border-subtle rounded-2xl backdrop:backdrop-blur-md" style="background: rgba(18, 18, 18, 0.95); color: #fff; margin: auto; border: 1px solid var(--border-subtle); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);">
+      <div class="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+        <h3 class="font-display font-bold text-lg" id="modal-group-name">Manage Njangi Group</h3>
+        <button type="button" onclick="document.getElementById('manage-group-modal').close()" class="nav-link p-1" style="background: transparent; border: none; color: #999; cursor: pointer;">✕</button>
+      </div>
+      <form id="manage-group-form" class="mt-4 space-y-4">
+        <input type="hidden" name="groupId" id="modal-group-id" />
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Subscription Plan</label>
+          <select name="subscription_tier" id="modal-tier" class="glass-input mt-1">
+            <option value="starter">Starter (Free)</option>
+            <option value="growth">Growth (5,000 FCFA)</option>
+            <option value="enterprise">Enterprise (15,000 FCFA)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Subscription Status</label>
+          <select name="subscription_status" id="modal-sub-status" class="glass-input mt-1">
+            <option value="active">Active</option>
+            <option value="past_due">Past Due</option>
+            <option value="canceled">Canceled</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Expiration Date</label>
+          <input type="date" name="subscription_expires_at" id="modal-expires" class="glass-input mt-1" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wider muted">Platform Status</label>
+          <select name="status" id="modal-status" class="glass-input mt-1">
+            <option value="active">Active (Normal Operations)</option>
+            <option value="suspended">Suspended (Blocked)</option>
+          </select>
+        </div>
+        <div class="pt-2 flex gap-3">
+          <button type="submit" class="btn-primary flex-1">Save Settings</button>
+          <button type="button" onclick="document.getElementById('manage-group-modal').close()" class="btn-ghost border border-subtle flex-1">Cancel</button>
+        </div>
+        <p id="modal-msg" class="text-xs text-center mt-2"></p>
+      </form>
+    </dialog>
+
     <script type="module">
       import { renderShell, mountContent } from '/src/js/components/app-shell.js';
+      import { createGroup } from '/src/js/api/njangi.js';
+      import { fetchAdminGroups, updateGroupSubscription, updateGroupStatus } from '/src/js/api/admin.js';
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
       renderShell({ role: 'admin', title: 'Njangi groups' });
-      const rows = [
-        { name: 'Les Amis de Yaoundé', plan: 'Growth', members: 14, mrr: '12 000', status: 'paid', statusLabel: 'Active' },
-        { name: 'Groupe Familial Mbarga', plan: 'Pro',    members: 25, mrr: '25 000', status: 'paid', statusLabel: 'Active' },
-        { name: 'Youth Savers Douala',   plan: 'Starter', members: 12, mrr: '5 000',  status: 'due',  statusLabel: 'Trial' },
-        { name: 'Bamenda Teachers',      plan: 'Growth',  members: 18, mrr: '12 000', status: 'paid', statusLabel: 'Active' },
-        { name: 'Buea Market Women',     plan: 'Starter', members: 9,  mrr: '0',      status: 'failed', statusLabel: 'Suspended' },
-      ].map(g => `
-        <tr>
-          <td class="px-5 py-3 font-medium">${g.name}</td>
-          <td>${g.plan}</td>
-          <td>${g.members}</td>
-          <td>${g.mrr}</td>
-          <td><span class="chip chip-${g.status}">${g.statusLabel}</span></td>
-          <td class="text-right pr-5">
-            <button class="nav-link text-xs">View</button>
-            <button class="nav-link text-xs text-red-500">Suspend</button>
-          </td>
-        </tr>
-      `).join('');
-      mountContent(`
-        <div class="glass-card p-5 mb-6 flex flex-wrap items-center gap-3">
-          <input type="search" placeholder="Search groups…" class="glass-input flex-1 min-w-[220px]" />
-          <select class="glass-input w-auto">
-            <option>All statuses</option>
-            <option>Active</option>
-            <option>Trial</option>
-            <option>Suspended</option>
-          </select>
-          <button class="btn-primary">+ New group</button>
-        </div>
 
-        <div class="glass-card p-0 overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+      // Store a local reference to groups to populate the modal
+      let loadedGroups = [];
+
+      const renderPage = async () => {
+        mountContent(`
+          <div class="glass-card p-6">Loading Njangi groups…</div>
+        `);
+
+        try {
+          loadedGroups = await fetchAdminGroups();
+          const totalMembers = loadedGroups.reduce((sum, group) => sum + Number(group.memberCount || 0), 0);
+          const rows = loadedGroups.length
+            ? loadedGroups.map((group) => {
+                const subStatusClass = group.subscription_status === 'active' 
+                  ? 'paid' 
+                  : (group.subscription_status === 'past_due' ? 'due' : 'info');
+
+                const statusClass = group.status === 'active' ? 'paid' : 'failed';
+
+                return `
+                  <tr>
+                    <td class="px-5 py-3 font-medium">${escapeHtml(group.name)}</td>
+                    <td>${escapeHtml(group.frequency || 'monthly')}</td>
+                    <td>${Number(group.memberCount || 0)}</td>
+                    <td>${Number(group.contribution_amount || 0).toLocaleString()} FCFA</td>
+                    <td>
+                      <span class="chip chip-${subStatusClass} uppercase text-[10px] font-bold">${escapeHtml(group.subscription_tier)} / ${escapeHtml(group.subscription_status)}</span>
+                    </td>
+                    <td>
+                      <span class="chip chip-${statusClass} uppercase text-[10px] font-bold">${escapeHtml(group.status)}</span>
+                    </td>
+                    <td class="text-right pr-5">
+                      <button type="button" data-manage-group="${escapeHtml(group.id)}" class="nav-link text-xs">Manage</button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')
+            : `
               <tr>
-                <th class="px-5 py-3">Group</th>
-                <th>Plan</th>
-                <th>Members</th>
-                <th>MRR (FCFA)</th>
-                <th>Status</th>
-                <th class="text-right pr-5">Actions</th>
+                <td colspan="7" class="px-5 py-8 text-center muted">No groups found in the database.</td>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
-          </table>
-        </div>
+            `;
 
-        <p class="mt-4 text-xs muted">Showing 5 of 47 groups · Per PR-40 & PR-41: Platform Admin can view and suspend any group.</p>
-      `);
+          mountContent(`
+            <div class="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <section class="glass-card p-6">
+                <p class="text-xs uppercase tracking-widest muted">Create group</p>
+                <h2 class="mt-2 font-display text-2xl font-bold">Start a new Njangi</h2>
+                <p class="mt-2 text-sm muted">Admin utility to quickly spin up groups for testing.</p>
+                <form id="create-group-form" class="mt-6 space-y-4">
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Group name</label>
+                    <input name="name" required class="glass-input mt-1" placeholder="Les Amis de Yaoundé" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Contribution</label>
+                      <input name="contribution_amount" required type="number" min="1" class="glass-input mt-1" value="10000" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Frequency</label>
+                      <select name="frequency" class="glass-input mt-1">
+                        <option value="monthly">Monthly</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold uppercase tracking-wider muted">Rotation</label>
+                    <select name="rotation_type" class="glass-input mt-1">
+                      <option value="fixed">Fixed</option>
+                      <option value="random">Random</option>
+                      <option value="president">President decides</option>
+                    </select>
+                  </div>
+                  <div class="grid grid-cols-3 gap-4">
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Penalty/day</label>
+                      <input name="penalty_per_day" type="number" min="0" class="glass-input mt-1" value="0" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">Approval %</label>
+                      <input name="approval_threshold" type="number" min="0" max="100" class="glass-input mt-1" value="0" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold uppercase tracking-wider muted">SaaS Plan</label>
+                      <select name="subscription_tier" class="glass-input mt-1">
+                        <option value="starter">Starter</option>
+                        <option value="growth">Growth</option>
+                        <option value="enterprise">Enterprise</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button type="submit" class="btn-primary w-full">+ New group</button>
+                  <p id="group-form-message" class="text-xs muted"></p>
+                </form>
+              </section>
+
+              <section class="glass-card p-0 overflow-hidden">
+                <div class="p-5 border-b border-[var(--border-subtle)] flex flex-wrap items-center gap-3 justify-between">
+                  <div>
+                    <p class="text-xs uppercase tracking-widest muted">Global Monitor</p>
+                    <h2 class="font-display text-xl font-bold mt-1">${loadedGroups.length} Njangi Group${loadedGroups.length === 1 ? '' : 's'}</h2>
+                  </div>
+                  <div class="text-sm muted">${totalMembers} active members across all groups</div>
+                </div>
+                <table class="w-full text-sm">
+                  <thead class="text-left muted uppercase text-xs bg-[var(--bg-muted)]">
+                    <tr>
+                      <th class="px-5 py-3">Group</th>
+                      <th>Frequency</th>
+                      <th>Members</th>
+                      <th>Contribution</th>
+                      <th>Billing (Tier / Status)</th>
+                      <th>Status</th>
+                      <th class="text-right pr-5">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[var(--border-subtle)]">${rows}</tbody>
+                </table>
+              </section>
+            </div>
+          `);
+
+          // Event Listeners for Management Modal
+          document.querySelectorAll('[data-manage-group]').forEach((button) => {
+            button.addEventListener('click', () => {
+              const groupId = button.dataset.manageGroup;
+              const group = loadedGroups.find(g => g.id === groupId);
+              if (group) {
+                document.getElementById('modal-group-id').value = group.id;
+                document.getElementById('modal-group-name').textContent = `Manage: ${group.name}`;
+                document.getElementById('modal-tier').value = group.subscription_tier;
+                document.getElementById('modal-sub-status').value = group.subscription_status;
+                document.getElementById('modal-status').value = group.status;
+                
+                // Format date string to YYYY-MM-DD
+                if (group.subscription_expires_at) {
+                  const dateObj = new Date(group.subscription_expires_at);
+                  const formattedDate = dateObj.toISOString().split('T')[0];
+                  document.getElementById('modal-expires').value = formattedDate;
+                } else {
+                  document.getElementById('modal-expires').value = '';
+                }
+
+                document.getElementById('modal-msg').textContent = '';
+                document.getElementById('manage-group-modal').showModal();
+              }
+            });
+          });
+
+          // Setup New Group creation form handler
+          const form = document.querySelector('#create-group-form');
+          const message = document.querySelector('#group-form-message');
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            message.textContent = 'Creating group…';
+
+            const payload = Object.fromEntries(new FormData(form).entries());
+            payload.contribution_amount = Number(payload.contribution_amount);
+            payload.penalty_per_day = Number(payload.penalty_per_day || 0);
+            payload.approval_threshold = Number(payload.approval_threshold || 0);
+
+            try {
+              await createGroup(payload);
+              message.textContent = 'Group created successfully.';
+              form.reset();
+              renderPage();
+            } catch (error) {
+              message.textContent = error.message || 'Failed to create group.';
+            }
+          });
+        } catch (error) {
+          mountContent(`
+            <div class="glass-card p-6">
+              <p class="text-sm text-red-500">${escapeHtml(error.message || 'Failed to load groups.')}</p>
+            </div>
+          `);
+        }
+      };
+
+      // Modal submit handler
+      const modalForm = document.getElementById('manage-group-form');
+      modalForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const msg = document.getElementById('modal-msg');
+        msg.textContent = 'Saving modifications…';
+
+        const data = Object.fromEntries(new FormData(modalForm).entries());
+        const groupId = data.groupId;
+
+        try {
+          // 1. Update subscription parameters
+          await updateGroupSubscription(groupId, {
+            subscription_tier: data.subscription_tier,
+            subscription_status: data.subscription_status,
+            subscription_expires_at: data.subscription_expires_at 
+              ? new Date(data.subscription_expires_at).toISOString() 
+              : null,
+          });
+
+          // 2. Update status parameter
+          await updateGroupStatus(groupId, data.status);
+
+          msg.style.color = '#10b981';
+          msg.textContent = 'Settings updated successfully.';
+          
+          setTimeout(() => {
+            document.getElementById('manage-group-modal').close();
+            renderPage();
+          }, 1000);
+        } catch (error) {
+          msg.style.color = '#ef4444';
+          msg.textContent = error.message || 'Failed to update settings.';
+        }
+      });
+
+      renderPage();
     </script>
   </body>
 </html>

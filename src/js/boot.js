@@ -9,7 +9,7 @@ Alpine.store('i18n',  createI18n());
 /* Convenience: $t('login.title') from markup. */
 Alpine.magic('t', () => (path) => Alpine.store('i18n').t(path));
 
-Alpine.start();
+setTimeout(() => Alpine.start(), 0);
 
 /* PWA — register service worker in production builds. */
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -19,3 +19,10 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .catch((err) => console.warn('SW registration failed:', err));
   });
 }
+
+// Security: prevent back-button access after logout by checking token on page show
+window.addEventListener('pageshow', () => {
+  if (window.location.pathname.includes('/app/') && !localStorage.getItem('naas.jwt')) {
+    window.location.replace('/login.html');
+  }
+});

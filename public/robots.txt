@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /app/
+Disallow: /login.html
+Disallow: /register.html
+Disallow: /invite.html
+Disallow: /api/
+Allow: /
+
+Sitemap: https://njangibridge.online/sitemap.xml

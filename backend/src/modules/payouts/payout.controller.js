@@ -36,6 +36,16 @@ const getCurrentPayout = async (req, res, next) => {
   }
 };
 
+const determineNextRecipient = async (req, res, next) => {
+  try {
+    const data = await payoutService.determineNextRecipient(req.params.groupId);
+    return res.status(201).json({ data });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    next(err);
+  }
+};
+
 const nominate = async (req, res, next) => {
   try {
     const { error, value } = nominateSchema.validate(req.body);
@@ -89,4 +99,4 @@ const execute = async (req, res, next) => {
   }
 };
 
-module.exports = { listPayouts, getCurrentPayout, nominate, approve, execute };
+module.exports = { listPayouts, getCurrentPayout, determineNextRecipient, nominate, approve, execute };

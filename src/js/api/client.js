@@ -1,8 +1,14 @@
-/* Minimal fetch wrapper for /api/*.
-   Reads VITE_API_BASE_URL and attaches the JWT header.
-   Falls back to a same-origin mock during local dev. */
+/* Minimal fetch wrapper for the backend API.
+  Reads VITE_API_BASE_URL and attaches the JWT header.
+  Normalizes legacy /api/* paths to the root-mounted backend routes. */
 
-const BASE = import.meta.env.VITE_API_BASE_URL || '';
+export const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
+const BASE = apiBase;
+
+function normalizePath(path) {
+  const clean = path.startsWith('/api/') ? path.slice(4) : path;
+  return clean.startsWith('/') ? clean : '/' + clean;
+}
 
 function authHeader() {
   const token = localStorage.getItem('naas.jwt');
@@ -10,7 +16,7 @@ function authHeader() {
 }
 
 async function request(path, { method = 'GET', body, headers = {} } = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${BASE}${normalizePath(path)}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -21,7 +27,7 @@ async function request(path, { method = 'GET', body, headers = {} } = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || `HTTP ${res.status}`);
+    throw new Error(err.message || err.error || `HTTP ${res.status}`);
   }
   if (res.status === 204) return null;
   return res.json();

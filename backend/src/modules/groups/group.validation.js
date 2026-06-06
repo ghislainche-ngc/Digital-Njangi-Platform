@@ -5,21 +5,31 @@ const Joi = require('joi');
 const createGroupSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   contribution_amount: Joi.number().positive().required(),
-  frequency: Joi.string().valid('weekly', 'monthly').default('monthly'),
+  frequency: Joi.string().valid('weekly', 'biweekly', 'monthly').default('monthly'),
   rotation_type: Joi.string().valid('fixed', 'random', 'president').required(),
   penalty_per_day: Joi.number().min(0).default(0),
   payout_threshold_pct: Joi.number().min(0).max(100).default(100),
   approval_threshold: Joi.number().min(0).default(0),
+  subscription_tier: Joi.string().valid('starter', 'growth', 'enterprise').default('starter'),
 });
 
 const updateGroupSchema = Joi.object({
   name: Joi.string().min(2).max(100),
   contribution_amount: Joi.number().positive(),
-  frequency: Joi.string().valid('weekly', 'monthly'),
+  frequency: Joi.string().valid('weekly', 'biweekly', 'monthly'),
   rotation_type: Joi.string().valid('fixed', 'random', 'president'),
   penalty_per_day: Joi.number().min(0),
   payout_threshold_pct: Joi.number().min(0).max(100),
   approval_threshold: Joi.number().min(0),
+  subscription_tier: Joi.string().valid('starter', 'growth', 'enterprise'),
 }).min(1);
 
-module.exports = { createGroupSchema, updateGroupSchema };
+const updateGatewaySchema = Joi.object({
+  gateway: Joi.string().valid('mtn_momo', 'orange_money', 'campay').required(),
+});
+
+const updatePayoutGatewaySchema = Joi.object({
+  payout_gateway: Joi.string().valid('mtn_momo', 'orange_money', 'campay').allow(null).required(),
+});
+
+module.exports = { createGroupSchema, updateGroupSchema, updateGatewaySchema, updatePayoutGatewaySchema };
