@@ -33,6 +33,28 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+##### Activity Diagram 3: Mobile Money Contribution Collection Flow (Push & Webhooks)
+Describes request-to-pay initiation, pending contribution state, polling vs webhook reconciliation, signature verification and ledger append.
+
+##### Activity Diagram 4: Payout Nominee Eligibility Checks & Approval Flow
+Describes parallel eligibility audits (contributions, fines, history), manual approval for large amounts, signature verification and disbursement orchestration.
+
+##### Activity Diagram 5: Late Fine Waiving & Solidarity Social Fund Transaction Flow
+Describes role-guarded fine waivers and solidarity fund transactions with audits, balance checks, and write-audit operations.
+
+---
+
+## 3.4 Application of Scrum
+
+### 3.4.1 Team Organisation
+Our team comprised 5 cross-functional roles:
+1. **Ghislain Che Ngwateh (Scrum Master / Group Leader / Backend Dev)**: Managed sprint boards, led system architecture design, backend API routing, database schema definitions, and MTNMomo payment gateway integration.
+2. **Glory (Product Owner / Frontend Dev)**: Prioritized user stories, designed mockups, and built authentication, invitation routing, and group management screens.
+3. **[Member 3 Name] (Developer)**: Integrated webhook handlers, configured Orange Money payment APIs, and set up PDFkit document rendering engines.
+4. **[Member 4 Name] (QA Engineer)**: Wrote automated unit and integration tests using Jest and Supertest, ensuring RLS data isolation was fully tested.
+5. **[Member 5 Name] (DevOps Engineer)**: Managed VPS environment settings, PM2 process daemons, Nginx reverse proxies, and configured the Telegram bot webhook tunnels.
+
+<!-- APPEND_MARKER -->
 ##### Activity Diagram 1: User Sign-Up & Phone OTP Verification Flow
 Describes the flow from user registration to OTP generation, SMS dispatch, OTP verification, JWT generation and final redirect.
 
