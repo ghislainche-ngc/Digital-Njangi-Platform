@@ -33,6 +33,19 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+#### 2. Class Diagram
+Describes core classes: `User`, `Group`, `Membership`, `Contribution`, `Payout`, `SocialFund`, rotation strategies, notification interfaces, and `PayoutEngine` dependencies. Shows composition, aggregation, multiplicity and inheritance among strategies.
+
+#### 3. Object Diagram
+Provides example runtime instances for a sample group (`lesAmisGroup`) and associated user membership objects to illustrate current state relationships.
+
+#### 4. Component Diagram
+Outlines high-level components: PWA client, API server, Payment/Notification/Payout services, and the PostgreSQL datastore along with artifacts such as `client.js` and `schema.sql`.
+
+#### 5. Activity Diagrams
+Defines workflows for: Sign-Up & OTP, Group Creation, Mobile Money Collection, Payout Approval, and Fine Waiving & Social Fund transactions.
+
+<!-- APPEND_MARKER -->
 ## 3.2 System Requirements
 
 ### 3.2.1 Functional Requirements
