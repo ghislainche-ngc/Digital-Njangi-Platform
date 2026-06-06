@@ -33,6 +33,18 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+| **6** | As a member, I want to view the live group contribution ledger showing everyone's status, so that I can monitor payments without relying on manual records. | When the ledger page opens, it displays all contributions for the current cycle with real-time status. | 2 | 13 | 1.0 | 13.0 |
+| **7** | As a member, I want to see the rotation calendar from the start of the cycle, so that I know exactly when I am due to receive the payout pot. | When the calendar page is accessed, the rotation list shows the exact cycle dates and the assigned recipient. | 2 | 8 | 1.0 | 8.0 |
+| **8** | As a treasurer, I want the system to automatically initiate MoMo requests-to-pay on the contribution date, to reduce the need for manual follow-ups. | When the contribution date arrives, pending transaction entries are generated and gateway requests are dispatched. | 3 | 20 | 2.0 | 40.0 |
+| **9** | As a treasurer, I want to manually record cash payments for members who cannot use mobile money, so that records remain accurate. | Given a cash payment, when recorded by the treasurer, the status is marked SUCCESS with a "Cash" label. | 3 | 8 | 1.5 | 12.0 |
+| **10** | As a president, I want the system to check that eligibility criteria (no arrears, no unpaid fines) are met before payouts are sent. | When a payout is triggered, eligibility checks are evaluated; the payout is blocked if checks fail. | 3 | 15 | 1.5 | 22.5 |
+| **11** | As a member, I want to receive notifications (Telegram/SMS) after a payout is executed, so that I can track group progress. | When a payout transitions to COMPLETED, notification dispatches are sent to all linked communication channels. | 3 | 13 | 1.5 | 19.5 |
+| **12** | As a treasurer, I want to record late fees and fines against members who miss deadlines, to enforce compliance with rules. | Given a late transaction, a fine record is generated with a specified reason, amount, and deadline. | 4 | 8 | 1.0 | 8.0 |
+| **13** | As a president, I want fine waivers to be logged with a reason, to maintain transparency in group decisions. | When a president waives a fine, the system updates the fine status and writes the decision to the audit log. | 4 | 5 | 1.0 | 5.0 |
+| **14** | As a treasurer, I want to manage a separate solidarity social fund to track deposits and withdrawals for weddings, births, and funerals. | Deposits and withdrawals to the solidarity fund are logged separately from the main tontine savings pot. | 4 | 10 | 1.5 | 15.0 |
+| **15** | As a platform admin, I want to monitor overall group statistics, modify billing configurations, and suspend groups if needed. | When the admin logs in, a dashboard displays MRR, active users, group status summaries, and action triggers. | 4 | 13 | 1.0 | 13.0 |
+
+<!-- APPEND_MARKER -->
 ## 3.5 Scrum Artifacts
 
 ### 3.5.1 Product Backlog
