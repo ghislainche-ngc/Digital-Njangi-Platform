@@ -33,6 +33,43 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+## 2.2 Comparison between Methodologies
+| Criterion | Waterfall | Spiral | Scrum | Kanban |
+|---|---|---|---|---|
+| **Approach** | Linear, sequential | Iterative, risk-driven | Iterative sprints | Continuous flow |
+| **Flexibility** | Very low | Medium-high | High | Very high |
+| **Requirement Changes** | Not allowed mid-project | Checked at loop end | Per sprint | Any time |
+| **Team Roles** | Functional departments | Specialized roles | Product Owner, SM, Devs | No prescribed roles |
+| **Delivery** | Single final release | Incremental prototypes | Every sprint | Continuous flow |
+| **Documentation** | Extensive | Moderate | Minimal, clean | Minimal |
+| **Client Involvement** | Low (start/end) | Moderate | High | High |
+| **Best For** | Stable, fixed specs | Highly risky projects | Dynamic, evolving specs | Ongoing maintenance |
+
+## 2.3 Reason for the Choice of Scrum Methodology
+Scrum was selected as the development framework for NAAS for the following reasons:
+1. **Evolving Requirements**: Integration with mobile money gateways and payment webhooks required rapid prototyping and feedback. Scrum allowed us to adjust requirements per sprint.
+2. **Team Size**: Our five-member team fit squarely within the recommended Scrum team size (3–9 members), enabling efficient, direct daily communication.
+3. **Time-Boxed cadence**: The academic timeline mapped naturally to eight one-week sprints, each delivering a concrete, working increment of the application.
+4. **Scrum Ceremonies**: Daily asynchronous standups via WhatsApp and weekly sprint planning/review sessions maintained high focus and accountability.
+
+## 2.4 General Review of Related Concepts
+* **Rotating Savings and Credit Associations (ROSCAs)**: Informal financial institutions where a group of individuals agree to contribute fixed amounts to a common pool. Njangis are Cameroonian ROSCAs.
+* **Mobile Money (MoMo)**: Digital payment services operated by telecom networks (MTN MoMo, Orange Money) dominant in Sub-Saharan Africa, enabling wallet-to-wallet transfers.
+* **Object-Oriented Programming (OOP)**: A paradigm based on "objects" containing data (attributes) and code (methods). It is structured around four pillars: **Encapsulation**, **Inheritance**, **Polymorphism**, and **Abstraction**.
+* **Progressive Web Applications (PWAs)**: Web apps that act like native mobile apps. They are installable from the browser, cache assets via Service Workers, and function in low or offline network conditions.
+* **Multi-Tenant SaaS**: An architecture where a single app instance serves multiple groups (tenants), with strict data isolation enforced at the database level.
+
+## 2.5 Review of Related Literature
+Prior studies on ROSCA digitisation in Africa (e.g., Fomba et al., 2021) show that ROSCA adoption depends heavily on **trust**, **preservation of social elements**, and **accessibility on low-end devices**. Platforms that attempt to replace social interaction with pure automation struggle to gain traction, whereas platforms that digitize manual ledgers while leaving decision-making (e.g. fine waivers, manual approvals) in the hands of the group officers succeed. Furthermore, research by Kabbedijk et al. (2018) indicates that multi-tenant architectures utilizing row-level database security are highly effective at isolating group financial data.
+
+---
+
+# CHAPTER THREE: METHODOLOGY AND MATERIALS
+
+## 3.1 Research Methodology
+We used a mixed-methods research approach combining primary field research with literature reviews. The primary research phase involved administering a structured questionnaire to **14 active Njangi groups** across four cities in Cameroon (Yaoundé, Douala, Buea, and Bafoussam) to map their meeting structures, contribution amounts, rotation methods, and usage of mobile money.
+
+<!-- APPEND_MARKER -->
 ## 1.2 Aim and Objectives
 **Aim:** To design and implement a fully functional, object-oriented multi-tenant web platform that digitises Njangi group management in Cameroon, improving transparency, reducing fraud, and increasing financial inclusion.
 
