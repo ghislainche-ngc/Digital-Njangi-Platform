@@ -33,6 +33,34 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+### 3.5.2 Sprint Backlog
+The table below illustrates the allocation of user stories across our development releases.
+
+| Release | Sprint | ID of User Stories | Period |
+|---|---|---|---|
+| **Release 1: Core Scaffolding** | Sprint 1 | Project Scaffolding, DB Schemas, SQL tables | Week 1 |
+| **Release 1: Core Scaffolding** | Sprint 2 | 2 (Auth & SMS OTP verification) | Week 2 |
+| **Release 1: Core Scaffolding** | Sprint 3 | 1, 3 (Group Creation & Invitation links) | Week 3 |
+| **Release 2: Settings & Roles** | Sprint 4 | 4, 5 (Role assignments & config settings) | Week 4 |
+| **Release 2: Settings & Roles** | Sprint 5 | 6, 7 (Live Ledger & Rotation scheduler) | Week 5 |
+| **Release 3: Gateway Integrations** | Sprint 6 | 8, 9 (MoMo/Orange integration & Campay webhooks) | Week 6 |
+| **Release 3: Gateway Integrations** | Sprint 7 | 10, 11 (Payout Engine & Telegram notification bot) | Week 7 |
+| **Release 4: Admin & Social Funds** | Sprint 8 | 12, 13, 14, 15 (Fines, Social Fund, Admin controls & VPS deploy) | Week 8 |
+
+---
+
+## 3.6 Test Case Document
+Our automated test suite validated system behaviors across 20 distinct use cases.
+
+* **TC-01**: User registration with valid data (POST `/auth/register`) -> Returns `201 Created` with JWT.
+* **TC-02**: Duplicate email registration -> Returns `409 Conflict`.
+* **TC-03**: Login with correct credentials (POST `/auth/login`) -> Returns `200 OK` with JWT.
+* **TC-04**: Login with wrong password -> Returns `401 Unauthorized`.
+* **TC-05**: Create Njangi group with valid payload (POST `/groups`) -> Returns `201 Created` with tenant ID.
+* **TC-06**: Non-president attempts to delete group -> Returns `403 Forbidden` (RLS isolations block).
+* **TC-07**: Record valid contribution (POST `/groups/:id/contributions`) -> Returns `201 Created` (appended to ledger).
+
+<!-- APPEND_MARKER -->
 | **6** | As a member, I want to view the live group contribution ledger showing everyone's status, so that I can monitor payments without relying on manual records. | When the ledger page opens, it displays all contributions for the current cycle with real-time status. | 2 | 13 | 1.0 | 13.0 |
 | **7** | As a member, I want to see the rotation calendar from the start of the cycle, so that I know exactly when I am due to receive the payout pot. | When the calendar page is accessed, the rotation list shows the exact cycle dates and the assigned recipient. | 2 | 8 | 1.0 | 8.0 |
 | **8** | As a treasurer, I want the system to automatically initiate MoMo requests-to-pay on the contribution date, to reduce the need for manual follow-ups. | When the contribution date arrives, pending transaction entries are generated and gateway requests are dispatched. | 3 | 20 | 2.0 | 40.0 |
