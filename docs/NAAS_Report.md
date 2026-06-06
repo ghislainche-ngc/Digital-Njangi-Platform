@@ -33,6 +33,21 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+### 3.4.2 Workflow Management
+Sprints were planned weekly using a **GitHub Projects Kanban Board**. Task sizes were estimated using Planning Poker with Fibonacci points (1, 2, 3, 5, 8, 13). Daily standup ceremonies were run asynchronously in a dedicated WhatsApp group to maximize flexibility under academic schedules. At the end of each week, a retrospective was conducted.
+
+### 3.4.3 Conflict Resolution
+The team resolved disagreements through a structured three-step escalation process:
+1. **Direct Bilateral Discussion**: Developers discussed technical tradeoffs together.
+2. **Scrum Master Facilitation**: If unresolved in 24 hours, the Scrum Master led a session using the "disagree and commit" principle.
+3. **Time-Boxed Spike**: For technical blocks, a 2-hour research spike was conducted to compare options objectively.
+
+### 3.4.4 Challenges Encountered and Solutions
+* **MTN MoMo API Sandbox Instability**: The sandbox API was frequently offline. **Solution**: We built a complete local mock provider in `PaymentProvider.js` to isolate testing from network dropouts.
+* **Complex RLS Policies**: Enforcing tenant isolation resulted in database performance loops. **Solution**: We simplified RLS rules and built a dedicated automated test suite.
+* **Vite/Alpine Race Conditions**: In production bundles, Alpine initialized before pages bound dynamic window methods. **Solution**: Deferred `Alpine.start()` using `setTimeout(..., 0)` inside `boot.js`.
+
+<!-- APPEND_MARKER -->
 ##### Activity Diagram 3: Mobile Money Contribution Collection Flow (Push & Webhooks)
 Describes request-to-pay initiation, pending contribution state, polling vs webhook reconciliation, signature verification and ledger append.
 
