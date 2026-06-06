@@ -33,6 +33,29 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+| **Singleton Pattern** | `DBConnect.js` guarantees exactly one database connection instance exists. | **Encapsulation** |
+| **Dependency Injection** | `PayoutEngine` receives database repositories and notification services via constructor injection, simplifying mock testing. | **Abstraction** |
+| **Facade Pattern** | `PayoutEngine.execute()` exposes a single method orchestrating eligibility audits, disbursements, ledgers, and logs. | **Abstraction** |
+| **Template Method** | `NotificationService.sendBulk()` implements the algorithm skeleton; subclasses override `send()` for specific channel behaviors. | **Inheritance + Polymorphism** |
+| **Chain of Responsibility** | Express middleware chain: `auth` processes token -> `tenant` checks plan limits -> `role` guards permissions. | **Encapsulation** |
+
+| **Adapter Pattern** | `DBConnect` wraps the external `@supabase/supabase-js` client SDK, adapting it to a standard CRUD API. | **Encapsulation + Abstraction** |
+| **Null Object Pattern** | `PresidentDecisionStrategy` returns `null` or a placeholder nominee as a valid strategy signal without causing pointer crashes. | **Polymorphism** |
+| **Observer Pattern** | `PaymentWebhookHandler` emits events (e.g., `PAYMENT_SUCCESS`) which are asynchronously processed by ledger and notification services. | **Encapsulation** |
+| **Repository Pattern** | Concrete repository modules abstract Supabase database queries, returning typed domain objects. | **Abstraction + Encapsulation** |
+
+---
+
+# CHAPTER FIVE: RECOMMENDATIONS AND CONCLUSION
+
+## 5.1 Summary of Achievements
+NAAS successfully digitizes rotating savings groups in Cameroon. By wrapping informal practices in object-oriented logic and deploying it as a secure multi-tenant SaaS, the system guarantees:
+* **Accountability**: Immutable database ledger logs prevent manipulation.
+* **Operational Ease**: MTN Mobile Money and Orange Money collections occur automatically.
+* **Low Overheads**: Native PWAs caching and automatic Telegram bot notifications keep users connected without high data costs.
+* **Unified Admin Panel**: Platform managers can monitor active billing stats, suspend/unsuspend groups, and inspect global users.
+
+<!-- APPEND_MARKER -->
 ## 4.2 API Request/Response Samples
 The Express server generates Swagger schemas visible at `https://njangibridge.online/api-docs`. Below are key REST request samples:
 * **POST `/auth/login`**:
