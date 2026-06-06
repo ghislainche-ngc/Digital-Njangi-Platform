@@ -33,6 +33,95 @@ Despite their widespread adoption, the vast majority of Njangis operate using en
 **NAAS (Njangi As A Service)** is a multi-tenant web platform designed to digitise the entire lifecycle of Njangi groups while preserving their social trust. It provides a secure, digital workspace where groups can automate MTN Mobile Money and Orange Money collections, schedule rotations with configurable rules, enforce fines, build emergency solidarity funds, and view a transparent, immutable ledger in real time.
 
 <!-- APPEND_MARKER -->
+### 3.7.2 Random Draw Algorithm
+```
+ALGORITHM RandomDraw
+INPUT: members[] — list of active members who have not yet received the pot
+OUTPUT: recipient — randomly selected recipient
+BEGIN
+	n <- LENGTH(members)
+	IF n = 0 THEN
+		RAISE Error("All members have already received a payout this round. Restarting cycle...")
+	END IF
+	randomIndex <- CRYPTOGRAPHIC_RANDOM_INT(0, n - 1)
+	recipient <- members[randomIndex]
+	RETURN recipient
+END
+```
+
+### 3.7.3 Penalty Calculation Algorithm
+```
+ALGORITHM CalculatePenalty
+INPUT: contribution — contribution record with due_date and paid_date
+INPUT: penalty_config — {rate_per_day, max_penalty, grace_period_days}
+OUTPUT: penalty_amount — total fine to apply
+BEGIN
+	IF paid_date <= due_date + grace_period_days THEN
+		RETURN 0
+	END IF
+	days_late <- paid_date - (due_date + grace_period_days)
+	raw_penalty <- days_late * penalty_config.rate_per_day
+	penalty_amount <- MIN(raw_penalty, penalty_config.max_penalty)
+	RETURN penalty_amount
+END
+```
+
+### 3.7.4 Payout Eligibility Check Algorithm
+```
+ALGORITHM CheckPayoutEligibility
+INPUT: member_id — ID of the nominee
+INPUT: group_id — ID of the group
+OUTPUT: {eligible: boolean, reason: string}
+BEGIN
+	unpaid_contributions <- QUERY contributions WHERE user_id = member_id AND status = 'unpaid'
+	IF LENGTH(unpaid_contributions) > 0 THEN
+		RETURN { eligible: false, reason: "Nominee has pending contributions" }
+	END IF
+  
+	unpaid_fines <- QUERY fines WHERE user_id = member_id AND status = 'unpaid'
+	IF LENGTH(unpaid_fines) > 0 THEN
+		RETURN { eligible: false, reason: "Nominee has outstanding late-payment fines" }
+	END IF
+  
+	already_received <- QUERY payouts WHERE recipient_id = member_id AND group_id = group_id
+	IF LENGTH(already_received) > 0 THEN
+		RETURN { eligible: false, reason: "Nominee has already received a payout in this rotation cycle" }
+	END IF
+  
+	RETURN { eligible: true, reason: "All eligibility audits passed successfully" }
+END
+```
+
+---
+
+## 3.8 Materials and Technologies Used
+* **HTML5 + Semantic Markup**: For building structure and accessibility layouts.
+* **Vanilla CSS**: Used for maximum control over layouts, using HSL tailoring for custom coloring.
+* **Alpine.js v3**: For client-side interactivity and modals dynamic state binding.
+* **Vite 5**: Asset bundler with service workers compiling.
+* **Node.js v20 LTS & Express.js v4**: The API logic server engine.
+* **JWT (jsonwebtoken)**: Stateless token auth.
+* **Bcrypt**: Password hashing.
+* **PostgreSQL 15 (Supabase)**: Relational tables utilizing Row Level Security logic.
+* **node-cron**: Automated cron schedule routines.
+* **PDFKit**: Layout exports.
+* **Jest + Supertest**: Automated mock tests runner.
+* **Telegram Bot API**: Linking interface logic.
+* **Swagger/OpenAPI 3.0**: Automated api documentation endpoints.
+
+---
+
+# CHAPTER FOUR: RESULTS AND DISCUSSIONS
+
+## 4.1 Application Screenshots
+The following screens have been dynamically wired and are live on the production site at `https://njangibridge.online`:
+1. **Landing Page**: Marketing banner, feature cards, and billing tiers.
+2. **Registration Wizard**: Multi-criteria user profile creation.
+3. **Admin Dashboard**: System MRR tracking, override metrics, and global directory.
+4. **Member Dashboard**: Live countdown to next contribution, rotation turn indicator, and ledger audit.
+5. **Treasurer Social Fund**: Balance tracking and dynamic deposits/withdrawals forms.
+
+<!-- APPEND_MARKER -->
 * **TC-08**: Duplicate contribution (Idempotency check) -> Returns `200 OK` (original contribution details).
 * **TC-09**: MTN MoMo contribution initiated -> Returns `202 Accepted` with state `pending`.
 * **TC-10**: MoMo Webhook Success -> Returns status `CONFIRMED` and registers ledger entry.
